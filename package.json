@@ -1,0 +1,53 @@
+{
+  "name": "solventa-web",
+  "version": "0.1.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "lint": "ng lint",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage",
+    "e2e": "playwright test",
+    "extract-i18n": "ng extract-i18n --output-path src/locale",
+    "format": "prettier --write \"src/**/*.{ts,html,scss}\" \"e2e/**/*.ts\" \"*.{js,ts,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,scss}\" \"e2e/**/*.ts\" \"*.{js,ts,json}\""
+  },
+  "private": true,
+  "packageManager": "npm@10.9.4",
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.0",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.2",
+    "@angular/cli": "^22.2.2",
+    "@angular/compiler-cli": "^22.2.0",
+    "@angular/localize": "^22.2.1",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
+    "@testing-library/angular": "^19.5.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/jest": "^30.0.0",
+    "angular-eslint": "22.5.0",
+    "eslint": "^10.9.1",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "jest-preset-angular": "^17.0.2",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "8.69.0"
+  },
+  "engines": {
+    "node": "^22.22.3 || >=24.15.0"
+  }
+}

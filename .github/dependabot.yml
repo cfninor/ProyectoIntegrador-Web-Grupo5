@@ -1,0 +1,23 @@
+# Actualizaciones de dependencias. Los paquetes de Angular se actualizan juntos
+# (idealmente con `ng update`), por eso van en un solo grupo.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      angular:
+        patterns: ["@angular/*", "@angular-devkit/*", "angular-eslint", "@angular-eslint/*"]
+      pruebas:
+        patterns: ["jest", "jest-*", "@types/jest", "@testing-library/*", "@playwright/test"]
+      otras-menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

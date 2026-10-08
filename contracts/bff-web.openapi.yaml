@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: Solventa · BFF Web
+  version: 1.0.0
+  description: >
+    Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
+    Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
+    Dentro de /v1 solo se admiten cambios compatibles; un cambio incompatible va en /v2 (BA-04).
+servers:
+  - url: http://localhost:8010
+    description: Local (docker compose)
+paths: {}
