@@ -13,6 +13,15 @@ updates:
         patterns: ["jest", "jest-*", "@types/jest", "@testing-library/*", "@playwright/test"]
       otras-menores:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@angular/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular-devkit/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "angular-eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
