@@ -9,16 +9,18 @@
   align-items: baseline;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--outline-variant);
+  background: var(--surface);
 }
 
 .marca {
+  font-family: var(--fuente-titulos);
   font-size: 1.25rem;
   font-weight: 600;
 }
 
 .subtitulo {
-  color: #555;
+  color: var(--on-surface-variant);
 }
 
 .contenido {

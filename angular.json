@@ -30,7 +30,13 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"],
+            "styles": [
+              "@fontsource/sora/600.css",
+              "@fontsource/sora/700.css",
+              "@fontsource/ibm-plex-sans/400.css",
+              "@fontsource/ibm-plex-sans/600.css",
+              "src/styles.scss"
+            ],
             "polyfills": ["@angular/localize/init"]
           },
           "configurations": {
