@@ -97,7 +97,11 @@ test('el cliente autoriza la consulta de sus datos', async ({ page }) => {
 
   const titulo = page.getByRole('heading', { name: 'Autorizaste la consulta de tus datos' });
   await expect(titulo).toBeFocused();
-  await expect(page.getByRole('status').getByText('Autorizada', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Autorizaste la consulta de tus datos' })
+      .getByText('Autorizada', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText('Tu asesor ya puede ver tu autorización y continuar con tu cotización'),
   ).toBeVisible();

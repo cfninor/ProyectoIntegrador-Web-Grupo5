@@ -261,7 +261,9 @@ describe('PaginaAutorizacionDatos · aceptación', () => {
     const titulo = await screen.findByRole('heading', {
       name: 'Autorizaste la consulta de tus datos',
     });
-    expect(screen.getByRole('status')).toContainElement(titulo);
+    expect(
+      screen.getByRole('region', { name: 'Autorizaste la consulta de tus datos' }),
+    ).toContainElement(titulo);
     expect(screen.getByText('Autorizada')).toHaveClass('chip', 'chip-verde');
     expect(
       screen.getByText('Tu asesor ya puede ver tu autorización y continuar con tu cotización'),

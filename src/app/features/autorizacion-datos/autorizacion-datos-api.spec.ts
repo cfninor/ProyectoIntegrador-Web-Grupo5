@@ -51,6 +51,13 @@ describe('AutorizacionDatosApi', () => {
   it('codifica el id del enlace para no alterar la ruta', () => {
     api.obtenerSolicitud('../otra/ruta').subscribe();
 
-    http.expectOne('http://bff.prueba/v1/solicitudes-autorizacion/..%2Fotra%2Fruta').flush({});
+    const peticion = http.expectOne(
+      'http://bff.prueba/v1/solicitudes-autorizacion/..%2Fotra%2Fruta',
+    );
+    expect(peticion.request.method).toBe('GET');
+    expect(peticion.request.url).toBe(
+      'http://bff.prueba/v1/solicitudes-autorizacion/..%2Fotra%2Fruta',
+    );
+    peticion.flush({});
   });
 });

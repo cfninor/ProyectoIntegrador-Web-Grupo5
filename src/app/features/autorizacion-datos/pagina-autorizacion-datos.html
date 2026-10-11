@@ -149,14 +149,14 @@
 
     @case ('resultado') {
       @if (resultado(); as resultado) {
-        <section class="tarjeta resultado" role="status">
+        <section class="tarjeta resultado" aria-labelledby="titulo-resultado">
           <span
             class="chip"
             [class.chip-verde]="resultado.estado === 'AUTORIZADA'"
             [class.chip-gris]="resultado.estado !== 'AUTORIZADA'"
             >{{ textoEstado(resultado.estado) }}</span
           >
-          <h2 #tituloResultado tabindex="-1">
+          <h2 #tituloResultado id="titulo-resultado" tabindex="-1">
             @if (resultado.yaRespondida) {
               <ng-container i18n="@@autorizacion.resultado.yaRespondida"
                 >Esta solicitud ya fue respondida</ng-container
