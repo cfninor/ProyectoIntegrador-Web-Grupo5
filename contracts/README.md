@@ -10,4 +10,5 @@ Con esta copia el portal puede:
 - generar el cliente TypeScript de la API, y
 - trabajar contra un mock del contrato mientras el backend se construye.
 
-Versión de la copia: 1.0.0 (sin rutas aún; las agregan las historias del Sprint 1).
+Versión de la copia: 1.0.0, tomada del commit `0c416d8` del repositorio principal (rutas de
+autorización de datos, SOLVENTAG5-65).
