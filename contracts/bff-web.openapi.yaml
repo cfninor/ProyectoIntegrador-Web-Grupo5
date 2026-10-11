@@ -9,4 +9,673 @@ info:
 servers:
   - url: http://localhost:8010
     description: Local (docker compose)
-paths: {}
+tags:
+  - name: autorizacion-datos
+    description: >
+      Operaciones del cliente sobre la autorización de consulta de datos de Open Data y
+      Open Finance para el perfilamiento (SOLVENTAG5-65). Mientras no exista login, el
+      cliente entra con el id aleatorio de la solicitud que recibe en el enlace.
+  - name: asesor
+    description: >
+      Operaciones del asesor. Mientras no exista login, los datos del asesor viajan en la
+      petición (deuda técnica hasta la HU transversal de login).
+paths:
+  /v1/clientes/{clienteId}/solicitudes-autorizacion:
+    post:
+      tags: [asesor]
+      operationId: pedirAutorizacion
+      summary: Pedir al cliente la autorización de consulta de datos
+      description: >
+        Si el cliente ya tiene una solicitud PENDIENTE, se reenvía esa misma (200, reenviada
+        true); si no, se crea una nueva (201). El correo se simula: el núcleo escribe el
+        enlace en su log.
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedirAutorizacion'
+            example:
+              asesor:
+                id: asesor-017
+                nombre: Laura Gómez
+      responses:
+        '201':
+          description: Solicitud nueva creada y enviada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudEnviada'
+              example:
+                solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                estado: PENDIENTE
+                fechaSolicitud: '2026-10-09T14:30:00Z'
+                envios: 1
+                reenviada: false
+                enlace: http://localhost:4200/autorizar/3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+        '200':
+          description: Ya había una solicitud pendiente y se reenvió.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudEnviada'
+              example:
+                solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                estado: PENDIENTE
+                fechaSolicitud: '2026-10-09T14:30:00Z'
+                envios: 2
+                reenviada: true
+                enlace: http://localhost:4200/autorizar/3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+        '409':
+          $ref: '#/components/responses/ClienteYaAutorizado'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/clientes/{clienteId}/autorizacion-datos:
+    get:
+      tags: [asesor]
+      operationId: consultarEstadoAutorizacionCliente
+      summary: Consultar el estado de la autorización de datos de un cliente
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: Estado de la autorización del cliente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoAutorizacionCliente'
+              example:
+                clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+                estado: AUTORIZADA
+                fechaEstado: '2026-10-09T15:02:11Z'
+                solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                consentimientoId: 7c6e5d4b-3a2f-4e1d-9c8b-0a1f2e3d4c5b
+                fechaVencimiento: '2027-10-09T15:02:11Z'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-autorizacion/{solicitudId}:
+    get:
+      tags: [autorizacion-datos]
+      operationId: consultarSolicitudAutorizacion
+      summary: Ver la solicitud de autorización (pantalla del cliente)
+      description: >
+        Devuelve quién pide la autorización, qué datos se consultan y de qué fuentes, y las
+        condiciones, en la versión del catálogo con que se creó la solicitud. Solo trae
+        códigos: la web pone los textos. No incluye el id del cliente ni el del asesor.
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Solicitud con su catálogo y condiciones.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudParaCliente'
+              example:
+                solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                estado: PENDIENTE
+                asesor:
+                  nombre: Laura Gómez
+                fechaSolicitud: '2026-10-09T14:30:00Z'
+                catalogo:
+                  version: v1
+                  fuentes:
+                    - fuente: OPEN_FINANCE
+                      datos:
+                        - codigo: COMPORTAMIENTO_PAGO
+                          entidades: [ENTIDADES_FINANZAS_ABIERTAS]
+                        - codigo: ESTABILIDAD_INGRESOS
+                          entidades: [ENTIDADES_FINANZAS_ABIERTAS]
+                    - fuente: OPEN_DATA
+                      datos:
+                        - codigo: SOCIODEMOGRAFICA_TERRITORIAL
+                          entidades: [DANE]
+                        - codigo: SALUD_ACTUARIAL_AGREGADA
+                          entidades: [MINSALUD]
+                        - codigo: INMUEBLE_UBICACION
+                          entidades: [IGAC]
+                condiciones:
+                  duracionMeses: 12
+                  finalidad: PERFILAMIENTO_VIDA_HIPOTECARIO
+                  destinatario: SOLVENTA
+                  baseLegal: [LEY_1581_2012, DECRETO_1297_2022]
+                  versionPolitica: v1
+        '404':
+          $ref: '#/components/responses/SolicitudNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-autorizacion/{solicitudId}/decision:
+    post:
+      tags: [autorizacion-datos]
+      operationId: decidirSolicitudAutorizacion
+      summary: Autorizar o no autorizar la consulta de datos
+      description: >
+        Solo se decide una solicitud PENDIENTE. AUTORIZAR exige aceptaPolitica true y la
+        versión vigente de la política, y crea un consentimiento VIGENTE por 12 meses.
+        NO_AUTORIZAR no crea consentimiento ni exige la casilla.
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionSolicitud'
+            examples:
+              autorizar:
+                summary: El cliente autoriza
+                value:
+                  decision: AUTORIZAR
+                  aceptaPolitica: true
+                  versionPolitica: v1
+              noAutorizar:
+                summary: El cliente no autoriza
+                value:
+                  decision: NO_AUTORIZAR
+                  aceptaPolitica: false
+                  versionPolitica: v1
+      responses:
+        '200':
+          description: Decisión registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoDecision'
+              examples:
+                autorizada:
+                  summary: Solicitud autorizada con su consentimiento
+                  value:
+                    solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                    estado: AUTORIZADA
+                    consentimiento:
+                      consentimientoId: 7c6e5d4b-3a2f-4e1d-9c8b-0a1f2e3d4c5b
+                      estado: VIGENTE
+                      alcance:
+                        - COMPORTAMIENTO_PAGO
+                        - ESTABILIDAD_INGRESOS
+                        - SOCIODEMOGRAFICA_TERRITORIAL
+                        - SALUD_ACTUARIAL_AGREGADA
+                        - INMUEBLE_UBICACION
+                      finalidad: PERFILAMIENTO_VIDA_HIPOTECARIO
+                      destinatario: SOLVENTA
+                      versionCatalogo: v1
+                      versionPolitica: v1
+                      fechaOtorga: '2026-10-09T15:02:11Z'
+                      fechaVencimiento: '2027-10-09T15:02:11Z'
+                noAutorizada:
+                  summary: Solicitud no autorizada, sin consentimiento
+                  value:
+                    solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+                    estado: NO_AUTORIZADA
+        '404':
+          $ref: '#/components/responses/SolicitudNoEncontrada'
+        '409':
+          $ref: '#/components/responses/SolicitudYaRespondida'
+        '422':
+          $ref: '#/components/responses/PoliticaNoAceptadaOValidacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/consentimientos/{consentimientoId}/revocacion:
+    post:
+      tags: [autorizacion-datos]
+      operationId: revocarConsentimiento
+      summary: Revocar un consentimiento vigente
+      description: >
+        Solo se revoca un consentimiento VIGENTE y no vencido. Después de confirmar la
+        revocación se avisa a ms-perfilamiento para que deje de usar los datos en caché.
+      parameters:
+        - $ref: '#/components/parameters/ConsentimientoId'
+      responses:
+        '200':
+          description: Consentimiento revocado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consentimiento'
+              example:
+                consentimientoId: 7c6e5d4b-3a2f-4e1d-9c8b-0a1f2e3d4c5b
+                estado: REVOCADO
+                alcance:
+                  - COMPORTAMIENTO_PAGO
+                  - ESTABILIDAD_INGRESOS
+                  - SOCIODEMOGRAFICA_TERRITORIAL
+                  - SALUD_ACTUARIAL_AGREGADA
+                  - INMUEBLE_UBICACION
+                finalidad: PERFILAMIENTO_VIDA_HIPOTECARIO
+                destinatario: SOLVENTA
+                versionCatalogo: v1
+                versionPolitica: v1
+                fechaOtorga: '2026-10-09T15:02:11Z'
+                fechaVencimiento: '2027-10-09T15:02:11Z'
+                fechaRevoca: '2026-11-20T10:45:00Z'
+        '404':
+          $ref: '#/components/responses/ConsentimientoNoEncontrado'
+        '409':
+          $ref: '#/components/responses/ConsentimientoNoVigente'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+components:
+  parameters:
+    ClienteId:
+      name: clienteId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SolicitudId:
+      name: solicitudId
+      in: path
+      required: true
+      description: Id aleatorio (UUID v4) de la solicitud; es el que va en el enlace del cliente.
+      schema:
+        type: string
+        format: uuid
+    ConsentimientoId:
+      name: consentimientoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ClienteYaAutorizado:
+      description: El cliente ya tiene un consentimiento vigente y no vencido.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CLIENTE_YA_AUTORIZADO
+          example:
+            codigo: CLIENTE_YA_AUTORIZADO
+            detalle: El cliente ya tiene una autorización vigente.
+    SolicitudNoEncontrada:
+      description: La solicitud no existe.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: SOLICITUD_NO_ENCONTRADA
+          example:
+            codigo: SOLICITUD_NO_ENCONTRADA
+            detalle: No encontramos la solicitud de autorización.
+    SolicitudYaRespondida:
+      description: La solicitud ya no está PENDIENTE.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: SOLICITUD_YA_RESPONDIDA
+          example:
+            codigo: SOLICITUD_YA_RESPONDIDA
+            detalle: La solicitud ya fue respondida.
+    PoliticaNoAceptadaOValidacion:
+      description: >
+        AUTORIZAR sin aceptar la política vigente (Error con codigo POLITICA_NO_ACEPTADA), o
+        un cuerpo mal formado (ErrorValidacion).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - properties:
+                      codigo:
+                        const: POLITICA_NO_ACEPTADA
+              - $ref: '#/components/schemas/ErrorValidacion'
+          examples:
+            politicaNoAceptada:
+              summary: No aceptó la política vigente
+              value:
+                codigo: POLITICA_NO_ACEPTADA
+                detalle: Para autorizar debes aceptar la política de tratamiento de datos vigente.
+            validacion:
+              summary: Cuerpo mal formado
+              value:
+                detail:
+                  - loc: [body, decision]
+                    msg: "Input should be 'AUTORIZAR' or 'NO_AUTORIZAR'"
+                    type: enum
+    ConsentimientoNoEncontrado:
+      description: El consentimiento no existe.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CONSENTIMIENTO_NO_ENCONTRADO
+          example:
+            codigo: CONSENTIMIENTO_NO_ENCONTRADO
+            detalle: No encontramos el consentimiento.
+    ConsentimientoNoVigente:
+      description: El consentimiento ya está revocado o vencido.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CONSENTIMIENTO_NO_VIGENTE
+          example:
+            codigo: CONSENTIMIENTO_NO_VIGENTE
+            detalle: El consentimiento no está vigente.
+    Validacion:
+      description: La petición no cumple el contrato (parámetros o cuerpo).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorValidacion'
+          example:
+            detail:
+              - loc: [path, clienteId]
+                msg: 'Input should be a valid UUID'
+                type: uuid_parsing
+    NucleoNoDisponible:
+      description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: NUCLEO_NO_DISPONIBLE
+          example:
+            codigo: NUCLEO_NO_DISPONIBLE
+            detalle: El servicio no está disponible. Intenta de nuevo en unos minutos.
+  schemas:
+    EstadoSolicitud:
+      type: string
+      enum: [PENDIENTE, AUTORIZADA, NO_AUTORIZADA]
+    EstadoConsentimiento:
+      type: string
+      description: VENCIDO no se guarda; se calcula a partir de fechaVencimiento.
+      enum: [VIGENTE, REVOCADO, VENCIDO]
+    EstadoAutorizacion:
+      type: string
+      enum: [SIN_SOLICITAR, ESPERANDO_CLIENTE, AUTORIZADA, REVOCADA, VENCIDA]
+    TipoDecision:
+      type: string
+      enum: [AUTORIZAR, NO_AUTORIZAR]
+    FuenteDatos:
+      type: string
+      enum: [OPEN_FINANCE, OPEN_DATA]
+    CodigoDato:
+      type: string
+      enum:
+        - COMPORTAMIENTO_PAGO
+        - ESTABILIDAD_INGRESOS
+        - SOCIODEMOGRAFICA_TERRITORIAL
+        - SALUD_ACTUARIAL_AGREGADA
+        - INMUEBLE_UBICACION
+    CodigoEntidad:
+      type: string
+      enum: [ENTIDADES_FINANZAS_ABIERTAS, DANE, MINSALUD, IGAC]
+    Finalidad:
+      type: string
+      enum: [PERFILAMIENTO_VIDA_HIPOTECARIO]
+    Destinatario:
+      type: string
+      enum: [SOLVENTA]
+    BaseLegal:
+      type: string
+      enum: [LEY_1581_2012, DECRETO_1297_2022]
+    PedirAutorizacion:
+      type: object
+      required: [asesor]
+      properties:
+        asesor:
+          type: object
+          required: [id, nombre]
+          properties:
+            id:
+              type: string
+              minLength: 1
+              description: Id del asesor. Llega en la petición mientras no haya login.
+            nombre:
+              type: string
+              minLength: 1
+              description: Nombre que se le muestra al cliente.
+    SolicitudEnviada:
+      type: object
+      required: [solicitudId, estado, fechaSolicitud, envios, reenviada, enlace]
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        fechaSolicitud:
+          type: string
+          format: date-time
+        envios:
+          type: integer
+          minimum: 1
+          description: Veces que se ha enviado la solicitud; empieza en 1.
+        reenviada:
+          type: boolean
+          description: true si se reenvió una solicitud pendiente que ya existía.
+        enlace:
+          type: string
+          format: uri
+          description: Enlace del portal web que abre el cliente.
+    SolicitudParaCliente:
+      type: object
+      description: No incluye clienteId ni el id del asesor (minimización).
+      required: [solicitudId, estado, asesor, fechaSolicitud, catalogo, condiciones]
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        asesor:
+          type: object
+          required: [nombre]
+          properties:
+            nombre:
+              type: string
+        fechaSolicitud:
+          type: string
+          format: date-time
+        catalogo:
+          $ref: '#/components/schemas/Catalogo'
+        condiciones:
+          $ref: '#/components/schemas/Condiciones'
+        fechaDecision:
+          type: string
+          format: date-time
+          description: Solo cuando la solicitud ya fue respondida.
+    Catalogo:
+      type: object
+      required: [version, fuentes]
+      properties:
+        version:
+          type: string
+          examples: [v1]
+        fuentes:
+          type: array
+          items:
+            type: object
+            required: [fuente, datos]
+            properties:
+              fuente:
+                $ref: '#/components/schemas/FuenteDatos'
+              datos:
+                type: array
+                items:
+                  type: object
+                  required: [codigo, entidades]
+                  properties:
+                    codigo:
+                      $ref: '#/components/schemas/CodigoDato'
+                    entidades:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/CodigoEntidad'
+    Condiciones:
+      type: object
+      required: [duracionMeses, finalidad, destinatario, baseLegal, versionPolitica]
+      properties:
+        duracionMeses:
+          type: integer
+          minimum: 1
+          examples: [12]
+        finalidad:
+          $ref: '#/components/schemas/Finalidad'
+        destinatario:
+          $ref: '#/components/schemas/Destinatario'
+        baseLegal:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseLegal'
+        versionPolitica:
+          type: string
+          examples: [v1]
+    DecisionSolicitud:
+      type: object
+      required: [decision, aceptaPolitica, versionPolitica]
+      properties:
+        decision:
+          $ref: '#/components/schemas/TipoDecision'
+        aceptaPolitica:
+          type: boolean
+          description: Debe ser true para AUTORIZAR.
+        versionPolitica:
+          type: string
+          description: Para AUTORIZAR debe ser la versión vigente de la política.
+          examples: [v1]
+    ResultadoDecision:
+      type: object
+      required: [solicitudId, estado]
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        consentimiento:
+          $ref: '#/components/schemas/Consentimiento'
+          description: Solo cuando la decisión es AUTORIZAR.
+    Consentimiento:
+      type: object
+      required:
+        - consentimientoId
+        - estado
+        - alcance
+        - finalidad
+        - destinatario
+        - versionCatalogo
+        - versionPolitica
+        - fechaOtorga
+        - fechaVencimiento
+      properties:
+        consentimientoId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoConsentimiento'
+        alcance:
+          type: array
+          description: Códigos del catálogo que se autorizaron.
+          items:
+            $ref: '#/components/schemas/CodigoDato'
+        finalidad:
+          $ref: '#/components/schemas/Finalidad'
+        destinatario:
+          $ref: '#/components/schemas/Destinatario'
+        versionCatalogo:
+          type: string
+          examples: [v1]
+        versionPolitica:
+          type: string
+          examples: [v1]
+        fechaOtorga:
+          type: string
+          format: date-time
+        fechaVencimiento:
+          type: string
+          format: date-time
+          description: fechaOtorga + 12 meses.
+        fechaRevoca:
+          type: string
+          format: date-time
+          description: Solo cuando el consentimiento fue revocado.
+    EstadoAutorizacionCliente:
+      type: object
+      required: [clienteId, estado]
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoAutorizacion'
+        fechaEstado:
+          type: string
+          format: date-time
+          description: Fecha del evento que fija el estado; no aplica a SIN_SOLICITAR.
+        solicitudId:
+          type: string
+          format: uuid
+        consentimientoId:
+          type: string
+          format: uuid
+        fechaVencimiento:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [codigo, detalle]
+      properties:
+        codigo:
+          type: string
+          description: >
+            Código estable del error. Los de esta versión son SOLICITUD_NO_ENCONTRADA,
+            SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA, CONSENTIMIENTO_NO_ENCONTRADO,
+            CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO y NUCLEO_NO_DISPONIBLE.
+        detalle:
+          type: string
+          description: Explicación legible; no la muestres tal cual en la interfaz.
+    ErrorValidacion:
+      type: object
+      description: Error de validación de la petición, con la forma que genera FastAPI.
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            required: [loc, msg, type]
+            properties:
+              loc:
+                type: array
+                items:
+                  anyOf:
+                    - type: string
+                    - type: integer
+              msg:
+                type: string
+              type:
+                type: string

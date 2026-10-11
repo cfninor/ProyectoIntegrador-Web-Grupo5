@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+  <file source-language="es-CO" datatype="plaintext" original="ng2.template">
+    <body>
+      <trans-unit id="app.marca" datatype="html">
+        <source>Solventa</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/app.html</context>
+          <context context-type="linenumber">2,3</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="app.subtitulo" datatype="html">
+        <source>Portal de clientes, asesores y socios</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/app.html</context>
+          <context context-type="linenumber">3,6</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.tituloPestana" datatype="html">
+        <source>Autorizar la consulta de tus datos · Solventa</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/app.routes.ts</context>
+          <context context-type="linenumber">7</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.titulo" datatype="html">
+        <source>Autorizar la consulta de tus datos</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">2,5</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.cargando" datatype="html">
+        <source>Cargando la solicitud…</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">6,9</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.errorCarga" datatype="html">
+        <source> No pudimos cargar la solicitud. Revisa tu conexión e intenta de nuevo. </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">12,14</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.reintentar" datatype="html">
+        <source> Reintentar </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">20,22</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.noEncontrada.titulo" datatype="html">
+        <source>No encontramos esta solicitud</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">27,28</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.noEncontrada.texto" datatype="html">
+        <source> Revisa el enlace que recibiste o pide a tu asesor que te envíe una nueva solicitud. </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">29,33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.origen" datatype="html">
+        <source> Solicitud enviada por <x id="INTERPOLATION" equiv-text="{{ origen.asesor }}"/>, de Solventa, el <x id="INTERPOLATION_1" equiv-text="{{ origen.fecha }}"/> a las <x id="INTERPOLATION_2" equiv-text="{{ origen.hora }}"/> </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">37,40</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.datos.titulo" datatype="html">
+        <source>Datos que vamos a consultar</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">44,45</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.datos.entidades" datatype="html">
+        <source>Entidades</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">56,57</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.titulo" datatype="html">
+        <source>Condiciones</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">73,75</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.duracion.etiqueta" datatype="html">
+        <source>Duración</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">75,77</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.finalidad.etiqueta" datatype="html">
+        <source>Para qué</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">77,79</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.destinatario.etiqueta" datatype="html">
+        <source> Quién ve el resultado </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">80,82</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.comoRevocar.etiqueta" datatype="html">
+        <source> Cómo revocar </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">84,86</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.baseLegal.etiqueta" datatype="html">
+        <source> Base legal </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">88,91</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.casilla" datatype="html">
+        <source>Autorizo a Solventa a consultar mis datos de Open Finance y Open Data para calcular mi perfil de riesgo, conforme a la Ley 1581 de 2012 y al Decreto 1297 de 2022, y acepto la política de tratamiento de datos. Puedo revocar esta autorización en cualquier momento.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">111,114</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.casilla.ayuda" datatype="html">
+        <source> Para autorizar, marca la casilla. Si no autorizas, no consultaremos tus datos. </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">118,121</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.errorEnvio" datatype="html">
+        <source> No pudimos registrar tu respuesta. Intenta de nuevo. </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">123,127</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.autorizar" datatype="html">
+        <source> Autorizar </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">135,137</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.noAutorizar" datatype="html">
+        <source> No autorizar </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">144,146</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.yaRespondida" datatype="html">
+        <source>Esta solicitud ya fue respondida</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">162,164</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.autorizada" datatype="html">
+        <source>Autorizaste la consulta de tus datos</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">166,168</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.noAutorizada" datatype="html">
+        <source>No autorizaste la consulta de tus datos</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">170,173</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.asesorPuedeVer" datatype="html">
+        <source> Tu asesor ya puede ver tu autorización y continuar con tu cotización </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">176,179</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.comoRevocar" datatype="html">
+        <source>Cómo revocar</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">179,181</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.resultado.noContinua" datatype="html">
+        <source> La cotización personalizada no continúa; tu asesor puede enviarte una nueva solicitud. </source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/pagina-autorizacion-datos.html</context>
+          <context context-type="linenumber">185,188</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.fuente.openFinance" datatype="html">
+        <source>Open Finance</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">22</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.fuente.openData" datatype="html">
+        <source>Open Data</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">23</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.comportamientoPago.nombre" datatype="html">
+        <source>Comportamiento de pago y endeudamiento</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">28</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.comportamientoPago.descripcion" datatype="html">
+        <source>Cómo pagas tus créditos y cuánto debes hoy</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">29</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.estabilidadIngresos.nombre" datatype="html">
+        <source>Estabilidad de ingresos</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">32</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.estabilidadIngresos.descripcion" datatype="html">
+        <source>Cómo han variado tus ingresos en el tiempo</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.sociodemograficaTerritorial.nombre" datatype="html">
+        <source>Información sociodemográfica y territorial de tu zona</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">36</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.saludActuarialAgregada.nombre" datatype="html">
+        <source>Salud pública y datos actuariales agregados</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">39</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.saludActuarialAgregada.descripcion" datatype="html">
+        <source>Indicadores de la población, no tu historia clínica</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">40</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.dato.inmuebleUbicacion.nombre" datatype="html">
+        <source>Datos del inmueble y su ubicación</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">43</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.entidad.entidadesFinanzasAbiertas" datatype="html">
+        <source>Entidades financieras del esquema de finanzas abiertas (simulado)</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">48</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.entidad.dane" datatype="html">
+        <source>DANE</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">49</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.entidad.minsalud" datatype="html">
+        <source>Ministerio de Salud y Protección Social</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">50</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.entidad.igac" datatype="html">
+        <source>Instituto Geográfico Agustín Codazzi</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.finalidad.perfilamientoVidaHipotecario" datatype="html">
+        <source>Para calcular tu perfil de riesgo y el precio personalizado de tu seguro de vida hipotecario</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">55</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.destinatario.solventa" datatype="html">
+        <source>Solventa usa el resultado para calcular tu prima. Tu asesor ve el estado de la autorización y la prima, no tus datos</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">59</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.baseLegal.ley15812012" datatype="html">
+        <source>Ley 1581 de 2012</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">63</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.baseLegal.decreto12972022" datatype="html">
+        <source>Decreto 1297 de 2022</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">64</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.comoRevocar" datatype="html">
+        <source>Desde «Mis autorizaciones», cuando quieras. Dejamos de consultar tus datos en máximo 5 minutos y tus pólizas vigentes siguen activas</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">67</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.condiciones.duracion" datatype="html">
+        <source>La autorización dura <x id="meses" equiv-text="meses"/> meses</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">70</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.estado.pendiente" datatype="html">
+        <source>Pendiente</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">74</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.estado.autorizada" datatype="html">
+        <source>Autorizada</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">75</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="autorizacion.estado.noAutorizada" datatype="html">
+        <source>No autorizada</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/features/autorizacion-datos/textos.ts</context>
+          <context context-type="linenumber">76</context>
+        </context-group>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

@@ -1,0 +1,192 @@
+<div class="pagina" [attr.aria-busy]="vista() === 'cargando'">
+  <h1 i18n="@@autorizacion.titulo">Autorizar la consulta de tus datos</h1>
+
+  @switch (vista()) {
+    @case ('cargando') {
+      <p class="texto-secundario" i18n="@@autorizacion.cargando">Cargando la solicitud…</p>
+    }
+
+    @case ('error-carga') {
+      <section class="tarjeta aviso" role="alert">
+        <p class="mensaje-error" i18n="@@autorizacion.errorCarga">
+          No pudimos cargar la solicitud. Revisa tu conexión e intenta de nuevo.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="cargar()"
+          i18n="@@autorizacion.reintentar"
+        >
+          Reintentar
+        </button>
+      </section>
+    }
+
+    @case ('no-encontrada') {
+      <section class="tarjeta aviso">
+        <h2 i18n="@@autorizacion.noEncontrada.titulo">No encontramos esta solicitud</h2>
+        <p class="texto-secundario" i18n="@@autorizacion.noEncontrada.texto">
+          Revisa el enlace que recibiste o pide a tu asesor que te envíe una nueva solicitud.
+        </p>
+      </section>
+    }
+
+    @case ('pendiente') {
+      @if (origen(); as origen) {
+        <p class="origen" i18n="@@autorizacion.origen">
+          Solicitud enviada por {{ origen.asesor }}, de Solventa, el {{ origen.fecha }} a las
+          {{ origen.hora }}
+        </p>
+      }
+
+      @if (solicitud(); as solicitud) {
+        <section class="bloque" aria-labelledby="titulo-datos">
+          <h2 id="titulo-datos" i18n="@@autorizacion.datos.titulo">Datos que vamos a consultar</h2>
+          @for (fuente of solicitud.catalogo.fuentes; track fuente.fuente) {
+            <article class="tarjeta">
+              <h3>{{ textoFuente(fuente.fuente) }}</h3>
+              <ul class="datos">
+                @for (dato of fuente.datos; track dato.codigo) {
+                  <li>
+                    <p class="nombre-dato">{{ textoDato(dato.codigo).nombre }}</p>
+                    @if (textoDato(dato.codigo).descripcion; as descripcion) {
+                      <p class="texto-secundario">{{ descripcion }}</p>
+                    }
+                    <p>
+                      <span class="etiqueta" i18n="@@autorizacion.datos.entidades">Entidades</span>
+                      <span class="entidades">
+                        @for (entidad of dato.entidades; track entidad; let ultima = $last) {
+                          {{ textoEntidad(entidad) }}{{ ultima ? '' : ', ' }}
+                        }
+                      </span>
+                    </p>
+                  </li>
+                }
+              </ul>
+            </article>
+          }
+        </section>
+      }
+
+      @if (condiciones(); as condiciones) {
+        <section class="tarjeta bloque" aria-labelledby="titulo-condiciones">
+          <h2 id="titulo-condiciones" i18n="@@autorizacion.condiciones.titulo">Condiciones</h2>
+          <dl class="condiciones">
+            <dt class="etiqueta" i18n="@@autorizacion.condiciones.duracion.etiqueta">Duración</dt>
+            <dd>{{ condiciones.duracion }}</dd>
+            <dt class="etiqueta" i18n="@@autorizacion.condiciones.finalidad.etiqueta">Para qué</dt>
+            <dd>{{ condiciones.finalidad }}</dd>
+            <dt class="etiqueta" i18n="@@autorizacion.condiciones.destinatario.etiqueta">
+              Quién ve el resultado
+            </dt>
+            <dd>{{ condiciones.destinatario }}</dd>
+            <dt class="etiqueta" i18n="@@autorizacion.condiciones.comoRevocar.etiqueta">
+              Cómo revocar
+            </dt>
+            <dd>{{ textoComoRevocar }}</dd>
+            <dt class="etiqueta" i18n="@@autorizacion.condiciones.baseLegal.etiqueta">
+              Base legal
+            </dt>
+            <dd>
+              <ul class="base-legal">
+                @for (norma of condiciones.baseLegal; track norma) {
+                  <li>{{ norma }}</li>
+                }
+              </ul>
+            </dd>
+          </dl>
+        </section>
+      }
+
+      <section class="tarjeta bloque aceptacion">
+        <label class="casilla declaracion">
+          <input
+            type="checkbox"
+            aria-describedby="ayuda-casilla"
+            [checked]="aceptaPolitica()"
+            [disabled]="enviando()"
+            (change)="alCambiarCasilla($event)"
+          />
+          <span i18n="@@autorizacion.casilla"
+            >Autorizo a Solventa a consultar mis datos de Open Finance y Open Data para calcular mi
+            perfil de riesgo, conforme a la Ley 1581 de 2012 y al Decreto 1297 de 2022, y acepto la
+            política de tratamiento de datos. Puedo revocar esta autorización en cualquier
+            momento.</span
+          >
+        </label>
+        <p id="ayuda-casilla" class="texto-secundario" i18n="@@autorizacion.casilla.ayuda">
+          Para autorizar, marca la casilla. Si no autorizas, no consultaremos tus datos.
+        </p>
+
+        @if (errorEnvio()) {
+          <p class="mensaje-error" role="alert" i18n="@@autorizacion.errorEnvio">
+            No pudimos registrar tu respuesta. Intenta de nuevo.
+          </p>
+        }
+
+        <div class="acciones">
+          <button
+            type="button"
+            class="boton-primario"
+            [disabled]="!aceptaPolitica() || enviando()"
+            (click)="decidir('AUTORIZAR')"
+            i18n="@@autorizacion.autorizar"
+          >
+            Autorizar
+          </button>
+          <button
+            type="button"
+            class="boton-secundario"
+            [disabled]="enviando()"
+            (click)="decidir('NO_AUTORIZAR')"
+            i18n="@@autorizacion.noAutorizar"
+          >
+            No autorizar
+          </button>
+        </div>
+      </section>
+    }
+
+    @case ('resultado') {
+      @if (resultado(); as resultado) {
+        <section class="tarjeta resultado" aria-labelledby="titulo-resultado">
+          <span
+            class="chip"
+            [class.chip-verde]="resultado.estado === 'AUTORIZADA'"
+            [class.chip-gris]="resultado.estado !== 'AUTORIZADA'"
+            >{{ textoEstado(resultado.estado) }}</span
+          >
+          <h2 #tituloResultado id="titulo-resultado" tabindex="-1">
+            @if (resultado.yaRespondida) {
+              <ng-container i18n="@@autorizacion.resultado.yaRespondida"
+                >Esta solicitud ya fue respondida</ng-container
+              >
+            } @else if (resultado.estado === 'AUTORIZADA') {
+              <ng-container i18n="@@autorizacion.resultado.autorizada"
+                >Autorizaste la consulta de tus datos</ng-container
+              >
+            } @else {
+              <ng-container i18n="@@autorizacion.resultado.noAutorizada"
+                >No autorizaste la consulta de tus datos</ng-container
+              >
+            }
+          </h2>
+          @if (resultado.estado === 'AUTORIZADA') {
+            <p i18n="@@autorizacion.resultado.asesorPuedeVer">
+              Tu asesor ya puede ver tu autorización y continuar con tu cotización
+            </p>
+            <p>
+              <span class="etiqueta" i18n="@@autorizacion.resultado.comoRevocar">Cómo revocar</span
+              ><br />
+              {{ textoComoRevocar }}
+            </p>
+          } @else {
+            <p i18n="@@autorizacion.resultado.noContinua">
+              La cotización personalizada no continúa; tu asesor puede enviarte una nueva solicitud.
+            </p>
+          }
+        </section>
+      }
+    }
+  }
+</div>

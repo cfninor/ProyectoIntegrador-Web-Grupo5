@@ -1,5 +1,208 @@
-/* Estilos globales */
+/*
+ * Estilo base del portal (SOLVENTAG5-65): colores, tipografía y controles comunes.
+ * Es global para que las demás pantallas (SOLVENTAG5-132) lo reutilicen. Las fuentes Sora e
+ * IBM Plex Sans se cargan desde @fontsource en angular.json.
+ */
+
+:root {
+  --primary: #0b5d57;
+  --primary-hover: #08443f;
+  --on-surface: #14201f;
+  --on-surface-variant: #5b6b69;
+  --background: #f4f7f6;
+  --surface: #ffffff;
+  --outline-variant: #dde3e2;
+  --outline: #c9d2d0; /* borde de los campos */
+  --info-container: #dff2f0;
+  --error: #a4231b;
+
+  --chip-verde-fondo: #e3f4e8;
+  --chip-verde-texto: #1b6b3d;
+  --chip-ambar-fondo: #fdf1d6;
+  --chip-ambar-texto: #7a4f00;
+  --chip-verde-azulado-fondo: #dff2f0;
+  --chip-verde-azulado-texto: #0b5d57;
+  --chip-rojo-fondo: #fbe5e3;
+  --chip-rojo-texto: #a4231b;
+  --chip-gris-fondo: #eceff0;
+  --chip-gris-texto: #4a5856;
+
+  --fuente-titulos: 'Sora', system-ui, sans-serif;
+  --fuente-cuerpo: 'IBM Plex Sans', system-ui, sans-serif;
+  --alto-control: 44px;
+  --radio-control: 8px;
+  --radio-tarjeta: 12px;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  background: var(--background);
+  color: var(--on-surface);
+  font-family: var(--fuente-cuerpo);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--fuente-titulos);
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+h1 {
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+h2,
+h3 {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/* Etiquetas: IBM Plex Sans 12 px / 600 en mayúsculas. */
+.etiqueta {
+  font-family: var(--fuente-cuerpo);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+}
+
+.texto-secundario {
+  color: var(--on-surface-variant);
+}
+
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-tarjeta);
+  padding: 20px 24px;
+}
+
+/* Botones de 44 px con radio de 8 px. */
+.boton-primario,
+.boton-secundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--alto-control);
+  padding: 0 20px;
+  border-radius: var(--radio-control);
+  font-family: var(--fuente-cuerpo);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boton-primario {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--surface);
+
+  &:hover:not(:disabled) {
+    border-color: var(--primary-hover);
+    background: var(--primary-hover);
+  }
+}
+
+.boton-secundario {
+  border: 1px solid var(--outline);
+  background: var(--surface);
+  color: var(--primary);
+
+  &:hover:not(:disabled) {
+    background: var(--info-container);
+  }
+}
+
+.boton-primario:disabled,
+.boton-secundario:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Casilla con su etiqueta: la fila completa mide al menos 44 px para tocarla con facilidad. */
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--alto-control);
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+}
+
+.campo {
+  min-height: var(--alto-control);
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio-control);
+  background: var(--surface);
+  font: inherit;
+  color: var(--on-surface);
+}
+
+/* Chips con radio de 999 px. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip-verde {
+  background: var(--chip-verde-fondo);
+  color: var(--chip-verde-texto);
+}
+
+.chip-ambar {
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+}
+
+.chip-verde-azulado {
+  background: var(--chip-verde-azulado-fondo);
+  color: var(--chip-verde-azulado-texto);
+}
+
+.chip-rojo {
+  background: var(--chip-rojo-fondo);
+  color: var(--chip-rojo-texto);
+}
+
+.chip-gris {
+  background: var(--chip-gris-fondo);
+  color: var(--chip-gris-texto);
+}
+
+.mensaje-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* Foco visible en todos los controles, solo cuando se navega con teclado. */
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.boton-primario:focus-visible {
+  outline-color: var(--primary-hover);
 }
