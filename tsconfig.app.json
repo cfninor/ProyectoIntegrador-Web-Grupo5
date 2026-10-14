@@ -6,5 +6,5 @@
     "types": ["@angular/localize"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/setup-jest.ts"]
+  "exclude": ["src/**/*.spec.ts", "src/setup-jest.ts", "src/testing/**"]
 }

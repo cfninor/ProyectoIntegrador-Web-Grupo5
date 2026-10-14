@@ -95,6 +95,9 @@ describe('routes', () => {
     expect(pagina.querySelector('app-layout-publico')).not.toBeNull();
     expect(pagina.querySelector('app-pagina-autorizacion-datos')).not.toBeNull();
     expect(vista.getByText('Solventa')).toBeInTheDocument();
+    expect(vista.getByRole('banner')).toContainElement(
+      vista.getByRole('group', { name: 'Idioma' }),
+    );
     expect(vista.getByRole('main')).toContainElement(
       vista.getByRole('heading', { level: 1, name: 'Autorizar la consulta de tus datos' }),
     );

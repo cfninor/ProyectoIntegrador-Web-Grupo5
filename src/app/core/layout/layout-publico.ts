@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { SelectorIdioma } from '../idioma/selector-idioma';
 import { Icono } from '../navegacion/icono';
 
 /**
- * Layout de las páginas públicas, como SOLV-WEB-20: barra superior con la marca y el contenido,
- * sin menú. El selector de idioma ES / EN llega en la parte 4.
+ * Layout de las páginas públicas, como SOLV-WEB-20: barra superior con la marca y el selector de
+ * idioma, y el contenido, sin menú.
  */
 @Component({
   selector: 'app-layout-publico',
-  imports: [Icono, RouterOutlet],
+  imports: [Icono, RouterOutlet, SelectorIdioma],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host {
@@ -21,6 +22,7 @@ import { Icono } from '../navegacion/icono';
     .barra {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       min-height: 80px;
       box-sizing: border-box;
       padding: 0 32px 0 29px;
@@ -57,6 +59,7 @@ import { Icono } from '../navegacion/icono';
         <app-icono nombre="escudo" [tamano]="22" />
         <span i18n="@@portal.marca">Solventa</span>
       </p>
+      <app-selector-idioma />
     </header>
 
     <main class="contenido">

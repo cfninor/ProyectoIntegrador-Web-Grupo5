@@ -10,6 +10,7 @@ import {
 } from '@angular/router';
 import { filter, map, startWith, tap } from 'rxjs';
 
+import { SelectorIdioma } from '../idioma/selector-idioma';
 import { Icono } from '../navegacion/icono';
 import { MENU } from '../navegacion/menu';
 import { NOMBRE_ROL } from '../sesion/roles';
@@ -28,12 +29,12 @@ export function iniciales(nombre: string): string {
 
 /**
  * Layout de los portales por rol (D18, componente `Sidebar` del Figma): menú lateral con las
- * opciones del rol y la tarjeta del usuario, barra superior con las migas y el título de la
- * pantalla, y el contenido. En pantallas angostas el menú se pliega tras un botón.
+ * opciones del rol y la tarjeta del usuario, barra superior con las migas, el título de la
+ * pantalla y el selector de idioma, y el contenido. En pantallas angostas el menú se pliega tras un botón.
  */
 @Component({
   selector: 'app-layout-portal',
-  imports: [Icono, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [Icono, RouterLink, RouterLinkActive, RouterOutlet, SelectorIdioma],
   templateUrl: './layout-portal.html',
   styleUrl: './layout-portal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

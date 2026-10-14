@@ -32,7 +32,7 @@ npm run test:ci         # Jest con cobertura (coverage/)
 npm run build           # build de producción (dist/solventa-web/browser)
 npx playwright install chromium   # una sola vez
 npm run e2e             # Playwright (levanta npm start si no se define BASE_URL)
-npm run extract-i18n    # extrae los textos a src/locale/messages.xlf
+npm run extract-i18n    # extrae los textos a src/locale/messages.json
 ```
 
 ## Estructura
@@ -60,9 +60,18 @@ puerto del `bff-web` en el `docker-compose.yml` del repositorio principal.
 ## Internacionalización
 
 Ningún texto visible queda fijo en un componente sin marcar: se usa el atributo `i18n` en las
-plantillas y `$localize` en el código, con un id explícito (`i18n="@@modulo.clave"`). El idioma
-fuente es `es-CO`; los idiomas adicionales se agregan en `angular.json` (`i18n.locales`) cuando
-el equipo los defina.
+plantillas y `$localize` en el código, con un id explícito (`i18n="@@modulo.clave"`).
+
+El portal está en español (`es-CO`, idioma fuente) y en inglés (`en-US`) con un solo build:
+
+- `npm run extract-i18n` genera `src/locale/messages.json` con los textos en español.
+- La traducción al inglés está en `public/i18n/en-US.json`, con los mismos ids. Una prueba de
+  Jest falla si a un id le falta su traducción o si sus marcadores no coinciden.
+- `src/main.ts` elige el idioma antes de iniciar la aplicación: la preferencia guardada en
+  `localStorage` (`solventa.idioma`) o, si no hay, inglés con el navegador en inglés y español en
+  cualquier otro caso. Para el inglés carga la traducción con `loadTranslations`, y luego provee
+  `LOCALE_ID` y pone `<html lang>`.
+- El selector ES / EN de la barra superior guarda la preferencia y recarga la página.
 
 ## Integración continua
 

@@ -10,7 +10,7 @@
     "test": "jest",
     "test:ci": "jest --ci --coverage",
     "e2e": "playwright test",
-    "extract-i18n": "ng extract-i18n --output-path src/locale",
+    "extract-i18n": "ng extract-i18n --format json --output-path src/locale",
     "format": "prettier --write \"src/**/*.{ts,html,scss}\" \"e2e/**/*.ts\" \"*.{js,ts,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss}\" \"e2e/**/*.ts\" \"*.{js,ts,json}\""
   },

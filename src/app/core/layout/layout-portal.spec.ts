@@ -1,3 +1,4 @@
+import { LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -23,6 +24,7 @@ async function abrirPortal(rol: Rol, nombre = 'Ana Sofía Reyes') {
         },
       },
       provideSesionSimulada(),
+      { provide: LOCALE_ID, useValue: 'es-CO' },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -79,6 +81,21 @@ describe('LayoutPortal', () => {
     expect(migas.getByText('Tablero')).toHaveAttribute('aria-current', 'page');
     expect(vista.getByRole('heading', { level: 1, name: 'Tablero' })).toBeInTheDocument();
     expect(vista.getByRole('main')).toHaveTextContent('Hola de nuevo, Ana Sofía Reyes.');
+  });
+
+  it('la barra superior tiene el selector de idioma con ES activo', async () => {
+    const { pagina, vista } = await abrirPortal('ASESOR');
+
+    const selector = vista.getByRole('group', { name: 'Idioma' });
+    expect(pagina.querySelector('header .acciones')).toContainElement(selector);
+    expect(within(selector).getByRole('button', { name: 'Español' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(selector).getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('el botón del menú lo abre y lo cierra, y lo anuncia con aria-expanded', async () => {

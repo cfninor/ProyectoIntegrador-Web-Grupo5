@@ -1,7 +1,9 @@
 /// <reference types="@angular/localize" />
 
-import { bootstrapApplication } from '@angular/platform-browser';
-import { appConfig } from './app/app.config';
-import { App } from './app/app';
+import { prepararIdioma } from './app/core/idioma/idioma';
 
-bootstrapApplication(App, appConfig).catch((err) => console.error(err));
+// Los textos con $localize se traducen al cargar sus módulos (títulos de ruta, menú, textos de
+// SOLV-WEB-20): la aplicación se importa después de cargar la traducción del idioma elegido (D12).
+prepararIdioma()
+  .then((idioma) => import('./iniciar-aplicacion').then((m) => m.iniciarAplicacion(idioma)))
+  .catch((err) => console.error(err));

@@ -4,7 +4,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "types": ["jest", "@angular/localize"]
+    "types": ["jest", "@angular/localize"],
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.d.ts", "src/**/*.spec.ts", "src/setup-jest.ts"]
+  "include": ["src/**/*.d.ts", "src/**/*.spec.ts", "src/setup-jest.ts", "src/testing/**/*.ts"]
 }
