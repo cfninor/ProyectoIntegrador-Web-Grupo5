@@ -1,19 +1,20 @@
 /*
  * Estilo base del portal (SOLVENTAG5-65): colores, tipografía y controles comunes.
- * Es global para que las demás pantallas (SOLVENTAG5-132) lo reutilicen. Las fuentes Sora e
- * IBM Plex Sans se cargan desde @fontsource en angular.json.
+ * Es global para que las demás pantallas (SOLVENTAG5-132) lo reutilicen. Colores y tipografía
+ * del Figma «Solventa - Portal Web» (SOLVENTAG5-132, D18). La fuente Inter se carga desde
+ * @fontsource en angular.json.
  */
 
 :root {
-  --primary: #0b5d57;
-  --primary-hover: #08443f;
-  --on-surface: #14201f;
-  --on-surface-variant: #5b6b69;
-  --background: #f4f7f6;
+  --primary: #214e4b;
+  --primary-hover: #183a38;
+  --on-surface: #111318;
+  --on-surface-variant: #62666d;
+  --background: #f8f9fb;
   --surface: #ffffff;
-  --outline-variant: #dde3e2;
-  --outline: #c9d2d0; /* borde de los campos */
-  --info-container: #dff2f0;
+  --outline-variant: #e4e5e7;
+  --outline: #d0d1d3; /* borde de los campos */
+  --info-container: #dcf0ee;
   --error: #a4231b;
 
   --chip-verde-fondo: #e3f4e8;
@@ -27,8 +28,8 @@
   --chip-gris-fondo: #eceff0;
   --chip-gris-texto: #4a5856;
 
-  --fuente-titulos: 'Sora', system-ui, sans-serif;
-  --fuente-cuerpo: 'IBM Plex Sans', system-ui, sans-serif;
+  --fuente-titulos: 'Inter', system-ui, sans-serif;
+  --fuente-cuerpo: 'Inter', system-ui, sans-serif;
   --alto-control: 44px;
   --radio-control: 8px;
   --radio-tarjeta: 12px;
@@ -64,7 +65,7 @@ h3 {
   line-height: 1.4;
 }
 
-/* Etiquetas: IBM Plex Sans 12 px / 600 en mayúsculas. */
+/* Etiquetas: 12 px / 600 en mayúsculas. */
 .etiqueta {
   font-family: var(--fuente-cuerpo);
   font-size: 12px;

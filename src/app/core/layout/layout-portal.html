@@ -1,0 +1,71 @@
+<div class="portal" [class.menu-abierto]="menuAbierto()">
+  <aside class="lateral" id="menu-lateral">
+    <p class="marca">
+      <app-icono nombre="escudo" [tamano]="22" />
+      <span i18n="@@portal.marca">Solventa</span>
+    </p>
+
+    <nav class="menu" aria-label="Menú principal" i18n-aria-label="@@menu.etiqueta">
+      <ul>
+        @for (opcion of menu; track opcion.ruta) {
+          <li>
+            <a
+              class="opcion"
+              [routerLink]="opcion.ruta"
+              routerLinkActive="activa"
+              [routerLinkActiveOptions]="{ exact: opcion.exacta }"
+              ariaCurrentWhenActive="page"
+            >
+              <app-icono [nombre]="opcion.icono" />
+              <span>{{ opcion.texto }}</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    @if (sesion; as sesion) {
+      <div class="usuario">
+        <span class="iniciales" aria-hidden="true">{{ iniciales }}</span>
+        <div>
+          <p class="nombre">{{ sesion.usuario.nombre }}</p>
+          <p class="cargo">{{ nombreRol }}</p>
+        </div>
+      </div>
+    }
+  </aside>
+
+  <div class="principal">
+    <header class="barra">
+      <div class="encabezado">
+        <nav aria-label="Ruta de navegación" i18n-aria-label="@@portal.migas">
+          <ol class="migas">
+            <li i18n="@@portal.migaInicio">Solventa</li>
+            <li aria-current="page">{{ miga() }}</li>
+          </ol>
+        </nav>
+        <h1>{{ titulo() }}</h1>
+      </div>
+
+      <!-- A la derecha va el selector de idioma ES / EN (parte 4). -->
+      <div class="acciones"></div>
+
+      <!-- A la derecha para que el menú abierto, que cubre la izquierda, no lo tape. -->
+      <button
+        type="button"
+        class="boton-menu"
+        aria-controls="menu-lateral"
+        [attr.aria-expanded]="menuAbierto()"
+        aria-label="Menú"
+        i18n-aria-label="@@menu.alternar"
+        (click)="alternarMenu()"
+      >
+        <app-icono nombre="menu" [tamano]="22" />
+      </button>
+    </header>
+
+    <main class="contenido">
+      <router-outlet />
+    </main>
+  </div>
+</div>

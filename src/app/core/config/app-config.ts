@@ -1,5 +1,7 @@
 import { InjectionToken, makeEnvironmentProviders, provideAppInitializer } from '@angular/core';
 
+import { Sesion } from '../sesion/sesion';
+
 /**
  * Configuración que cambia por ambiente (local, dev, qa, prod).
  *
@@ -9,6 +11,11 @@ import { InjectionToken, makeEnvironmentProviders, provideAppInitializer } from 
 export interface AppConfig {
   /** URL base del BFF web (conector C1). */
   apiBaseUrl: string;
+  /**
+   * Sesión de la implementación simulada (D11), solo en local y DEV. Sin ella no hay sesión y
+   * solo se abren las rutas públicas.
+   */
+  sesionSimulada?: Sesion;
 }
 
 export const APP_CONFIG = new InjectionToken<AppConfig>('APP_CONFIG');

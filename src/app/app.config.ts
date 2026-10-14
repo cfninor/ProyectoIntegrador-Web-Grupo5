@@ -4,6 +4,7 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 
 import { routes } from './app.routes';
 import { provideAppConfig } from './core/config/app-config';
+import { provideSesionSimulada } from './core/sesion/sesion-simulada';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -11,5 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withFetch()),
     provideAppConfig(),
+    // Sesión simulada de config.json (D11): un inicio de sesión real solo cambia este proveedor.
+    provideSesionSimulada(),
   ],
 };

@@ -1,13 +1,58 @@
-import { Routes } from '@angular/router';
+import { Route, Routes } from '@angular/router';
+
+import { datosPagina } from './core/layout/pagina';
+import { PREFIJO_PORTAL } from './core/sesion/roles';
+import { redirigirAlPortal, rolGuard } from './core/sesion/rol-guard';
+import { Rol } from './core/sesion/sesion';
+
+/** Tablero de cada portal: la raíz de su grupo de rutas. */
+const tablero: Route = {
+  path: '',
+  title: $localize`:@@portal.tablero.tituloPestana:Tablero · Solventa`,
+  data: datosPagina($localize`:@@portal.tablero.titulo:Tablero`),
+  loadComponent: () => import('./features/tablero/tablero').then((m) => m.Tablero),
+};
+
+/**
+ * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
+ * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
+ */
+function portal(rol: Rol, pantallas: Routes): Route {
+  return {
+    path: PREFIJO_PORTAL[rol],
+    canActivate: [rolGuard(rol)],
+    loadComponent: () => import('./core/layout/layout-portal').then((m) => m.LayoutPortal),
+    children: pantallas,
+  };
+}
 
 export const routes: Routes = [
+  { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
+  portal('ASESOR', [tablero]),
+  portal('CLIENTE', [tablero]),
+  portal('ANALISTA_RIESGO', [tablero]),
+  portal('OPERACIONES', [tablero]),
+  portal('SOCIO', [tablero]),
   {
-    // Enlace que recibe el cliente para autorizar la consulta de sus datos (SOLVENTAG5-65).
-    path: 'autorizar/:solicitudId',
-    title: $localize`:@@autorizacion.tituloPestana:Autorizar la consulta de tus datos · Solventa`,
-    loadComponent: () =>
-      import('./features/autorizacion-datos/pagina-autorizacion-datos').then(
-        (m) => m.PaginaAutorizacionDatos,
-      ),
+    // Páginas públicas, sin sesión. Va al final: su '**' recoge cualquier ruta que no existe.
+    path: '',
+    loadComponent: () => import('./core/layout/layout-publico').then((m) => m.LayoutPublico),
+    children: [
+      {
+        // Enlace que recibe el cliente para autorizar la consulta de sus datos (SOLVENTAG5-65).
+        path: 'autorizar/:solicitudId',
+        title: $localize`:@@autorizacion.tituloPestana:Autorizar la consulta de tus datos · Solventa`,
+        loadComponent: () =>
+          import('./features/autorizacion-datos/pagina-autorizacion-datos').then(
+            (m) => m.PaginaAutorizacionDatos,
+          ),
+      },
+      {
+        path: '**',
+        title: $localize`:@@portal.noEncontrada.tituloPestana:Página no encontrada · Solventa`,
+        loadComponent: () =>
+          import('./features/no-encontrada/pagina-no-encontrada').then((m) => m.PaginaNoEncontrada),
+      },
+    ],
   },
 ];
