@@ -1,0 +1,200 @@
+// Marco «Cotizador Interactivo» y sección «Cotizador» de contexto/figma/README.md.
+:host {
+  display: block;
+  container-type: inline-size;
+}
+
+p {
+  margin: 0;
+}
+
+.cotizador {
+  display: grid;
+  grid-template-columns: minmax(0, 630px) 298px;
+  gap: 32px;
+  align-items: start;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px;
+
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+  }
+}
+
+.ayuda {
+  margin-top: -12px;
+  color: var(--on-surface-variant);
+}
+
+.grilla {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.documento {
+  display: flex;
+  gap: 8px;
+
+  select {
+    flex: none;
+    width: 84px;
+  }
+}
+
+.estado-busqueda {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.caja-autorizacion {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid #c6d6d3;
+  border-radius: 8px;
+  background: var(--info-container);
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.indicador {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--surface);
+}
+
+.texto-caja {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.calcular {
+  min-height: 40px;
+  padding: 0 24px;
+}
+
+.falla {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel {
+  padding: 24px;
+
+  h2 {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--on-surface-variant);
+  }
+}
+
+.prima {
+  margin-top: 4px;
+
+  .valor {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .periodo {
+    margin-left: 6px;
+    color: var(--on-surface-variant);
+  }
+}
+
+.moneda,
+.pie,
+.texto-panel {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.texto-panel {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.aviso {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-size: 12px;
+}
+
+.filas {
+  margin: 20px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--outline-variant);
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 12px;
+  }
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+  }
+}
+
+.pie {
+  margin-top: 16px;
+}
+
+// Sin espacio para el panel al lado, va debajo; y en un teléfono, una sola columna de campos.
+@container (max-width: 959px) {
+  .cotizador {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 599px) {
+  .formulario {
+    padding: 20px;
+  }
+
+  .grilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -13,7 +13,8 @@
   --background: #f8f9fb;
   --surface: #ffffff;
   --outline-variant: #e4e5e7;
-  --outline: #d0d1d3; /* borde de los campos */
+  --outline: #d0d1d3; /* borde de los botones secundarios */
+  --outline-campo: #8a8f98; /* borde de los campos: 3,2:1 contra blanco (D19, WCAG 1.4.11) */
   --info-container: #dcf0ee;
   --error: #a4231b;
 
@@ -146,15 +147,44 @@ h3 {
   }
 }
 
+/* Campo de formulario como el del Figma: 38 px de alto y borde --outline-campo (D19). */
 .campo {
-  min-height: var(--alto-control);
+  width: 100%;
+  height: 38px;
   box-sizing: border-box;
   padding: 0 12px;
-  border: 1px solid var(--outline);
+  border: 1px solid var(--outline-campo);
   border-radius: var(--radio-control);
   background: var(--surface);
   font: inherit;
+  font-size: 14px;
   color: var(--on-surface);
+
+  &[readonly] {
+    background: var(--background);
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--error);
+  }
+}
+
+/* Etiqueta encima del campo, a 10 px. */
+.etiqueta-campo {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 14px;
+  color: var(--on-surface);
+}
+
+/* Mensaje de un campo que no cumple su regla, bajo el campo. */
+.error-campo {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--error);
 }
 
 /* Chips con radio de 999 px. */

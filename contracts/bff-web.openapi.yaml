@@ -19,6 +19,12 @@ tags:
     description: >
       Operaciones del asesor. Mientras no exista login, los datos del asesor viajan en la
       petición (deuda técnica hasta la HU transversal de login).
+  - name: cotizacion
+    description: >
+      Cotización en línea según el perfil de riesgo del cliente (SOLVENTAG5-47). Si el perfil
+      no está disponible a tiempo, el journey no se bloquea: la prima se calcula con el valor por
+      defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Mientras no exista
+      login, el id del cliente viaja en la petición.
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -97,6 +103,54 @@ paths:
                 fechaVencimiento: '2027-10-09T15:02:11Z'
         '422':
           $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/clientes/busqueda:
+    post:
+      tags: [asesor]
+      operationId: buscarCliente
+      summary: Buscar un cliente por su documento de identidad
+      description: >
+        Búsqueda exacta por el tipo y el número de documento, contra el documento tokenizado
+        (los nombres están cifrados y no se buscan). Si hay más de un cliente con el mismo
+        documento, responde el registro más reciente. El documento va en el cuerpo y no en la
+        URL para que no quede en los logs. El BFF valida solo la forma del cuerpo (tipos y
+        campos obligatorios) y lo reenvía al núcleo; el patrón del número sirve para que la
+        pantalla valide antes de buscar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusquedaCliente'
+            example:
+              tipoDocumento: CC
+              numeroDocumento: '1020305678'
+      responses:
+        '200':
+          description: Cliente encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClienteEncontrado'
+              example:
+                clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+                nombres: María Fernanda
+                apellidos: López Rojas
+                documentoEnmascarado: CC ••••5678
+        '404':
+          $ref: '#/components/responses/ClienteNoEncontrado'
+        '422':
+          description: El cuerpo no cumple el contrato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+              example:
+                detail:
+                  - loc: [body, tipoDocumento]
+                    msg: "Input should be 'CC', 'CE', 'PA' or 'PPT'"
+                    type: enum
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
   /v1/solicitudes-autorizacion/{solicitudId}:
@@ -264,6 +318,73 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/cotizaciones:
+    post:
+      tags: [cotizacion]
+      operationId: cotizar
+      summary: Cotizar un seguro según el perfil de riesgo del cliente
+      description: >
+        Valida el ramo y los datos del bien con el catálogo de ramos y calcula la prima mensual
+        con el nivel de riesgo del cliente. Con clienteId y una autorización de datos vigente,
+        el núcleo consulta el perfil de riesgo en ms-perfilamiento. Sin clienteId, sin
+        autorización vigente o si el perfil no responde a tiempo, usa el valor por defecto
+        (nivel MEDIO) y responde calculadaSinPerfil true con su motivoSinPerfil. La oferta es
+        válida 7 días desde fechaCotizacion. El BFF agrega el canal antes de llamar al núcleo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudCotizacion'
+            examples:
+              conCliente:
+                $ref: '#/components/examples/SolicitudConCliente'
+              sinCliente:
+                $ref: '#/components/examples/SolicitudSinCliente'
+      responses:
+        '201':
+          description: Cotización calculada y registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cotizacion'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/CotizacionConPerfil'
+                sinPerfil:
+                  $ref: '#/components/examples/CotizacionSinPerfil'
+        '422':
+          $ref: '#/components/responses/SolicitudCotizacionInvalida'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/cotizaciones/{cotizacionId}:
+    get:
+      tags: [cotizacion]
+      operationId: obtenerCotizacion
+      summary: Consultar una cotización registrada
+      description: >
+        Devuelve la cotización como se calculó, con la foto del perfil usado. El estado se
+        calcula en cada consulta: VENCIDA cuando ya pasó vigenteHasta.
+      parameters:
+        - $ref: '#/components/parameters/CotizacionId'
+      responses:
+        '200':
+          description: Cotización registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cotizacion'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/CotizacionConPerfil'
+                sinPerfil:
+                  $ref: '#/components/examples/CotizacionSinPerfil'
+        '404':
+          $ref: '#/components/responses/CotizacionNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
 components:
   parameters:
     ClienteId:
@@ -288,6 +409,13 @@ components:
       schema:
         type: string
         format: uuid
+    CotizacionId:
+      name: cotizacionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     ClienteYaAutorizado:
       description: El cliente ya tiene un consentimiento vigente y no vencido.
@@ -302,6 +430,19 @@ components:
           example:
             codigo: CLIENTE_YA_AUTORIZADO
             detalle: El cliente ya tiene una autorización vigente.
+    ClienteNoEncontrado:
+      description: No hay un cliente registrado con ese documento.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CLIENTE_NO_ENCONTRADO
+          example:
+            codigo: CLIENTE_NO_ENCONTRADO
+            detalle: No encontramos un cliente con ese documento.
     SolicitudNoEncontrada:
       description: La solicitud no existe.
       content:
@@ -381,6 +522,57 @@ components:
           example:
             codigo: CONSENTIMIENTO_NO_VIGENTE
             detalle: El consentimiento no está vigente.
+    CotizacionNoEncontrada:
+      description: La cotización no existe.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: COTIZACION_NO_ENCONTRADA
+          example:
+            codigo: COTIZACION_NO_ENCONTRADA
+            detalle: No encontramos la cotización.
+    SolicitudCotizacionInvalida:
+      description: >
+        Un ramo que no está en el catálogo (Error con codigo RAMO_NO_SOPORTADO), datos del bien
+        que no cumplen las reglas del ramo (Error con codigo DATOS_BIEN_INVALIDOS y la lista
+        campos con todos los que fallan) o un cuerpo mal formado (ErrorValidacion).
+        El BFF valida solo la forma del cuerpo (tipos y campos obligatorios) y lo reenvía al
+        núcleo. El catálogo de ramos y los rangos de los datos del bien los aplica solo el
+        núcleo, que responde RAMO_NO_SOPORTADO o DATOS_BIEN_INVALIDOS. Los rangos de este
+        contrato sirven para que la pantalla valide antes de enviar.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - properties:
+                      codigo:
+                        enum: [DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO]
+              - $ref: '#/components/schemas/ErrorValidacion'
+          examples:
+            datosBienInvalidos:
+              summary: Datos del bien fuera de las reglas del ramo
+              value:
+                codigo: DATOS_BIEN_INVALIDOS
+                detalle: Los datos del bien no cumplen las reglas del ramo.
+                campos: [montoCredito, plazoAnios]
+            ramoNoSoportado:
+              summary: Ramo que no está en el catálogo
+              value:
+                codigo: RAMO_NO_SOPORTADO
+                detalle: El ramo no está disponible para cotizar.
+            validacion:
+              summary: Cuerpo mal formado
+              value:
+                detail:
+                  - loc: [body, datosBien, montoCredito]
+                    msg: 'Input should be a valid integer'
+                    type: int_type
     Validacion:
       description: La petición no cumple el contrato (parámetros o cuerpo).
       content:
@@ -645,6 +837,200 @@ components:
         fechaVencimiento:
           type: string
           format: date-time
+    TipoDocumento:
+      type: string
+      description: >
+        CC cédula de ciudadanía, CE cédula de extranjería, PA pasaporte, PPT permiso por
+        protección temporal.
+      enum: [CC, CE, PA, PPT]
+    BusquedaCliente:
+      type: object
+      required: [tipoDocumento, numeroDocumento]
+      properties:
+        tipoDocumento:
+          $ref: '#/components/schemas/TipoDocumento'
+        numeroDocumento:
+          type: string
+          description: >
+            CC, CE y PPT: de 6 a 10 dígitos. PA: de 6 a 12 letras o dígitos. Se busca sin
+            espacios al inicio y al final.
+          pattern: '^[A-Za-z0-9]{6,12}$'
+          examples: ['1020305678', AB123456]
+    ClienteEncontrado:
+      type: object
+      description: Datos mínimos para identificar al cliente en la pantalla (minimización).
+      required: [clienteId, nombres, apellidos, documentoEnmascarado]
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        nombres:
+          type: string
+        apellidos:
+          type: string
+        documentoEnmascarado:
+          type: string
+          description: El tipo de documento y los cuatro últimos caracteres del número.
+          pattern: '^(CC|CE|PA|PPT) ••••[A-Za-z0-9]{4}$'
+          examples: [CC ••••5678]
+    Ramo:
+      type: string
+      description: Código del catálogo de ramos v1.
+      enum: [VIDA_HIPOTECARIO]
+    NivelRiesgo:
+      type: string
+      enum: [BAJO, MEDIO, ALTO]
+    EstadoCotizacion:
+      type: string
+      description: VENCIDA no se guarda; se calcula a partir de vigenteHasta.
+      enum: [VIGENTE, VENCIDA]
+    MotivoSinPerfil:
+      type: string
+      description: >
+        Por qué la prima se calculó con el valor por defecto. SIN_CLIENTE no llegó clienteId;
+        SIN_CONSENTIMIENTO el cliente no tiene una autorización de datos vigente;
+        PERFIL_NO_DISPONIBLE ms-perfilamiento no respondió a tiempo o falló.
+      enum: [SIN_CLIENTE, SIN_CONSENTIMIENTO, PERFIL_NO_DISPONIBLE]
+    DatosBienVidaHipotecario:
+      type: object
+      description: >
+        Datos del bien del ramo VIDA_HIPOTECARIO. Los textos se guardan sin espacios al inicio y
+        al final.
+      required: [montoCredito, plazoAnios, ciudadInmueble, entidadAcreedora]
+      properties:
+        montoCredito:
+          type: integer
+          minimum: 10000000
+          maximum: 1200000000
+          description: Monto del crédito hipotecario en COP.
+          examples: [200000000]
+        plazoAnios:
+          type: integer
+          minimum: 5
+          maximum: 30
+          description: Plazo del crédito en años.
+          examples: [20]
+        ciudadInmueble:
+          type: string
+          minLength: 2
+          maxLength: 80
+          examples: [Bogotá]
+        entidadAcreedora:
+          type: string
+          minLength: 2
+          maxLength: 120
+          description: Entidad que otorga el crédito.
+          examples: [Banco de Ejemplo]
+    SolicitudCotizacion:
+      type: object
+      required: [ramo, datosBien]
+      properties:
+        ramo:
+          $ref: '#/components/schemas/Ramo'
+        datosBien:
+          $ref: '#/components/schemas/DatosBienVidaHipotecario'
+        clienteId:
+          type: string
+          format: uuid
+          description: Opcional. Sin él la prima usa el valor por defecto (motivo SIN_CLIENTE).
+    Senal:
+      type: integer
+      minimum: 0
+      maximum: 100
+    SenalesPerfil:
+      type: object
+      description: Indicadores de 0 a 100 que explican el nivel; no son datos crudos de Open Finance.
+      required: [comportamientoPago, estabilidadIngresos, ubicacion, endeudamiento]
+      properties:
+        comportamientoPago:
+          $ref: '#/components/schemas/Senal'
+        estabilidadIngresos:
+          $ref: '#/components/schemas/Senal'
+        ubicacion:
+          $ref: '#/components/schemas/Senal'
+        endeudamiento:
+          $ref: '#/components/schemas/Senal'
+    PerfilUsado:
+      type: object
+      description: Foto del perfil de riesgo con que se calculó la prima.
+      required: [perfilId, version, score, nivel, senales, calculadoEn, vigenteHasta]
+      properties:
+        perfilId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        score:
+          type: integer
+          minimum: 0
+          maximum: 850
+        nivel:
+          $ref: '#/components/schemas/NivelRiesgo'
+        senales:
+          $ref: '#/components/schemas/SenalesPerfil'
+        calculadoEn:
+          type: string
+          format: date-time
+        vigenteHasta:
+          type: string
+          format: date-time
+          description: Hasta cuándo ms-perfilamiento considera vigente el perfil.
+    Cotizacion:
+      type: object
+      required:
+        - cotizacionId
+        - ramo
+        - datosBien
+        - prima
+        - moneda
+        - periodicidad
+        - fechaCotizacion
+        - vigenteHasta
+        - estado
+        - calculadaSinPerfil
+      properties:
+        cotizacionId:
+          type: string
+          format: uuid
+        ramo:
+          $ref: '#/components/schemas/Ramo'
+        datosBien:
+          $ref: '#/components/schemas/DatosBienVidaHipotecario'
+        clienteId:
+          type: string
+          format: uuid
+          description: Solo si la solicitud lo trajo.
+        prima:
+          type: integer
+          minimum: 0
+          description: Prima en COP, redondeada al peso.
+        moneda:
+          type: string
+          enum: [COP]
+        periodicidad:
+          type: string
+          enum: [MENSUAL]
+        fechaCotizacion:
+          type: string
+          format: date-time
+        vigenteHasta:
+          type: string
+          format: date-time
+          description: Fin de la vigencia de la oferta, fechaCotizacion + 7 días.
+        estado:
+          $ref: '#/components/schemas/EstadoCotizacion'
+        calculadaSinPerfil:
+          type: boolean
+          description: >
+            true si la prima se calculó con el valor por defecto de BA-01 (nivel MEDIO) y no con
+            el perfil del cliente.
+        motivoSinPerfil:
+          $ref: '#/components/schemas/MotivoSinPerfil'
+          description: Solo cuando calculadaSinPerfil es true.
+        perfil:
+          $ref: '#/components/schemas/PerfilUsado'
+          description: Solo cuando calculadaSinPerfil es false.
     Error:
       type: object
       required: [codigo, detalle]
@@ -654,10 +1040,18 @@ components:
           description: >
             Código estable del error. Los de esta versión son SOLICITUD_NO_ENCONTRADA,
             SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA, CONSENTIMIENTO_NO_ENCONTRADO,
-            CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO y NUCLEO_NO_DISPONIBLE.
+            CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO, CLIENTE_NO_ENCONTRADO,
+            DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO, COTIZACION_NO_ENCONTRADA y
+            NUCLEO_NO_DISPONIBLE.
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
+        campos:
+          type: array
+          description: Solo en DATOS_BIEN_INVALIDOS. Nombres de todos los campos que fallan.
+          items:
+            type: string
+          examples: [[montoCredito, plazoAnios]]
     ErrorValidacion:
       type: object
       description: Error de validación de la petición, con la forma que genera FastAPI.
@@ -679,3 +1073,72 @@ components:
                 type: string
               type:
                 type: string
+  examples:
+    SolicitudConCliente:
+      summary: Cliente identificado
+      value:
+        ramo: VIDA_HIPOTECARIO
+        datosBien:
+          montoCredito: 200000000
+          plazoAnios: 20
+          ciudadInmueble: Bogotá
+          entidadAcreedora: Banco de Ejemplo
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+    SolicitudSinCliente:
+      summary: Sin clienteId (prima con el valor por defecto)
+      value:
+        ramo: VIDA_HIPOTECARIO
+        datosBien:
+          montoCredito: 200000000
+          plazoAnios: 20
+          ciudadInmueble: Bogotá
+          entidadAcreedora: Banco de Ejemplo
+    CotizacionConPerfil:
+      summary: Con perfil MEDIO, crédito de 200.000.000 y prima de 70.000
+      value:
+        cotizacionId: 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+        ramo: VIDA_HIPOTECARIO
+        datosBien:
+          montoCredito: 200000000
+          plazoAnios: 20
+          ciudadInmueble: Bogotá
+          entidadAcreedora: Banco de Ejemplo
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        fechaCotizacion: '2026-10-13T15:00:00Z'
+        vigenteHasta: '2026-10-20T15:00:00Z'
+        estado: VIGENTE
+        calculadaSinPerfil: false
+        perfil:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+          score: 640
+          nivel: MEDIO
+          senales:
+            comportamientoPago: 72
+            estabilidadIngresos: 65
+            ubicacion: 58
+            endeudamiento: 41
+          calculadoEn: '2026-10-13T14:59:59Z'
+          vigenteHasta: '2026-10-14T14:59:59Z'
+    CotizacionSinPerfil:
+      summary: Sin perfil porque ms-perfilamiento no respondió a tiempo
+      value:
+        cotizacionId: 8f1e2d3c-4b5a-4c6d-9e7f-0a1b2c3d4e5f
+        ramo: VIDA_HIPOTECARIO
+        datosBien:
+          montoCredito: 200000000
+          plazoAnios: 20
+          ciudadInmueble: Bogotá
+          entidadAcreedora: Banco de Ejemplo
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        fechaCotizacion: '2026-10-13T15:00:00Z'
+        vigenteHasta: '2026-10-20T15:00:00Z'
+        estado: VIGENTE
+        calculadaSinPerfil: true
+        motivoSinPerfil: PERFIL_NO_DISPONIBLE

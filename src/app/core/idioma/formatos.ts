@@ -1,4 +1,4 @@
-import { formatDate } from '@angular/common';
+import { formatDate, formatNumber } from '@angular/common';
 
 import { Idioma } from './idioma';
 
@@ -16,9 +16,12 @@ const FORMATOS: Record<Idioma, { fecha: string; hora: string }> = {
 /**
  * Datos de idioma con que se formatea: los de en-US, que Angular trae siempre. Los formatos de
  * es-CO son solo numéricos y no dependen de nombres de meses ni de AM/PM, así que funcionan sin
- * registrar los datos de es-CO.
+ * registrar los datos de es-CO. En los números solo cambia el separador de miles.
  */
 const DATOS_IDIOMA = 'en-US';
+
+/** Separador de miles de cada idioma: «280.000.000» en español y «280,000,000» en inglés. */
+const SEPARADOR_MILES: Record<Idioma, string> = { 'es-CO': '.', 'en-US': ',' };
 
 /** La fecha de `iso` en hora de Bogotá, con el formato del idioma. */
 export function fechaBogota(iso: string, idioma: Idioma): string {
@@ -28,4 +31,15 @@ export function fechaBogota(iso: string, idioma: Idioma): string {
 /** La hora de `iso` en hora de Bogotá, con el formato del idioma. */
 export function horaBogota(iso: string, idioma: Idioma): string {
   return formatDate(iso, FORMATOS[idioma].hora, DATOS_IDIOMA, ZONA_BOGOTA);
+}
+
+/** Un número entero con el separador de miles del idioma: «280.000.000» o «280,000,000». */
+export function numeroConMiles(valor: number, idioma: Idioma): string {
+  return formatNumber(valor, DATOS_IDIOMA, '1.0-0').replace(/,/g, SEPARADOR_MILES[idioma]);
+}
+
+/** Un monto en COP, sin decimales (D8): «$ 148.500» en español y «$148,500» en inglés. */
+export function montoCop(valor: number, idioma: Idioma): string {
+  const numero = numeroConMiles(valor, idioma);
+  return idioma === 'es-CO' ? `$ ${numero}` : `$${numero}`;
 }

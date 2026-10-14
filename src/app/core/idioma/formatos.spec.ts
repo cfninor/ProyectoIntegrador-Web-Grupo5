@@ -1,4 +1,4 @@
-import { fechaBogota, horaBogota } from './formatos';
+import { fechaBogota, horaBogota, montoCop, numeroConMiles } from './formatos';
 
 // Fechas en UTC y lo que se ve en Bogotá (UTC−05:00).
 describe('fechaBogota y horaBogota', () => {
@@ -18,5 +18,20 @@ describe('fechaBogota y horaBogota', () => {
     expect(horaBogota(iso, 'es-CO')).toBe(horaEs);
     expect(fechaBogota(iso, 'en-US')).toBe(fechaEn);
     expect(horaBogota(iso, 'en-US')).toBe(horaEn);
+  });
+});
+
+describe('montos en COP (D8)', () => {
+  it.each([
+    [148_500, '148.500', '148,500', '$ 148.500', '$148,500'],
+    [280_000_000, '280.000.000', '280,000,000', '$ 280.000.000', '$280,000,000'],
+    [1_200_000_000, '1.200.000.000', '1,200,000,000', '$ 1.200.000.000', '$1,200,000,000'],
+    [999, '999', '999', '$ 999', '$999'],
+    [0, '0', '0', '$ 0', '$0'],
+  ])('%s → «%s» y «%s»; «%s» y «%s»', (valor, milesEs, milesEn, montoEs, montoEn) => {
+    expect(numeroConMiles(valor, 'es-CO')).toBe(milesEs);
+    expect(numeroConMiles(valor, 'en-US')).toBe(milesEn);
+    expect(montoCop(valor, 'es-CO')).toBe(montoEs);
+    expect(montoCop(valor, 'en-US')).toBe(montoEn);
   });
 });
