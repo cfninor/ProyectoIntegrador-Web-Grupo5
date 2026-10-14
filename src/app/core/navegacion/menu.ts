@@ -20,12 +20,22 @@ function tablero(rol: Rol): OpcionMenu {
   };
 }
 
+/** Cotizar un seguro (SOLVENTAG5-132): SOLV-WEB-05 para el asesor. */
+function cotizar(rol: Rol): OpcionMenu {
+  return {
+    ruta: `${tableroDe(rol)}/cotizar`,
+    icono: 'documento',
+    texto: $localize`:@@menu.cotizar:Cotizar`,
+    exacta: false,
+  };
+}
+
 /**
  * Opciones del menú de cada rol. Una pantalla nueva agrega aquí su opción y su ruta dentro del
  * grupo de su rol en `app.routes.ts`; no toca los layouts.
  */
 export const MENU: Record<Rol, readonly OpcionMenu[]> = {
-  ASESOR: [tablero('ASESOR')],
+  ASESOR: [tablero('ASESOR'), cotizar('ASESOR')],
   CLIENTE: [tablero('CLIENTE')],
   ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO')],
   OPERACIONES: [tablero('OPERACIONES')],

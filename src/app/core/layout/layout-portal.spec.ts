@@ -34,20 +34,20 @@ async function abrirPortal(rol: Rol, nombre = 'Ana Sofía Reyes') {
 }
 
 describe('LayoutPortal', () => {
-  it.each<[Rol, string, string]>([
-    ['ASESOR', '/asesor', 'Asesor comercial'],
-    ['CLIENTE', '/cliente', 'Cliente'],
-    ['ANALISTA_RIESGO', '/riesgo', 'Analista de riesgo'],
-    ['OPERACIONES', '/operaciones', 'Operaciones'],
-    ['SOCIO', '/socio', 'Socio'],
+  it.each<[Rol, string, string, string[]]>([
+    ['ASESOR', '/asesor', 'Asesor comercial', ['Tablero', 'Cotizar']],
+    ['CLIENTE', '/cliente', 'Cliente', ['Tablero']],
+    ['ANALISTA_RIESGO', '/riesgo', 'Analista de riesgo', ['Tablero']],
+    ['OPERACIONES', '/operaciones', 'Operaciones', ['Tablero']],
+    ['SOCIO', '/socio', 'Socio', ['Tablero']],
   ])(
-    'el menú del rol %s tiene su tablero y la tarjeta dice el rol',
-    async (rol, ruta, nombreRol) => {
+    'el menú del rol %s tiene sus opciones y la tarjeta dice el rol',
+    async (rol, ruta, nombreRol, opcionesDelRol) => {
       const { vista } = await abrirPortal(rol);
 
       const menu = within(vista.getByRole('navigation', { name: 'Menú principal' }));
       const opciones = menu.getAllByRole('link');
-      expect(opciones.map((opcion) => opcion.textContent?.trim())).toEqual(['Tablero']);
+      expect(opciones.map((opcion) => opcion.textContent?.trim())).toEqual(opcionesDelRol);
       expect(menu.getByRole('link', { name: 'Tablero' })).toHaveAttribute('href', ruta);
       expect(vista.getByText(nombreRol)).toBeInTheDocument();
     },

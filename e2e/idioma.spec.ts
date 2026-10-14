@@ -134,7 +134,7 @@ test('navegación del asesor en inglés', async ({ page }) => {
 
   await expect(page).toHaveURL('/asesor');
   const menu = page.getByRole('navigation', { name: 'Main menu' });
-  await expect(menu.getByRole('link')).toHaveText(['Dashboard']);
+  await expect(menu.getByRole('link')).toHaveText(['Dashboard', 'Quote']);
   await expect(menu.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
     'aria-current',
     'page',

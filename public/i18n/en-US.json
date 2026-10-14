@@ -144,6 +144,14 @@
     "cotizacion.panel.vigencia": "Term",
     "cotizacion.panel.vigenciaAnios": "{$plazo} years",
     "cotizacion.panel.validaHasta": "Offer valid until {$INTERPOLATION}",
-    "cotizacion.panel.invitacion": "Complete the details and calculate the quote to see the estimated premium."
+    "cotizacion.panel.invitacion": "Complete the details and calculate the quote to see the estimated premium.",
+    "menu.cotizar": "Quote",
+    "cotizacion.miga": "Quote",
+    "cotizacion.titulo": "Mortgage life insurance quote",
+    "cotizacion.tituloPestana": "Mortgage life insurance quote · Solventa",
+    "cotizacion.asesor.aviso.pedida": "We sent the authorization request to the customer.",
+    "cotizacion.asesor.aviso.reenviada": "We resent the authorization request to the customer.",
+    "cotizacion.asesor.aviso.error": "We couldn't send the authorization request. Try again.",
+    "portal.tablero.nuevaCotizacion": "New quote"
   }
 }

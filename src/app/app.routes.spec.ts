@@ -79,6 +79,32 @@ describe('routes', () => {
     expect(url).toBe(propio);
   });
 
+  it('el asesor abre SOLV-WEB-05 desde su menú, con sus migas y su título', async () => {
+    const { url, vista } = await navegar('/asesor/cotizar', sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor/cotizar');
+    expect(document.title).toBe('Cotizar seguro de vida hipotecario · Solventa');
+    const migas = within(vista.getByRole('navigation', { name: 'Ruta de navegación' }));
+    expect(migas.getAllByRole('listitem').map((miga) => miga.textContent?.trim())).toEqual([
+      'Solventa',
+      'Cotizar',
+    ]);
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Cotizar seguro de vida hipotecario' }),
+    ).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Cotizar' })).toHaveAttribute('aria-current', 'page');
+    expect(vista.getByRole('link', { name: 'Tablero' })).not.toHaveAttribute('aria-current');
+    expect(
+      vista.getByRole('heading', { name: 'Datos del cliente y del crédito' }),
+    ).toBeInTheDocument();
+  });
+
+  it('el cotizador del asesor no se abre con otro rol', async () => {
+    const { url } = await navegar('/asesor/cotizar', sesionDe('CLIENTE'));
+
+    expect(url).toBe('/cliente');
+  });
+
   it('una ruta que no existe muestra la página no encontrada en el layout público', async () => {
     const { url, vista } = await navegar('/no-existe/de-verdad', sesionDe('ASESOR'));
 

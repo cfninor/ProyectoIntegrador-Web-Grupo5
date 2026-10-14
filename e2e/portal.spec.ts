@@ -28,7 +28,7 @@ test('el asesor entra a su tablero con su menú y su tarjeta', async ({ page }) 
   await expect(page).toHaveURL('/asesor');
   await expect(page).toHaveTitle('Tablero · Solventa');
   const menu = page.getByRole('navigation', { name: 'Menú principal' });
-  await expect(menu.getByRole('link')).toHaveText(['Tablero']);
+  await expect(menu.getByRole('link')).toHaveText(['Tablero', 'Cotizar']);
   await expect(menu.getByRole('link', { name: 'Tablero' })).toHaveAttribute('aria-current', 'page');
   const migas = page.getByRole('navigation', { name: 'Ruta de navegación' });
   await expect(migas.getByRole('listitem')).toHaveText(['Solventa', 'Tablero']);

@@ -76,6 +76,32 @@ export interface ClienteEncontrado {
   documentoEnmascarado: string;
 }
 
+/** Estado de la autorización de datos de un cliente, para el asesor (SOLVENTAG5-65). */
+export interface EstadoAutorizacionCliente {
+  clienteId: string;
+  estado: EstadoAutorizacion;
+  /** Fecha del evento que fija el estado; no aplica a SIN_SOLICITAR. */
+  fechaEstado?: string;
+  solicitudId?: string;
+  consentimientoId?: string;
+  fechaVencimiento?: string;
+}
+
+/** Cuerpo de «pedir autorización»: los datos del asesor salen de la sesión (D4). */
+export interface PedirAutorizacion {
+  asesor: { id: string; nombre: string };
+}
+
+/** Respuesta de «pedir autorización»: 201 con una solicitud nueva, 200 si se reenvió. */
+export interface SolicitudEnviada {
+  solicitudId: string;
+  estado: 'PENDIENTE';
+  fechaSolicitud: string;
+  envios: number;
+  reenviada: boolean;
+  enlace: string;
+}
+
 /** Cuerpo `Error` del contrato. `campos` solo viene en DATOS_BIEN_INVALIDOS. */
 export interface ErrorApi {
   codigo: string;
