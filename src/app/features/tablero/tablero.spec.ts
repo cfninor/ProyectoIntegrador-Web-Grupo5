@@ -25,19 +25,19 @@ describe('Tablero', () => {
     expect(screen.getByText('Hola de nuevo, Asesor de prueba.')).toBeInTheDocument();
   });
 
-  it('el tablero del asesor lleva «Nueva cotización» a su cotizador', async () => {
+  it.each([
+    ['ASESOR', '/asesor/cotizar'],
+    ['CLIENTE', '/cliente/cotizar'],
+  ] as const)('el tablero del rol %s lleva «Nueva cotización» a %s', async (rol, ruta) => {
     await renderizar({
       apiBaseUrl: '',
-      sesionSimulada: { usuario: { id: 'a', nombre: 'Asesor de prueba' }, rol: 'ASESOR' },
+      sesionSimulada: { usuario: { id: 'a', nombre: 'X' }, rol },
     });
 
-    expect(screen.getByRole('link', { name: 'Nueva cotización' })).toHaveAttribute(
-      'href',
-      '/asesor/cotizar',
-    );
+    expect(screen.getByRole('link', { name: 'Nueva cotización' })).toHaveAttribute('href', ruta);
   });
 
-  it.each(['CLIENTE', 'ANALISTA_RIESGO', 'OPERACIONES', 'SOCIO'] as const)(
+  it.each(['ANALISTA_RIESGO', 'OPERACIONES', 'SOCIO'] as const)(
     'el tablero del rol %s no lleva «Nueva cotización»',
     async (rol) => {
       await renderizar({

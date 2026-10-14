@@ -20,7 +20,7 @@ function tablero(rol: Rol): OpcionMenu {
   };
 }
 
-/** Cotizar un seguro (SOLVENTAG5-132): SOLV-WEB-05 para el asesor. */
+/** Cotizar un seguro (SOLVENTAG5-132): SOLV-WEB-05 para el asesor y la del cliente. */
 function cotizar(rol: Rol): OpcionMenu {
   return {
     ruta: `${tableroDe(rol)}/cotizar`,
@@ -36,7 +36,7 @@ function cotizar(rol: Rol): OpcionMenu {
  */
 export const MENU: Record<Rol, readonly OpcionMenu[]> = {
   ASESOR: [tablero('ASESOR'), cotizar('ASESOR')],
-  CLIENTE: [tablero('CLIENTE')],
+  CLIENTE: [tablero('CLIENTE'), cotizar('CLIENTE')],
   ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO')],
   OPERACIONES: [tablero('OPERACIONES')],
   SOCIO: [tablero('SOCIO')],

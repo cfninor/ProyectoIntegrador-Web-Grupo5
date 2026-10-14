@@ -5,8 +5,8 @@ import { Icono } from '../../core/navegacion/icono';
 import { tableroDe } from '../../core/sesion/roles';
 import { Rol, SERVICIO_SESION } from '../../core/sesion/sesion';
 
-/** Roles cuyo tablero lleva «Nueva cotización» (SOLVENTAG5-132). La parte 7 agrega el cliente. */
-const COTIZAN: readonly Rol[] = ['ASESOR'];
+/** Roles cuyo tablero lleva «Nueva cotización» (SOLVENTAG5-132). */
+const COTIZAN: readonly Rol[] = ['ASESOR', 'CLIENTE'];
 
 /**
  * Tablero de cada portal: la bienvenida al usuario y, para quien cotiza, «Nueva cotización». El

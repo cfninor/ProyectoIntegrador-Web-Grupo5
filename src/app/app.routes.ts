@@ -29,6 +29,15 @@ const cotizarAsesor: Route = {
     import('./features/cotizacion/pagina-cotizar-asesor').then((m) => m.PaginaCotizarAsesor),
 };
 
+/** El cliente cotiza para sí mismo, con sus datos de la sesión (SOLVENTAG5-132, CA4). */
+const cotizarCliente: Route = {
+  path: 'cotizar',
+  title: TITULO_COTIZAR,
+  data: DATOS_COTIZAR,
+  loadComponent: () =>
+    import('./features/cotizacion/pagina-cotizar-cliente').then((m) => m.PaginaCotizarCliente),
+};
+
 /**
  * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
  * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
@@ -45,7 +54,7 @@ function portal(rol: Rol, pantallas: Routes): Route {
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
   portal('ASESOR', [tablero, cotizarAsesor]),
-  portal('CLIENTE', [tablero]),
+  portal('CLIENTE', [tablero, cotizarCliente]),
   portal('ANALISTA_RIESGO', [tablero]),
   portal('OPERACIONES', [tablero]),
   portal('SOCIO', [tablero]),

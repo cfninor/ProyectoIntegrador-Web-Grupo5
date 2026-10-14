@@ -1,5 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -103,6 +103,35 @@ describe('routes', () => {
     const { url } = await navegar('/asesor/cotizar', sesionDe('CLIENTE'));
 
     expect(url).toBe('/cliente');
+  });
+
+  it('el cliente abre su cotizador desde su menú, con sus datos de la sesión', async () => {
+    const sesion: Sesion = {
+      ...sesionDe('CLIENTE'),
+      clienteId: '9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e',
+      documentoEnmascarado: 'CC ••••5678',
+    };
+    const { url, vista } = await navegar('/cliente/cotizar', sesion);
+
+    expect(url).toBe('/cliente/cotizar');
+    expect(document.title).toBe('Cotizar seguro de vida hipotecario · Solventa');
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Cotizar seguro de vida hipotecario' }),
+    ).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Cotizar' })).toHaveAttribute('aria-current', 'page');
+    expect(vista.getByLabelText('Nombre completo')).toHaveValue('Ana Sofía Reyes');
+    expect(vista.getByLabelText('Documento de identidad')).toHaveValue('CC ••••5678');
+    TestBed.inject(HttpTestingController)
+      .expectOne(
+        'http://bff.prueba/v1/clientes/9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e/autorizacion-datos',
+      )
+      .flush({ clienteId: sesion.clienteId, estado: 'SIN_SOLICITAR' });
+  });
+
+  it('el cotizador del cliente no se abre con otro rol', async () => {
+    const { url } = await navegar('/cliente/cotizar', sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor');
   });
 
   it('una ruta que no existe muestra la página no encontrada en el layout público', async () => {
