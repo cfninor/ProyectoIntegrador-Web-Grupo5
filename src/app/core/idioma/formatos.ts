@@ -35,7 +35,7 @@ export function horaBogota(iso: string, idioma: Idioma): string {
 
 /** Un número entero con el separador de miles del idioma: «280.000.000» o «280,000,000». */
 export function numeroConMiles(valor: number, idioma: Idioma): string {
-  return formatNumber(valor, DATOS_IDIOMA, '1.0-0').replace(/,/g, SEPARADOR_MILES[idioma]);
+  return formatNumber(valor, DATOS_IDIOMA, '1.0-0').replaceAll(',', SEPARADOR_MILES[idioma]);
 }
 
 /** Un monto en COP, sin decimales (D8): «$ 148.500» en español y «$148,500» en inglés. */

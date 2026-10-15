@@ -51,6 +51,8 @@ describe('AutorizacionAsesorApi', () => {
   it('codifica el id del cliente en la ruta', () => {
     api.consultarEstado('a/b').subscribe();
 
-    http.expectOne('http://bff.prueba/v1/clientes/a%2Fb/autorizacion-datos').flush({});
+    const peticion = http.expectOne('http://bff.prueba/v1/clientes/a%2Fb/autorizacion-datos');
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush({});
   });
 });

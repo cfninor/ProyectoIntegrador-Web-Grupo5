@@ -40,12 +40,14 @@
         }}</label>
         @if (actor() === 'asesor') {
           <div class="documento">
-            <select
-              class="campo"
-              formControlName="tipoDocumento"
-              aria-label="Tipo de documento"
-              i18n-aria-label="@@cotizacion.campo.tipoDocumento"
+            <!-- Un aria-label no contendría el texto visible del selector (WCAG 2.5.3). -->
+            <label
+              class="visualmente-oculto"
+              for="cotizacion-tipo-documento"
+              i18n="@@cotizacion.campo.tipoDocumento"
+              >Tipo de documento</label
             >
+            <select id="cotizacion-tipo-documento" class="campo" formControlName="tipoDocumento">
               @for (tipo of tiposDocumento; track tipo) {
                 <option [value]="tipo">{{ textoTipo(tipo) }}</option>
               }

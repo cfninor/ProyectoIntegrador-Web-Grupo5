@@ -303,5 +303,8 @@ describe('PaginaCotizarAsesor · SOLV-WEB-05', () => {
     await usuario.click(await screen.findByRole('button', { name: 'Pedir autorización' }));
 
     http.expectNone(URL_SOLICITUD);
+    expect(
+      screen.queryByText('Le enviamos al cliente la solicitud de autorización.'),
+    ).not.toBeInTheDocument();
   });
 });

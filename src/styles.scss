@@ -179,6 +179,19 @@ h3 {
   color: var(--on-surface);
 }
 
+/* Oculto a la vista y leído por el lector de pantalla, como la etiqueta del tipo de documento. */
+.visualmente-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Mensaje de un campo que no cumple su regla, bajo el campo. */
 .error-campo {
   margin: 6px 0 0;

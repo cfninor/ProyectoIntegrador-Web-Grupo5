@@ -582,6 +582,8 @@ describe('FormularioCotizacion · asesor', () => {
     await usuario.click(reintentar);
 
     http.expectNone(URL_COTIZAR);
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    expect(screen.queryByText('Calculando la prima…')).not.toBeInTheDocument();
   });
 
   it('si el documento cambia y no se ha buscado, pide buscar antes de calcular', async () => {
