@@ -1,0 +1,207 @@
+// Medidas del componente `Sidebar` y del marco «Tablero» del Figma (contexto/figma/README.md).
+$ancho-menu: 256px;
+$alto-barra: 80px;
+$angosto: 900px;
+
+:host {
+  display: block;
+}
+
+p {
+  margin: 0;
+}
+
+.portal {
+  display: flex;
+  min-height: 100vh;
+}
+
+.lateral {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: $ancho-menu;
+  height: 100vh;
+  box-sizing: border-box;
+  border-right: 1px solid var(--outline-variant);
+  background: var(--surface);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: $alto-barra;
+  // El trazo del escudo empieza unos 3 px dentro de su caja: así queda a 32 px del borde.
+  padding-left: 29px;
+  font-family: var(--fuente-titulos);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.menu {
+  flex: 1;
+  overflow-y: auto;
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 12px 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 44px;
+  // El trazo del ícono empieza 1,5 px dentro de su caja: así queda a 19 px del borde de la opción.
+  padding-left: 17px;
+  border-radius: 8px;
+  color: var(--on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+
+  app-icono {
+    color: var(--on-surface-variant);
+  }
+
+  &:hover {
+    background: var(--background);
+  }
+
+  &.activa {
+    background: var(--primary);
+    color: var(--surface);
+
+    app-icono {
+      color: var(--surface);
+    }
+  }
+}
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.iniciales {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #d6ede5;
+  color: #173533;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nombre {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cargo {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.principal {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: $alto-barra;
+  box-sizing: border-box;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--outline-variant);
+  background: var(--surface);
+}
+
+.encabezado {
+  flex: 1;
+  min-width: 0;
+}
+
+.migas {
+  display: flex;
+  margin: 0 0 2px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+
+  li + li::before {
+    content: '/';
+    padding: 0 4px;
+  }
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.boton-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--on-surface);
+  cursor: pointer;
+}
+
+.contenido {
+  flex: 1;
+  padding: 32px;
+}
+
+// En pantallas angostas el menú lateral se pliega y se abre sobre el contenido con el botón.
+@media (max-width: $angosto) {
+  .lateral {
+    position: fixed;
+    z-index: 10;
+    left: 0;
+    display: none;
+    box-shadow: 0 8px 24px rgb(17 19 24 / 16%);
+  }
+
+  .menu-abierto .lateral {
+    display: flex;
+  }
+
+  .boton-menu {
+    display: inline-flex;
+  }
+
+  .barra,
+  .contenido {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}

@@ -1,9 +1,9 @@
-import { formatDate } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   Component,
   ElementRef,
   Injector,
+  LOCALE_ID,
   OnInit,
   afterNextRender,
   computed,
@@ -13,6 +13,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { fechaBogota, horaBogota } from '../../core/idioma/formatos';
+import { idiomaDe } from '../../core/idioma/idioma';
 import { AutorizacionDatosApi } from './autorizacion-datos-api';
 import {
   CodigoDato,
@@ -45,21 +47,6 @@ interface Resultado {
   yaRespondida: boolean;
 }
 
-/** Bogotá: UTC−05:00, sin horario de verano. */
-const ZONA_BOGOTA = '-0500';
-
-/**
- * Formatos numéricos que no dependen de los datos de un idioma: se usan los de en-US, que
- * Angular trae siempre, y el resultado es el mismo dd/mm/aaaa y hh:mm en cualquier idioma.
- */
-function fechaBogota(iso: string): string {
-  return formatDate(iso, 'dd/MM/yyyy', 'en-US', ZONA_BOGOTA);
-}
-
-function horaBogota(iso: string): string {
-  return formatDate(iso, 'HH:mm', 'en-US', ZONA_BOGOTA);
-}
-
 /** SOLV-WEB-20 «Autorizar consulta de datos»: el cliente autoriza o no la consulta (CA1, CA2). */
 @Component({
   selector: 'app-pagina-autorizacion-datos',
@@ -72,6 +59,8 @@ export class PaginaAutorizacionDatos implements OnInit {
 
   private readonly api = inject(AutorizacionDatosApi);
   private readonly injector = inject(Injector);
+  /** Idioma de las fechas y horas, en hora de Bogotá (D8). */
+  private readonly idioma = idiomaDe(inject(LOCALE_ID));
   private readonly tituloResultado = viewChild<ElementRef<HTMLElement>>('tituloResultado');
 
   protected readonly vista = signal<Vista>('cargando');
@@ -86,8 +75,8 @@ export class PaginaAutorizacionDatos implements OnInit {
     return solicitud
       ? {
           asesor: solicitud.asesor.nombre,
-          fecha: fechaBogota(solicitud.fechaSolicitud),
-          hora: horaBogota(solicitud.fechaSolicitud),
+          fecha: fechaBogota(solicitud.fechaSolicitud, this.idioma),
+          hora: horaBogota(solicitud.fechaSolicitud, this.idioma),
         }
       : null;
   });

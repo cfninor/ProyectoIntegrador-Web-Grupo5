@@ -1,0 +1,438 @@
+<div class="cotizador">
+  <form
+    class="tarjeta formulario"
+    [formGroup]="formulario"
+    (ngSubmit)="calcular()"
+    novalidate
+    aria-labelledby="cotizacion-titulo"
+  >
+    <h2 id="cotizacion-titulo" i18n="@@cotizacion.formulario.titulo">
+      Datos del cliente y del crédito
+    </h2>
+    @if (actor() === 'asesor') {
+      <p class="ayuda" i18n="@@cotizacion.formulario.ayuda.asesor">
+        Con estos datos y la autorización del cliente, calculamos un precio personalizado según su
+        perfil de riesgo.
+      </p>
+    } @else {
+      <p class="ayuda" i18n="@@cotizacion.formulario.ayuda.cliente">
+        Con estos datos y tu autorización, calculamos un precio personalizado usando tu perfil de
+        riesgo.
+      </p>
+    }
+
+    <!-- Mientras calcula, los datos no cambian: la prima que llegue es la de estos datos. -->
+    <fieldset class="grilla" [disabled]="estado() === 'calculando'">
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-nombre">{{ etiquetas.nombre }}</label>
+        <input
+          id="cotizacion-nombre"
+          class="campo"
+          type="text"
+          readonly
+          [value]="cliente()?.nombreCompleto ?? ''"
+        />
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-documento">{{
+          etiquetas.numeroDocumento
+        }}</label>
+        @if (actor() === 'asesor') {
+          <div class="documento">
+            <!-- Un aria-label no contendría el texto visible del selector (WCAG 2.5.3). -->
+            <label
+              class="visualmente-oculto"
+              for="cotizacion-tipo-documento"
+              i18n="@@cotizacion.campo.tipoDocumento"
+              >Tipo de documento</label
+            >
+            <select id="cotizacion-tipo-documento" class="campo" formControlName="tipoDocumento">
+              @for (tipo of tiposDocumento; track tipo) {
+                <option [value]="tipo">{{ textoTipo(tipo) }}</option>
+              }
+            </select>
+            <input
+              id="cotizacion-documento"
+              class="campo"
+              type="text"
+              autocomplete="off"
+              formControlName="numeroDocumento"
+              [attr.aria-invalid]="error('numeroDocumento') !== null"
+              aria-describedby="cotizacion-documento-estado"
+              (blur)="buscar()"
+              (keydown.enter)="alPresionarEnter($event)"
+            />
+          </div>
+          <div id="cotizacion-documento-estado" aria-live="polite">
+            @if (error('numeroDocumento'); as mensaje) {
+              <p class="error-campo">{{ mensaje }}</p>
+            } @else {
+              @switch (busqueda()) {
+                @case ('buscando') {
+                  <p class="estado-busqueda" i18n="@@cotizacion.busqueda.buscando">
+                    Buscando al cliente…
+                  </p>
+                }
+                @case ('no-encontrado') {
+                  <p class="error-campo" i18n="@@cotizacion.busqueda.noEncontrado">
+                    No encontramos un cliente con ese documento.
+                  </p>
+                }
+                @case ('error') {
+                  <p class="error-campo" i18n="@@cotizacion.busqueda.error">
+                    No pudimos buscar al cliente. Intenta de nuevo.
+                  </p>
+                }
+              }
+            }
+          </div>
+        } @else {
+          <input
+            id="cotizacion-documento"
+            class="campo"
+            type="text"
+            readonly
+            [value]="cliente()?.documento ?? ''"
+          />
+        }
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-monto">{{ etiquetas.montoCredito }}</label>
+        <input
+          id="cotizacion-monto"
+          class="campo"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          formControlName="montoCredito"
+          [attr.aria-invalid]="error('montoCredito') !== null"
+          aria-describedby="cotizacion-monto-error"
+          (blur)="formatearMonto()"
+        />
+        <div id="cotizacion-monto-error">
+          @if (error('montoCredito'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-plazo">{{ etiquetas.plazoAnios }}</label>
+        <input
+          id="cotizacion-plazo"
+          class="campo"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          formControlName="plazoAnios"
+          [attr.aria-invalid]="error('plazoAnios') !== null"
+          aria-describedby="cotizacion-plazo-error"
+        />
+        <div id="cotizacion-plazo-error">
+          @if (error('plazoAnios'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-ciudad">{{ etiquetas.ciudadInmueble }}</label>
+        <input
+          id="cotizacion-ciudad"
+          class="campo"
+          type="text"
+          autocomplete="address-level2"
+          formControlName="ciudadInmueble"
+          [attr.aria-invalid]="error('ciudadInmueble') !== null"
+          aria-describedby="cotizacion-ciudad-error"
+        />
+        <div id="cotizacion-ciudad-error">
+          @if (error('ciudadInmueble'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="cotizacion-entidad">{{
+          etiquetas.entidadAcreedora
+        }}</label>
+        <input
+          id="cotizacion-entidad"
+          class="campo"
+          type="text"
+          autocomplete="off"
+          formControlName="entidadAcreedora"
+          [attr.aria-invalid]="error('entidadAcreedora') !== null"
+          aria-describedby="cotizacion-entidad-error"
+        />
+        <div id="cotizacion-entidad-error">
+          @if (error('entidadAcreedora'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="caja-autorizacion" aria-live="polite">
+      @if (vistaCaja() === 'AUTORIZADA') {
+        <span class="indicador" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+            <path
+              d="m5 12.5 4.5 4.5L19 7.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+      }
+      <div class="texto-caja">
+        @if (actor() === 'asesor') {
+          @switch (vistaCaja()) {
+            @case ('sin-cliente') {
+              <p i18n="@@cotizacion.caja.asesor.sinCliente">
+                Busca al cliente por su documento para ver el estado de su autorización.
+              </p>
+            }
+            @case ('cargando') {
+              <p i18n="@@cotizacion.caja.asesor.cargando">
+                Consultando la autorización del cliente…
+              </p>
+            }
+            @case ('error') {
+              <p i18n="@@cotizacion.caja.asesor.error">
+                No pudimos consultar la autorización del cliente.
+              </p>
+              <button
+                type="button"
+                class="boton-secundario"
+                (click)="reintentarAutorizacion.emit()"
+                i18n="@@cotizacion.caja.reintentar"
+              >
+                Reintentar
+              </button>
+            }
+            @case ('AUTORIZADA') {
+              @if (fechaAutorizacion(); as momento) {
+                <p i18n="@@cotizacion.caja.asesor.autorizadaEl">
+                  El cliente autorizó la consulta de sus datos de Open Finance y Open Data el
+                  {{ momento.fecha }} a las {{ momento.hora }}.
+                </p>
+              } @else {
+                <p i18n="@@cotizacion.caja.asesor.autorizada">
+                  El cliente autorizó la consulta de sus datos de Open Finance y Open Data.
+                </p>
+              }
+            }
+            @case ('ESPERANDO_CLIENTE') {
+              <p i18n="@@cotizacion.caja.asesor.esperando">
+                Le enviamos la solicitud de autorización al cliente y aún no responde.
+              </p>
+              <button
+                type="button"
+                class="boton-secundario"
+                (click)="reenviarSolicitud.emit()"
+                i18n="@@cotizacion.caja.reenviar"
+              >
+                Reenviar solicitud
+              </button>
+            }
+            @default {
+              @switch (vistaCaja()) {
+                @case ('REVOCADA') {
+                  <p i18n="@@cotizacion.caja.asesor.revocada">
+                    El cliente revocó la autorización para consultar sus datos.
+                  </p>
+                }
+                @case ('VENCIDA') {
+                  <p i18n="@@cotizacion.caja.asesor.vencida">La autorización del cliente venció.</p>
+                }
+                @default {
+                  <p i18n="@@cotizacion.caja.asesor.sinSolicitar">
+                    El cliente todavía no ha autorizado la consulta de sus datos de Open Finance y
+                    Open Data.
+                  </p>
+                }
+              }
+              <button
+                type="button"
+                class="boton-secundario"
+                (click)="pedirAutorizacion.emit()"
+                i18n="@@cotizacion.caja.pedir"
+              >
+                Pedir autorización
+              </button>
+            }
+          }
+        } @else {
+          @switch (vistaCaja()) {
+            @case ('cargando') {
+              <p i18n="@@cotizacion.caja.cliente.cargando">Consultando tu autorización…</p>
+            }
+            @case ('error') {
+              <p i18n="@@cotizacion.caja.cliente.error">
+                No pudimos consultar tu autorización. Puedes calcular igual: la prima se calculará
+                sin tu perfil de riesgo.
+              </p>
+              <button
+                type="button"
+                class="boton-secundario"
+                (click)="reintentarAutorizacion.emit()"
+                i18n="@@cotizacion.caja.reintentar"
+              >
+                Reintentar
+              </button>
+            }
+            @case ('AUTORIZADA') {
+              @if (fechaAutorizacion(); as momento) {
+                <p i18n="@@cotizacion.caja.cliente.autorizadaEl">
+                  Tu autorización para consultar tus datos de Open Finance y Open Data está vigente
+                  desde el {{ momento.fecha }}.
+                </p>
+              } @else {
+                <p i18n="@@cotizacion.caja.cliente.autorizada">
+                  Tu autorización para consultar tus datos de Open Finance y Open Data está vigente.
+                </p>
+              }
+            }
+            @default {
+              <p i18n="@@cotizacion.caja.cliente.sinAutorizacion">
+                No tienes una autorización vigente: calcularemos la prima sin tu perfil de riesgo.
+              </p>
+            }
+          }
+        }
+      </div>
+    </div>
+
+    <div class="acciones">
+      <button
+        type="submit"
+        class="boton-primario calcular"
+        [disabled]="!puedeEnviar()"
+        aria-describedby="cotizacion-bloqueo"
+      >
+        @if (estado() === 'calculando') {
+          <ng-container i18n="@@cotizacion.calculando">Calculando…</ng-container>
+        } @else {
+          <ng-container i18n="@@cotizacion.calcular">Calcular cotización</ng-container>
+        }
+      </button>
+
+      <div id="cotizacion-bloqueo">
+        @switch (bloqueo()) {
+          @case ('campos') {
+            <p class="texto-secundario" i18n="@@cotizacion.bloqueo.campos">
+              Para calcular, completa: {{ faltantes().join(', ') }}.
+            </p>
+          }
+          @case ('cliente') {
+            <p class="texto-secundario" i18n="@@cotizacion.bloqueo.cliente">
+              Para calcular, busca al cliente por su documento.
+            </p>
+          }
+          @case ('autorizacion') {
+            <p class="texto-secundario" i18n="@@cotizacion.bloqueo.autorizacion">
+              Para calcular, el cliente debe autorizar la consulta de sus datos.
+            </p>
+          }
+        }
+      </div>
+
+      @if (estado() === 'error') {
+        <div class="falla" role="alert">
+          <p class="mensaje-error" i18n="@@cotizacion.error.servicio">
+            No pudimos calcular la cotización. Tus datos siguen aquí: intenta de nuevo.
+          </p>
+          <button
+            type="button"
+            class="boton-secundario"
+            (click)="calcular()"
+            i18n="@@cotizacion.reintentar"
+          >
+            Reintentar
+          </button>
+        </div>
+      } @else if (estado() === 'rechazada') {
+        <p class="mensaje-error" role="alert" i18n="@@cotizacion.error.rechazada">
+          El servicio no aceptó algunos datos. Revisa los campos marcados.
+        </p>
+      }
+    </div>
+  </form>
+
+  <section
+    class="tarjeta panel"
+    aria-labelledby="cotizacion-panel-titulo"
+    [attr.aria-busy]="estado() === 'calculando'"
+  >
+    <h2 id="cotizacion-panel-titulo" i18n="@@cotizacion.panel.titulo">Prima estimada</h2>
+    <div aria-live="polite">
+      @if (estado() === 'calculando') {
+        <p class="texto-panel" i18n="@@cotizacion.panel.calculando">Calculando la prima…</p>
+      } @else if (resumen(); as datos) {
+        <p class="prima">
+          <span class="valor">{{ datos.prima }}</span>
+          <span class="periodo" i18n="@@cotizacion.panel.porMes">/ mes</span>
+        </p>
+        <p class="moneda" i18n="@@cotizacion.panel.moneda">COP</p>
+        @switch (datos.motivoSinPerfil) {
+          @case ('SIN_CLIENTE') {
+            <p class="aviso" i18n="@@cotizacion.panel.sinPerfil.sinCliente">
+              Calculada sin perfil de riesgo porque no hay un cliente identificado.
+            </p>
+          }
+          @case ('SIN_CONSENTIMIENTO') {
+            @if (actor() === 'asesor') {
+              <p class="aviso" i18n="@@cotizacion.panel.sinPerfil.sinConsentimiento.asesor">
+                Calculada sin el perfil de riesgo del cliente porque no tiene una autorización
+                vigente.
+              </p>
+            } @else {
+              <p class="aviso" i18n="@@cotizacion.panel.sinPerfil.sinConsentimiento.cliente">
+                Calculada sin tu perfil de riesgo porque no tienes una autorización vigente.
+              </p>
+            }
+          }
+          @case ('PERFIL_NO_DISPONIBLE') {
+            @if (actor() === 'asesor') {
+              <p class="aviso" i18n="@@cotizacion.panel.sinPerfil.noDisponible.asesor">
+                Calculada sin el perfil de riesgo del cliente porque no estuvo disponible a tiempo.
+              </p>
+            } @else {
+              <p class="aviso" i18n="@@cotizacion.panel.sinPerfil.noDisponible.cliente">
+                Calculada sin tu perfil de riesgo porque no estuvo disponible a tiempo.
+              </p>
+            }
+          }
+        }
+        <dl class="filas">
+          <div>
+            <dt i18n="@@cotizacion.panel.cobertura">Cobertura</dt>
+            <dd i18n="@@cotizacion.panel.saldoCredito">Saldo del crédito</dd>
+          </div>
+          <div>
+            <dt i18n="@@cotizacion.panel.sumaAsegurada">Suma asegurada</dt>
+            <dd>{{ datos.sumaAsegurada }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@cotizacion.panel.vigencia">Vigencia</dt>
+            <dd>{{ datos.vigencia }}</dd>
+          </div>
+        </dl>
+        <p class="pie" i18n="@@cotizacion.panel.validaHasta">
+          Oferta válida hasta el {{ datos.validaHasta }}
+        </p>
+      } @else {
+        <p class="texto-panel" i18n="@@cotizacion.panel.invitacion">
+          Completa los datos y calcula la cotización para ver la prima estimada.
+        </p>
+      }
+    </div>
+  </section>
+</div>

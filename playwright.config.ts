@@ -13,6 +13,9 @@ export default defineConfig({
   reporter: enCI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
+    // El portal elige el idioma del navegador si no hay preferencia guardada (D12): las pruebas
+    // fijan español; las de inglés guardan la preferencia antes de abrir la página.
+    locale: 'es-CO',
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
