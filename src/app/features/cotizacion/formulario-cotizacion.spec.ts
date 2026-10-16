@@ -70,6 +70,7 @@ async function renderizar(opciones: Opciones = {}) {
     reenviarSolicitud: jest.fn(),
     reintentarAutorizacion: jest.fn(),
     cotizada: jest.fn(),
+    verOferta: jest.fn(),
   };
   const actor = opciones.actor ?? 'cliente';
   const vista = await render(FormularioCotizacion, {
@@ -219,6 +220,11 @@ describe('FormularioCotizacion · cliente', () => {
     expect(panel.getByText('Oferta válida hasta el 21/10/2026')).toBeInTheDocument();
     expect(panel.queryByText(/Calculada sin/)).not.toBeInTheDocument();
     expect(salidas.cotizada).toHaveBeenCalledWith(CON_PERFIL);
+
+    // SOLVENTAG5-49: desde el panel se abre la oferta completa de esta cotización.
+    expect(salidas.verOferta).not.toHaveBeenCalled();
+    await usuario.click(panel.getByRole('button', { name: 'Ver la oferta' }));
+    expect(salidas.verOferta).toHaveBeenCalledWith(CON_PERFIL);
   });
 
   it('Enter en un campo no envía mientras falten datos', async () => {

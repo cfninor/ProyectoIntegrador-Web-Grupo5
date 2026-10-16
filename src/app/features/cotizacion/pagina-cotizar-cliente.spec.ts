@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
@@ -113,6 +114,11 @@ describe('PaginaCotizarCliente', () => {
     const panel = within(await screen.findByRole('region', { name: 'Prima estimada' }));
     expect(panel.getByText('$ 148.500')).toBeInTheDocument();
     expect(panel.queryByText(/Calculada sin/)).not.toBeInTheDocument();
+
+    // SOLVENTAG5-49: «Ver la oferta» abre la oferta de esta cotización en el Portal Clientes.
+    const navegar = jest.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await usuario.click(panel.getByRole('button', { name: 'Ver la oferta' }));
+    expect(navegar).toHaveBeenCalledWith('/cliente/cotizar/oferta/c-1');
   });
 
   it.each(['SIN_SOLICITAR', 'ESPERANDO_CLIENTE', 'REVOCADA', 'VENCIDA'])(

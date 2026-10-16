@@ -4,6 +4,7 @@ import { datosPagina } from './core/layout/pagina';
 import { PREFIJO_PORTAL } from './core/sesion/roles';
 import { redirigirAlPortal, rolGuard } from './core/sesion/rol-guard';
 import { Rol } from './core/sesion/sesion';
+import type { Actor } from './features/cotizacion/formulario-cotizacion';
 
 /** Tablero de cada portal: la raíz de su grupo de rutas. */
 const tablero: Route = {
@@ -38,6 +39,22 @@ const cotizarCliente: Route = {
     import('./features/cotizacion/pagina-cotizar-cliente').then((m) => m.PaginaCotizarCliente),
 };
 
+/** Datos de la barra superior de la oferta: «Solventa / Cotizar / Oferta» y su título. */
+const DATOS_OFERTA = datosPagina(
+  $localize`:@@oferta.miga:Cotizar / Oferta`,
+  $localize`:@@oferta.titulo:Oferta personalizada`,
+);
+
+/** SOLVENTAG5-49: la oferta de una cotización, en el portal del asesor y en el del cliente. */
+function oferta(actor: Actor): Route {
+  return {
+    path: 'cotizar/oferta/:cotizacionId',
+    title: $localize`:@@oferta.tituloPestana:Oferta personalizada · Solventa`,
+    data: { ...DATOS_OFERTA, actor },
+    loadComponent: () => import('./features/cotizacion/pagina-oferta').then((m) => m.PaginaOferta),
+  };
+}
+
 /**
  * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
  * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
@@ -53,8 +70,8 @@ function portal(rol: Rol, pantallas: Routes): Route {
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
-  portal('ASESOR', [tablero, cotizarAsesor]),
-  portal('CLIENTE', [tablero, cotizarCliente]),
+  portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor')]),
+  portal('CLIENTE', [tablero, cotizarCliente, oferta('cliente')]),
   portal('ANALISTA_RIESGO', [tablero]),
   portal('OPERACIONES', [tablero]),
   portal('SOCIO', [tablero]),

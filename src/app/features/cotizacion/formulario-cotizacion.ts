@@ -130,6 +130,8 @@ export class FormularioCotizacion implements OnInit {
   readonly reenviarSolicitud = output<void>();
   readonly reintentarAutorizacion = output<void>();
   readonly cotizada = output<Cotizacion>();
+  /** «Ver la oferta» del panel: el contenedor abre la oferta de la cotización (SOLVENTAG5-49). */
+  readonly verOferta = output<Cotizacion>();
 
   private readonly api = inject(CotizacionApi);
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
@@ -322,6 +324,11 @@ export class FormularioCotizacion implements OnInit {
   protected alPresionarEnter(evento: Event): void {
     evento.preventDefault();
     this.buscar();
+  }
+
+  /** «Ver la oferta» solo aparece con un resultado: siempre hay una cotización que abrir. */
+  protected abrirOferta(): void {
+    this.verOferta.emit(this.cotizacion() as Cotizacion);
   }
 
   /** Al salir del monto lo muestra con separador de miles, como se lee en el idioma. */

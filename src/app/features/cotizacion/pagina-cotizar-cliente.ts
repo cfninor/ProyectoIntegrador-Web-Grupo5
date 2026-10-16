@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { SERVICIO_SESION } from '../../core/sesion/sesion';
 import { AutorizacionAsesorApi } from './autorizacion-asesor-api';
 import { CajaAutorizacion, ClienteCotizacion, FormularioCotizacion } from './formulario-cotizacion';
+import { Cotizacion } from './modelos';
 
 /**
  * Cotización del Portal Clientes, destino de «Cotizar otro seguro» de SOLV-WEB-21 (D1). El cliente
@@ -21,11 +23,13 @@ import { CajaAutorizacion, ClienteCotizacion, FormularioCotizacion } from './for
       [cliente]="cliente"
       [autorizacion]="caja()"
       (reintentarAutorizacion)="consultarAutorizacion()"
+      (verOferta)="abrirOferta($event)"
     />
   `,
 })
 export class PaginaCotizarCliente {
   private readonly autorizacionApi = inject(AutorizacionAsesorApi);
+  private readonly router = inject(Router);
 
   /** El cliente de la sesión (D11, CA4); null si la sesión no trae su `clienteId`. */
   protected readonly cliente: ClienteCotizacion | null = this.clienteDeLaSesion();
@@ -51,6 +55,11 @@ export class PaginaCotizarCliente {
       next: ({ estado, fechaEstado }) => this.caja.set({ tipo: 'estado', estado, fechaEstado }),
       error: () => this.caja.set({ tipo: 'error' }),
     });
+  }
+
+  /** La oferta de la cotización recién calculada (SOLVENTAG5-49). */
+  protected abrirOferta(cotizacion: Cotizacion): void {
+    void this.router.navigateByUrl(`/cliente/cotizar/oferta/${cotizacion.cotizacionId}`);
   }
 
   private clienteDeLaSesion(): ClienteCotizacion | null {

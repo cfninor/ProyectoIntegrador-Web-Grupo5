@@ -182,6 +182,11 @@ p {
   margin-top: 16px;
 }
 
+.ver-oferta {
+  width: 100%;
+  margin-top: 16px;
+}
+
 // Sin espacio para el panel al lado, va debajo; y en un teléfono, una sola columna de campos.
 @container (max-width: 959px) {
   .cotizador {

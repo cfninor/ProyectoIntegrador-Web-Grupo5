@@ -428,6 +428,15 @@
         <p class="pie" i18n="@@cotizacion.panel.validaHasta">
           Oferta válida hasta el {{ datos.validaHasta }}
         </p>
+        <!-- La oferta completa: precio explicado, cobertura y decisión (SOLVENTAG5-49). -->
+        <button
+          type="button"
+          class="boton-secundario ver-oferta"
+          (click)="abrirOferta()"
+          i18n="@@cotizacion.panel.verOferta"
+        >
+          Ver la oferta
+        </button>
       } @else {
         <p class="texto-panel" i18n="@@cotizacion.panel.invitacion">
           Completa los datos y calcula la cotización para ver la prima estimada.

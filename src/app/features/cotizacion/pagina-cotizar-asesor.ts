@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { SERVICIO_SESION } from '../../core/sesion/sesion';
@@ -18,7 +19,7 @@ import {
   EstadoBusqueda,
   FormularioCotizacion,
 } from './formulario-cotizacion';
-import { BusquedaCliente } from './modelos';
+import { BusquedaCliente, Cotizacion } from './modelos';
 
 /** Resultado de «Pedir autorización» o «Reenviar solicitud», que se avisa sobre el formulario. */
 type AvisoEnvio = 'pedida' | 'reenviada' | 'error' | null;
@@ -84,12 +85,14 @@ type AvisoEnvio = 'pedida' | 'reenviada' | 'error' | null;
       (pedirAutorizacion)="pedirAutorizacion()"
       (reenviarSolicitud)="pedirAutorizacion()"
       (reintentarAutorizacion)="consultarAutorizacion()"
+      (verOferta)="abrirOferta($event)"
     />
   `,
 })
 export class PaginaCotizarAsesor {
   private readonly cotizacionApi = inject(CotizacionApi);
   private readonly autorizacionApi = inject(AutorizacionAsesorApi);
+  private readonly router = inject(Router);
   /** El asesor de la sesión: sus datos van en la solicitud de autorización (D4). */
   private readonly asesor = inject(SERVICIO_SESION).actual()?.usuario ?? null;
 
@@ -177,6 +180,11 @@ export class PaginaCotizarAsesor {
           }
         },
       });
+  }
+
+  /** La oferta de la cotización recién calculada (SOLVENTAG5-49). */
+  protected abrirOferta(cotizacion: Cotizacion): void {
+    void this.router.navigateByUrl(`/asesor/cotizar/oferta/${cotizacion.cotizacionId}`);
   }
 
   /**

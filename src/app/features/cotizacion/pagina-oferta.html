@@ -1,0 +1,213 @@
+<ol class="pasos" i18n-aria-label="@@oferta.pasos" aria-label="Pasos de la contratación">
+  <li class="paso actual" aria-current="step">
+    <span class="numero">1</span><span i18n="@@oferta.paso.cotizacion">Cotización</span>
+  </li>
+  <li class="separador" aria-hidden="true"></li>
+  <li class="paso">
+    <span class="numero">2</span><span i18n="@@oferta.paso.suscripcion">Suscripción</span>
+  </li>
+  <li class="separador" aria-hidden="true"></li>
+  <li class="paso"><span class="numero">3</span><span i18n="@@oferta.paso.pago">Pago</span></li>
+  <li class="separador" aria-hidden="true"></li>
+  <li class="paso"><span class="numero">4</span><span i18n="@@oferta.paso.firma">Firma</span></li>
+  <li class="separador" aria-hidden="true"></li>
+  <li class="paso">
+    <span class="numero">5</span><span i18n="@@oferta.paso.emision">Emisión</span>
+  </li>
+</ol>
+
+<div aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <p class="tarjeta estado-carga" i18n="@@oferta.cargando">Cargando la oferta…</p>
+    }
+    @case ('no-encontrada') {
+      <div class="tarjeta estado-carga">
+        <p class="mensaje-error" i18n="@@oferta.noEncontrada">No encontramos esta oferta.</p>
+        <a class="boton-secundario" [routerLink]="rutaCotizar()" i18n="@@oferta.volverACotizar"
+          >Volver a cotizar</a
+        >
+      </div>
+    }
+    @case ('error') {
+      <div class="tarjeta estado-carga">
+        <p class="mensaje-error" i18n="@@oferta.error">
+          No pudimos cargar la oferta. Intenta de nuevo.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="cargar()"
+          i18n="@@oferta.reintentar"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+  }
+</div>
+
+@if (oferta(); as datos) {
+  <div class="fila">
+    <section class="tarjeta prima" aria-labelledby="oferta-prima-titulo">
+      <h2 id="oferta-prima-titulo" class="etiqueta-prima" i18n="@@oferta.primaMensual">
+        Prima mensual
+      </h2>
+      <p class="valor-prima">{{ datos.prima }}</p>
+      <p class="periodicidad" i18n="@@oferta.copPorMes">COP / mes · pago mensual</p>
+      @if (datos.perfil; as perfil) {
+        <svg
+          class="anillo"
+          width="140"
+          height="140"
+          viewBox="0 0 140 140"
+          role="img"
+          [attr.aria-label]="perfil.etiquetaAnillo"
+        >
+          <circle class="anillo-fondo" cx="70" cy="70" [attr.r]="radioAnillo" />
+          <circle
+            class="anillo-valor"
+            cx="70"
+            cy="70"
+            [attr.r]="radioAnillo"
+            [attr.stroke-dasharray]="perfil.arco"
+            transform="rotate(-90 70 70)"
+          />
+          <text class="anillo-score" x="70" y="74" text-anchor="middle">{{ perfil.score }}</text>
+          <text class="anillo-maximo" x="70" y="94" text-anchor="middle" i18n="@@oferta.de850">
+            de 850
+          </text>
+        </svg>
+        <span class="chip {{ perfil.claseNivel }}">{{ perfil.nivel }}</span>
+      }
+      <p class="valida-hasta" i18n="@@oferta.validaHasta">
+        Oferta válida hasta el <strong>{{ datos.validaHasta }}</strong>
+      </p>
+    </section>
+
+    <section class="tarjeta perfil" aria-labelledby="oferta-perfil-titulo">
+      <div class="encabezado-perfil">
+        <div>
+          @if (actor() === 'asesor') {
+            <h2 id="oferta-perfil-titulo" i18n="@@oferta.porque.asesor">
+              Por qué el cliente recibió este precio
+            </h2>
+          } @else {
+            <h2 id="oferta-perfil-titulo" i18n="@@oferta.porque.cliente">
+              Por qué recibiste este precio
+            </h2>
+          }
+          @if (datos.perfil) {
+            @if (actor() === 'asesor') {
+              <p class="texto-secundario" i18n="@@oferta.senales.asesor">
+                Señales del perfil de riesgo, calculadas con la autorización del cliente.
+              </p>
+            } @else {
+              <p class="texto-secundario" i18n="@@oferta.senales.cliente">
+                Señales de tu perfil de riesgo, calculadas con tu autorización.
+              </p>
+            }
+          }
+        </div>
+        @if (datos.perfil; as perfil) {
+          <span class="chip chip-verde-azulado" i18n="@@oferta.perfilVigente"
+            >Perfil vigente · {{ perfil.fecha }} {{ perfil.hora }}</span
+          >
+        } @else {
+          <span class="chip chip-gris" i18n="@@oferta.sinPerfil">Sin perfil de riesgo</span>
+        }
+      </div>
+
+      @if (datos.perfil; as perfil) {
+        <ul class="senales">
+          @for (senal of perfil.senales; track senal.senal) {
+            <li class="senal">
+              <span>{{ senal.nombre }}</span>
+              <span class="barra" aria-hidden="true">
+                <span class="relleno {{ senal.tramo }}" [style.width.%]="senal.valor"></span>
+              </span>
+              <span class="lectura"
+                >{{ senal.lectura }}
+                <span class="visualmente-oculto" i18n="@@oferta.senal.valor"
+                  >({{ senal.valor }} de 100)</span
+                ></span
+              >
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="sin-perfil">
+          @switch (datos.motivoSinPerfil) {
+            @case ('SIN_CLIENTE') {
+              <p i18n="@@cotizacion.panel.sinPerfil.sinCliente">
+                Calculada sin perfil de riesgo porque no hay un cliente identificado.
+              </p>
+            }
+            @case ('SIN_CONSENTIMIENTO') {
+              @if (actor() === 'asesor') {
+                <p i18n="@@cotizacion.panel.sinPerfil.sinConsentimiento.asesor">
+                  Calculada sin el perfil de riesgo del cliente porque no tiene una autorización
+                  vigente.
+                </p>
+              } @else {
+                <p i18n="@@cotizacion.panel.sinPerfil.sinConsentimiento.cliente">
+                  Calculada sin tu perfil de riesgo porque no tienes una autorización vigente.
+                </p>
+              }
+            }
+            @default {
+              @if (actor() === 'asesor') {
+                <p i18n="@@cotizacion.panel.sinPerfil.noDisponible.asesor">
+                  Calculada sin el perfil de riesgo del cliente porque no estuvo disponible a
+                  tiempo.
+                </p>
+              } @else {
+                <p i18n="@@cotizacion.panel.sinPerfil.noDisponible.cliente">
+                  Calculada sin tu perfil de riesgo porque no estuvo disponible a tiempo.
+                </p>
+              }
+            }
+          }
+          <p class="texto-secundario" i18n="@@oferta.valorPorDefecto">
+            La prima usa el valor por defecto del seguro, sin descuentos ni recargos por perfil.
+          </p>
+        </div>
+      }
+
+      <p class="fuentes" i18n="@@oferta.fuentes">
+        Fuentes: Open Finance y Open Data. Si una fuente no responde a tiempo, la prima se calcula
+        con el valor por defecto y se indica aquí.
+      </p>
+    </section>
+  </div>
+
+  <section class="tarjeta cobertura" aria-labelledby="oferta-cobertura-titulo">
+    <h2 id="oferta-cobertura-titulo" i18n="@@oferta.resumenCobertura">Resumen de la cobertura</h2>
+    <dl class="datos-cobertura">
+      <div>
+        <dt i18n="@@oferta.producto">Producto</dt>
+        <dd i18n="@@oferta.vidaHipotecario">Vida hipotecario</dd>
+      </div>
+      <div>
+        <dt i18n="@@cotizacion.panel.cobertura">Cobertura</dt>
+        <dd i18n="@@cotizacion.panel.saldoCredito">Saldo del crédito</dd>
+      </div>
+      <div>
+        <dt i18n="@@cotizacion.panel.sumaAsegurada">Suma asegurada</dt>
+        <dd>{{ datos.sumaAsegurada }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@oferta.periodicidad">Periodicidad de pago</dt>
+        <dd i18n="@@oferta.mensual">Mensual</dd>
+      </div>
+      <div>
+        <dt i18n="@@oferta.vigenciaPoliza">Vigencia de la póliza</dt>
+        <dd>{{ datos.vigenciaPoliza }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@oferta.beneficiario">Beneficiario</dt>
+        <dd>{{ datos.beneficiario }}</dd>
+      </div>
+    </dl>
+  </section>
+}
