@@ -207,6 +207,21 @@
     "oferta.senal.endeudamiento.desfavorable": "High",
     "oferta.nivel.bajo": "Low risk",
     "oferta.nivel.medio": "Medium risk",
-    "oferta.nivel.alto": "High risk"
+    "oferta.nivel.alto": "High risk",
+    "suscripcion.tituloPestana": "Underwriting · Solventa",
+    "suscripcion.miga": "Quote / Underwriting",
+    "suscripcion.tituloPagina": "Underwriting",
+    "oferta.vencida.aviso": "This offer expired on {$INTERPOLATION}. Get a new quote for a current premium.",
+    "oferta.vencida.fecha": "Offer expired on {$START_TAG_STRONG}{$INTERPOLATION}{$CLOSE_TAG_STRONG}",
+    "oferta.recotizar": "Get a new quote",
+    "oferta.continuar.asesor": "The client accepts · send to underwriting",
+    "oferta.continuar.cliente": "Continue with the purchase",
+    "oferta.ajustarDatos": "Adjust details",
+    "oferta.descartar": "Discard offer",
+    "suscripcion.titulo": "Underwriting is coming soon",
+    "suscripcion.texto.asesor": "The client accepted the offer. The next step, the evaluation with the underwriting rules, isn't available in the portal yet.",
+    "suscripcion.texto.cliente": "You chose to continue with your offer. The next step, the evaluation of your application, isn't available in the portal yet.",
+    "suscripcion.volverOferta": "Back to the offer",
+    "suscripcion.irTablero": "Go to the dashboard"
   }
 }

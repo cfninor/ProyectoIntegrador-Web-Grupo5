@@ -6,6 +6,7 @@ import { SERVICIO_SESION } from '../../core/sesion/sesion';
 import { AutorizacionAsesorApi } from './autorizacion-asesor-api';
 import { CajaAutorizacion, ClienteCotizacion, FormularioCotizacion } from './formulario-cotizacion';
 import { Cotizacion } from './modelos';
+import { estadoNavegacion } from './navegacion-oferta';
 
 /**
  * Cotización del Portal Clientes, destino de «Cotizar otro seguro» de SOLV-WEB-21 (D1). El cliente
@@ -23,6 +24,7 @@ import { Cotizacion } from './modelos';
       [cliente]="cliente"
       [autorizacion]="caja()"
       (reintentarAutorizacion)="consultarAutorizacion()"
+      [inicial]="inicial"
       (verOferta)="abrirOferta($event)"
     />
   `,
@@ -30,6 +32,8 @@ import { Cotizacion } from './modelos';
 export class PaginaCotizarCliente {
   private readonly autorizacionApi = inject(AutorizacionAsesorApi);
   private readonly router = inject(Router);
+  /** Los datos de la oferta que se ajusta o recotiza (SOLVENTAG5-49), si se viene de ella. */
+  protected readonly inicial = estadoNavegacion(this.router).recotizar ?? null;
 
   /** El cliente de la sesión (D11, CA4); null si la sesión no trae su `clienteId`. */
   protected readonly cliente: ClienteCotizacion | null = this.clienteDeLaSesion();

@@ -1,20 +1,4 @@
-<ol class="pasos" i18n-aria-label="@@oferta.pasos" aria-label="Pasos de la contratación">
-  <li class="paso actual" aria-current="step">
-    <span class="numero">1</span><span i18n="@@oferta.paso.cotizacion">Cotización</span>
-  </li>
-  <li class="separador" aria-hidden="true"></li>
-  <li class="paso">
-    <span class="numero">2</span><span i18n="@@oferta.paso.suscripcion">Suscripción</span>
-  </li>
-  <li class="separador" aria-hidden="true"></li>
-  <li class="paso"><span class="numero">3</span><span i18n="@@oferta.paso.pago">Pago</span></li>
-  <li class="separador" aria-hidden="true"></li>
-  <li class="paso"><span class="numero">4</span><span i18n="@@oferta.paso.firma">Firma</span></li>
-  <li class="separador" aria-hidden="true"></li>
-  <li class="paso">
-    <span class="numero">5</span><span i18n="@@oferta.paso.emision">Emisión</span>
-  </li>
-</ol>
+<app-pasos-contratacion [actual]="1" />
 
 <div aria-live="polite">
   @switch (carga().tipo) {
@@ -48,6 +32,11 @@
 </div>
 
 @if (oferta(); as datos) {
+  @if (datos.vencida) {
+    <p class="aviso-vencida" role="alert" i18n="@@oferta.vencida.aviso">
+      Esta oferta venció el {{ datos.validaHasta }}. Recotiza para obtener una prima vigente.
+    </p>
+  }
   <div class="fila">
     <section class="tarjeta prima" aria-labelledby="oferta-prima-titulo">
       <h2 id="oferta-prima-titulo" class="etiqueta-prima" i18n="@@oferta.primaMensual">
@@ -80,9 +69,15 @@
         </svg>
         <span class="chip {{ perfil.claseNivel }}">{{ perfil.nivel }}</span>
       }
-      <p class="valida-hasta" i18n="@@oferta.validaHasta">
-        Oferta válida hasta el <strong>{{ datos.validaHasta }}</strong>
-      </p>
+      @if (datos.vencida) {
+        <p class="valida-hasta" i18n="@@oferta.vencida.fecha">
+          Oferta vencida el <strong>{{ datos.validaHasta }}</strong>
+        </p>
+      } @else {
+        <p class="valida-hasta" i18n="@@oferta.validaHasta">
+          Oferta válida hasta el <strong>{{ datos.validaHasta }}</strong>
+        </p>
+      }
     </section>
 
     <section class="tarjeta perfil" aria-labelledby="oferta-perfil-titulo">
@@ -209,5 +204,53 @@
         <dd>{{ datos.beneficiario }}</dd>
       </div>
     </dl>
+    <div class="acciones">
+      @if (datos.vencida) {
+        <button
+          type="button"
+          class="boton-primario"
+          (click)="recotizar(datos.datosBien)"
+          i18n="@@oferta.recotizar"
+        >
+          Recotizar
+        </button>
+      } @else {
+        @if (actor() === 'asesor') {
+          <button
+            type="button"
+            class="boton-primario"
+            (click)="continuar()"
+            i18n="@@oferta.continuar.asesor"
+          >
+            El cliente acepta · enviar a suscripción
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="boton-primario"
+            (click)="continuar()"
+            i18n="@@oferta.continuar.cliente"
+          >
+            Continuar a la contratación
+          </button>
+        }
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="recotizar(datos.datosBien)"
+          i18n="@@oferta.ajustarDatos"
+        >
+          Ajustar datos
+        </button>
+      }
+      <button
+        type="button"
+        class="boton-secundario descartar"
+        (click)="descartar()"
+        i18n="@@oferta.descartar"
+      >
+        Descartar oferta
+      </button>
+    </div>
   </section>
 }

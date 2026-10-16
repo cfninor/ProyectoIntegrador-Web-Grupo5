@@ -20,6 +20,7 @@ import {
   FormularioCotizacion,
 } from './formulario-cotizacion';
 import { BusquedaCliente, Cotizacion } from './modelos';
+import { EstadoNavegacionOferta, estadoNavegacion } from './navegacion-oferta';
 
 /** Resultado de «Pedir autorización» o «Reenviar solicitud», que se avisa sobre el formulario. */
 type AvisoEnvio = 'pedida' | 'reenviada' | 'error' | null;
@@ -85,6 +86,7 @@ type AvisoEnvio = 'pedida' | 'reenviada' | 'error' | null;
       (pedirAutorizacion)="pedirAutorizacion()"
       (reenviarSolicitud)="pedirAutorizacion()"
       (reintentarAutorizacion)="consultarAutorizacion()"
+      [inicial]="inicial"
       (verOferta)="abrirOferta($event)"
     />
   `,
@@ -93,6 +95,13 @@ export class PaginaCotizarAsesor {
   private readonly cotizacionApi = inject(CotizacionApi);
   private readonly autorizacionApi = inject(AutorizacionAsesorApi);
   private readonly router = inject(Router);
+  /**
+   * Los datos de la oferta que se ajusta o recotiza (SOLVENTAG5-49), si se viene de ella: el
+   * formulario se llena con ellos y vuelve a buscar al cliente.
+   */
+  protected readonly inicial = estadoNavegacion(this.router).recotizar ?? null;
+  /** El documento de la última búsqueda: viaja a la oferta para poder recotizar. */
+  private ultimaBusqueda?: BusquedaCliente;
   /** El asesor de la sesión: sus datos van en la solicitud de autorización (D4). */
   private readonly asesor = inject(SERVICIO_SESION).actual()?.usuario ?? null;
 
@@ -117,6 +126,7 @@ export class PaginaCotizarAsesor {
 
   /** Busca al cliente por su documento (D2) y, si lo encuentra, consulta su autorización. */
   protected buscar(busqueda: BusquedaCliente): void {
+    this.ultimaBusqueda = busqueda;
     this.cancelar();
     this.cliente.set(null);
     this.caja.set({ tipo: 'cargando' });
@@ -184,7 +194,9 @@ export class PaginaCotizarAsesor {
 
   /** La oferta de la cotización recién calculada (SOLVENTAG5-49). */
   protected abrirOferta(cotizacion: Cotizacion): void {
-    void this.router.navigateByUrl(`/asesor/cotizar/oferta/${cotizacion.cotizacionId}`);
+    // Solo se calcula con un cliente encontrado: siempre hay una búsqueda que llevar.
+    const state: EstadoNavegacionOferta = { busqueda: this.ultimaBusqueda };
+    void this.router.navigateByUrl(`/asesor/cotizar/oferta/${cotizacion.cotizacionId}`, { state });
   }
 
   /**

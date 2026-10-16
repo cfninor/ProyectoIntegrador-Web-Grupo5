@@ -177,6 +177,21 @@ describe('routes', () => {
     },
   );
 
+  it.each<[Rol, string]>([
+    ['ASESOR', '/asesor'],
+    ['CLIENTE', '/cliente'],
+  ])('con el rol %s, continuar con la oferta lleva a su suscripción', async (rol, portal) => {
+    const { url, vista } = await navegar(`${portal}/cotizar/oferta/c-1/suscripcion`, sesionDe(rol));
+
+    expect(url).toBe(`${portal}/cotizar/oferta/c-1/suscripcion`);
+    expect(document.title).toBe('Suscripción · Solventa');
+    expect(vista.getByRole('heading', { level: 1, name: 'Suscripción' })).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Volver a la oferta' })).toHaveAttribute(
+      'href',
+      `${portal}/cotizar/oferta/c-1`,
+    );
+  });
+
   it('la oferta del cliente no se abre con otro rol', async () => {
     const { url } = await navegar('/cliente/cotizar/oferta/c-1', sesionDe('ASESOR'));
 

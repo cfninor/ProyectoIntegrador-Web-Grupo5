@@ -14,6 +14,7 @@ import {
   leerEntero,
 } from './formulario-cotizacion';
 import { Cotizacion } from './modelos';
+import { DatosRecotizar } from './navegacion-oferta';
 
 const URL_COTIZAR = 'http://bff.prueba/v1/cotizaciones';
 const CLIENTE: ClienteCotizacion = {
@@ -54,6 +55,7 @@ interface Opciones {
   busqueda?: EstadoBusqueda;
   autorizacion?: CajaAutorizacion;
   envioHabilitado?: boolean;
+  inicial?: DatosRecotizar | null;
 }
 
 let http: HttpTestingController | undefined;
@@ -81,6 +83,7 @@ async function renderizar(opciones: Opciones = {}) {
       busqueda: opciones.busqueda ?? 'inactiva',
       autorizacion: opciones.autorizacion ?? AUTORIZADA,
       envioHabilitado: opciones.envioHabilitado ?? true,
+      inicial: opciones.inicial ?? null,
     },
     on: salidas,
     providers: [
@@ -697,5 +700,44 @@ describe('leerEntero', () => {
     ['-5', null],
   ])('«%s» → %s', (texto, esperado) => {
     expect(leerEntero(texto)).toBe(esperado);
+  });
+
+  describe('al ajustar o recotizar una oferta (SOLVENTAG5-49, CA3)', () => {
+    it('el cliente ve el formulario lleno con los datos del crédito y puede calcular', async () => {
+      await renderizar({ inicial: { datosBien: DATOS_BIEN } });
+
+      expect(campo('Monto del crédito (COP)')).toHaveValue('280.000.000');
+      expect(campo('Plazo (años)')).toHaveValue('15');
+      expect(campo('Ciudad del inmueble')).toHaveValue('Bogotá D.C.');
+      expect(campo('Entidad acreedora')).toHaveValue('Banco de Ejemplo');
+      expect(botonCalcular()).toBeEnabled();
+    });
+
+    it('el asesor ve el documento con que se buscó y el formulario pide buscarlo', async () => {
+      const { salidas } = await renderizar({
+        actor: 'asesor',
+        inicial: {
+          datosBien: DATOS_BIEN,
+          busqueda: { tipoDocumento: 'PA', numeroDocumento: 'AB12345' },
+        },
+      });
+
+      expect(campo(/Tipo de documento/)).toHaveValue('PA');
+      expect(campo('Documento de identidad')).toHaveValue('AB12345');
+      expect(campo('Monto del crédito (COP)')).toHaveValue('280.000.000');
+      expect(salidas.buscarCliente).toHaveBeenCalledTimes(1);
+      expect(salidas.buscarCliente).toHaveBeenCalledWith({
+        tipoDocumento: 'PA',
+        numeroDocumento: 'AB12345',
+      });
+    });
+
+    it('el cliente no usa el documento de una búsqueda', async () => {
+      const { salidas } = await renderizar({
+        inicial: { datosBien: DATOS_BIEN, busqueda: { tipoDocumento: 'CC', numeroDocumento: '1' } },
+      });
+
+      expect(salidas.buscarCliente).not.toHaveBeenCalled();
+    });
   });
 });

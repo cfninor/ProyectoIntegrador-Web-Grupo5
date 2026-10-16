@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
@@ -10,8 +10,9 @@ import { Actor } from './formulario-cotizacion';
 import { Cotizacion } from './modelos';
 import { PaginaOferta } from './pagina-oferta';
 
-// Oferta personalizada (SOLVENTAG5-49, CA1): prima y periodicidad, por qué recibió ese precio,
-// resumen de la cobertura y vigencia de la oferta, en los dos portales.
+// Oferta personalizada (SOLVENTAG5-49): prima y periodicidad, por qué recibió ese precio, resumen
+// de la cobertura y vigencia de la oferta (CA1); continuar, ajustar o descartar (CA2); y la oferta
+// vencida, que solo permite recotizar (CA3). En los dos portales.
 
 const BFF = 'http://bff.prueba';
 const COTIZACION_ID = '5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d';
@@ -56,6 +57,7 @@ const SIN_PERFIL: Cotizacion = {
 let http: HttpTestingController | undefined;
 
 afterEach(() => {
+  history.replaceState(null, '');
   http?.verify();
   http = undefined;
 });
@@ -235,5 +237,111 @@ describe('PaginaOferta · SOLVENTAG5-49', () => {
       '4Firma',
       '5Emisión',
     ]);
+  });
+});
+
+describe('PaginaOferta · decisiones del cliente (CA2, CA3)', () => {
+  const VENCIDA: Cotizacion = { ...CON_PERFIL, estado: 'VENCIDA' };
+  const acciones = () => region('Resumen de la cobertura').getAllByRole('button');
+  const espiarNavegacion = () =>
+    jest.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+  it('el cliente puede continuar a la contratación, ajustar los datos o descartar la oferta', async () => {
+    await cargar(CON_PERFIL);
+
+    expect(acciones().map((boton) => boton.textContent?.trim())).toEqual([
+      'Continuar a la contratación',
+      'Ajustar datos',
+      'Descartar oferta',
+    ]);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('el asesor registra que el cliente acepta y envía a suscripción', async () => {
+    await cargar(CON_PERFIL, 'asesor');
+
+    expect(acciones().map((boton) => boton.textContent?.trim())).toEqual([
+      'El cliente acepta · enviar a suscripción',
+      'Ajustar datos',
+      'Descartar oferta',
+    ]);
+  });
+
+  it.each<[Actor, string, string]>([
+    ['cliente', 'Continuar a la contratación', '/cliente'],
+    ['asesor', 'El cliente acepta · enviar a suscripción', '/asesor'],
+  ])('el %s continúa al paso de suscripción de esta oferta', async (actor, boton, portal) => {
+    const { usuario } = await cargar(CON_PERFIL, actor);
+    const navegar = espiarNavegacion();
+
+    await usuario.click(screen.getByRole('button', { name: boton }));
+
+    expect(navegar).toHaveBeenCalledWith(`${portal}/cotizar/oferta/${COTIZACION_ID}/suscripcion`);
+  });
+
+  it.each<[Actor, string]>([
+    ['cliente', '/cliente'],
+    ['asesor', '/asesor'],
+  ])('el %s descarta la oferta y vuelve a su tablero, sin llamar al BFF', async (actor, portal) => {
+    const { usuario } = await cargar(CON_PERFIL, actor);
+    const navegar = espiarNavegacion();
+
+    await usuario.click(screen.getByRole('button', { name: 'Descartar oferta' }));
+
+    expect(navegar).toHaveBeenCalledWith(portal);
+  });
+
+  it('«Ajustar datos» abre el cotizador con los datos del crédito de la oferta', async () => {
+    const { usuario } = await cargar(CON_PERFIL);
+    const navegar = espiarNavegacion();
+
+    await usuario.click(screen.getByRole('button', { name: 'Ajustar datos' }));
+
+    expect(navegar).toHaveBeenCalledWith('/cliente/cotizar', {
+      state: { recotizar: { datosBien: CON_PERFIL.datosBien } },
+    });
+  });
+
+  it('para el asesor, el cotizador también recibe el documento con que buscó al cliente', async () => {
+    const busqueda = { tipoDocumento: 'CC', numeroDocumento: '1020305678' };
+    history.replaceState({ busqueda }, '');
+    const { usuario } = await cargar(CON_PERFIL, 'asesor');
+    const navegar = espiarNavegacion();
+
+    await usuario.click(screen.getByRole('button', { name: 'Ajustar datos' }));
+
+    expect(navegar).toHaveBeenCalledWith('/asesor/cotizar', {
+      state: { recotizar: { datosBien: CON_PERFIL.datosBien, busqueda } },
+    });
+  });
+
+  it('una oferta vencida lo indica y ofrece recotizar en lugar de continuar (CA3)', async () => {
+    const { usuario } = await cargar(VENCIDA);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Esta oferta venció el 21/10/2026. Recotiza para obtener una prima vigente.',
+    );
+    expect(region('Prima mensual').getByText(/Oferta vencida el/)).toHaveTextContent(
+      'Oferta vencida el 21/10/2026',
+    );
+    expect(screen.queryByText(/Oferta válida hasta/)).not.toBeInTheDocument();
+    expect(acciones().map((boton) => boton.textContent?.trim())).toEqual([
+      'Recotizar',
+      'Descartar oferta',
+    ]);
+    expect(screen.queryByRole('button', { name: /Continuar/ })).not.toBeInTheDocument();
+
+    const navegar = espiarNavegacion();
+    await usuario.click(screen.getByRole('button', { name: 'Recotizar' }));
+    expect(navegar).toHaveBeenCalledWith('/cliente/cotizar', {
+      state: { recotizar: { datosBien: VENCIDA.datosBien } },
+    });
+  });
+
+  it('al asesor tampoco le permite enviar a suscripción una oferta vencida', async () => {
+    await cargar(VENCIDA, 'asesor');
+
+    expect(screen.queryByRole('button', { name: /enviar a suscripción/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recotizar' })).toBeInTheDocument();
   });
 });

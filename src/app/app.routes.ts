@@ -55,6 +55,23 @@ function oferta(actor: Actor): Route {
   };
 }
 
+/** CA2 de la SOLVENTAG5-49: «Continuar a la contratación» lleva al paso 2, Suscripción. */
+function suscripcion(actor: Actor): Route {
+  return {
+    path: 'cotizar/oferta/:cotizacionId/suscripcion',
+    title: $localize`:@@suscripcion.tituloPestana:Suscripción · Solventa`,
+    data: {
+      ...datosPagina(
+        $localize`:@@suscripcion.miga:Cotizar / Suscripción`,
+        $localize`:@@suscripcion.tituloPagina:Suscripción`,
+      ),
+      actor,
+    },
+    loadComponent: () =>
+      import('./features/cotizacion/pagina-suscripcion').then((m) => m.PaginaSuscripcion),
+  };
+}
+
 /**
  * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
  * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
@@ -70,8 +87,8 @@ function portal(rol: Rol, pantallas: Routes): Route {
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
-  portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor')]),
-  portal('CLIENTE', [tablero, cotizarCliente, oferta('cliente')]),
+  portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor'), suscripcion('asesor')]),
+  portal('CLIENTE', [tablero, cotizarCliente, oferta('cliente'), suscripcion('cliente')]),
   portal('ANALISTA_RIESGO', [tablero]),
   portal('OPERACIONES', [tablero]),
   portal('SOCIO', [tablero]),

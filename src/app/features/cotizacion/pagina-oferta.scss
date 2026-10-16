@@ -16,53 +16,6 @@ h2 {
   font-weight: 600;
 }
 
-.pasos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--on-surface-variant);
-}
-
-.paso {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.numero {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--chip-gris-fondo);
-  color: var(--chip-gris-texto);
-  font-size: 12px;
-}
-
-.actual {
-  color: var(--on-surface);
-  font-weight: 600;
-
-  .numero {
-    background: var(--primary);
-    color: #fff;
-  }
-}
-
-.separador {
-  width: 24px;
-  height: 1px;
-  background: var(--outline);
-}
-
 .estado-carga {
   display: flex;
   flex-direction: column;
@@ -156,11 +109,12 @@ h2 {
 
 .encabezado-perfil {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
 
   > div {
-    flex: 1;
+    flex: 1 1 260px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -237,6 +191,34 @@ h2 {
   gap: 16px;
 }
 
+.aviso-vencida {
+  padding: 12px 16px;
+  border: 1px solid var(--chip-ambar-texto);
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+// «Descartar oferta» va a la derecha, en rojo, como en el Figma.
+.descartar {
+  margin-left: auto;
+  border-color: #e8b7b3;
+  color: var(--error);
+
+  &:hover {
+    background: var(--chip-rojo-fondo);
+  }
+}
+
 .datos-cobertura {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -257,15 +239,6 @@ h2 {
 
 // En pantallas angostas las tarjetas van una debajo de otra.
 @container (max-width: 860px) {
-  // Los pasos pasan a varias líneas: sin las líneas que los unen.
-  .pasos {
-    gap: 8px 16px;
-  }
-
-  .separador {
-    display: none;
-  }
-
   .fila {
     flex-direction: column;
   }

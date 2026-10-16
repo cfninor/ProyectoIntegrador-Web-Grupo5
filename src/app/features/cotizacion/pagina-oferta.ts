@@ -10,14 +10,16 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { fechaBogota, horaBogota, montoCop } from '../../core/idioma/formatos';
 import { idiomaDe } from '../../core/idioma/idioma';
 import { CotizacionApi } from './cotizacion-api';
 import { Actor } from './formulario-cotizacion';
-import { Cotizacion } from './modelos';
+import { Cotizacion, DatosBienVidaHipotecario } from './modelos';
+import { EstadoNavegacionOferta, estadoNavegacion } from './navegacion-oferta';
+import { PasosContratacion } from './pasos-contratacion';
 import {
   CLASE_NIVEL,
   NombreSenal,
@@ -54,10 +56,14 @@ const SCORE_MAXIMO = 850;
  * perfil de riesgo), el resumen de la cobertura y hasta cuándo vale la oferta (CA1). Sirve a los
  * dos portales, como el formulario de cotización: textos en tercera persona para el asesor y en
  * segunda para el cliente (D8).
+ *
+ * Desde aquí se decide (CA2): continuar a la contratación, ajustar los datos o descartar la oferta.
+ * Una oferta vencida lo dice y solo permite recotizar (CA3). Ninguna de las tres decisiones se
+ * guarda en el backend: cada una lleva a la pantalla que sigue.
  */
 @Component({
   selector: 'app-pagina-oferta',
-  imports: [RouterLink],
+  imports: [PasosContratacion, RouterLink],
   templateUrl: './pagina-oferta.html',
   styleUrl: './pagina-oferta.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -69,6 +75,9 @@ export class PaginaOferta implements OnInit {
   readonly actor = input.required<Actor>();
 
   private readonly api = inject(CotizacionApi);
+  private readonly router = inject(Router);
+  /** El documento con que el asesor encontró al cliente, si la oferta se abrió desde el cotizador. */
+  private readonly busqueda = estadoNavegacion(this.router).busqueda;
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
   private consulta?: Subscription;
 
@@ -92,8 +101,11 @@ export class PaginaOferta implements OnInit {
       sumaAsegurada: montoCop(cotizacion.datosBien.montoCredito, this.idioma),
       vigenciaPoliza: $localize`:@@cotizacion.panel.vigenciaAnios:${plazo}:plazo: años`,
       beneficiario: cotizacion.datosBien.entidadAcreedora,
+      datosBien: cotizacion.datosBien,
       motivoSinPerfil: cotizacion.calculadaSinPerfil ? cotizacion.motivoSinPerfil : undefined,
       perfil: this.perfilDe(cotizacion),
+      // El núcleo calcula el estado al consultar: VENCIDA desde vigenteHasta (CA3).
+      vencida: cotizacion.estado === 'VENCIDA',
     };
   });
 
@@ -114,6 +126,32 @@ export class PaginaOferta implements OnInit {
       error: (error: HttpErrorResponse) =>
         this.carga.set({ tipo: error.status === 404 ? 'no-encontrada' : 'error' }),
     });
+  }
+
+  /** CA2: el siguiente paso de la contratación, la suscripción. */
+  protected continuar(): void {
+    void this.router.navigateByUrl(
+      `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/suscripcion`,
+    );
+  }
+
+  /** CA2: descartar la oferta lleva al tablero, como en el prototipo. No se guarda nada. */
+  protected descartar(): void {
+    void this.router.navigateByUrl(`/${this.actor()}`);
+  }
+
+  /**
+   * «Ajustar datos» y, con la oferta vencida, «Recotizar» (CA3): el cotizador se abre con los
+   * datos de esta cotización y, para el asesor, vuelve a buscar al cliente.
+   */
+  protected recotizar(datosBien: DatosBienVidaHipotecario): void {
+    const state: EstadoNavegacionOferta = {
+      recotizar: {
+        datosBien,
+        ...(this.busqueda ? { busqueda: this.busqueda } : {}),
+      },
+    };
+    void this.router.navigateByUrl(this.rutaCotizar(), { state });
   }
 
   private perfilDe(cotizacion: Cotizacion) {

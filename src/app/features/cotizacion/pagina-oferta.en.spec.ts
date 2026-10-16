@@ -101,4 +101,39 @@ describe('PaginaOferta en inglés', () => {
       screen.getByRole('heading', { name: 'Why the client got this price' }),
     ).toBeInTheDocument();
   });
+
+  it('las decisiones y la oferta vencida, en inglés', async () => {
+    await render(PaginaOferta, {
+      inputs: { cotizacionId: 'c-2', actor: 'cliente' },
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: APP_CONFIG, useValue: { apiBaseUrl: BFF } },
+        IDIOMA_INGLES,
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    http.expectOne(`${BFF}/v1/cotizaciones/c-2`).flush({ ...OFERTA, estado: 'VENCIDA' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This offer expired on Oct 21, 2026. Get a new quote for a current premium.',
+    );
+    const cobertura = within(screen.getByRole('region', { name: 'Coverage summary' }));
+    expect(cobertura.getAllByRole('button').map((boton) => boton.textContent?.trim())).toEqual([
+      'Get a new quote',
+      'Discard offer',
+    ]);
+  });
+
+  it('el asesor, en inglés, envía a suscripción', async () => {
+    await cargar('asesor');
+
+    const cobertura = within(screen.getByRole('region', { name: 'Coverage summary' }));
+    expect(cobertura.getAllByRole('button').map((boton) => boton.textContent?.trim())).toEqual([
+      'The client accepts · send to underwriting',
+      'Adjust details',
+      'Discard offer',
+    ]);
+  });
 });

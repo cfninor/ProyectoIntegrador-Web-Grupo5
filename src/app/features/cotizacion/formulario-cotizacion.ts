@@ -34,6 +34,7 @@ import {
   TIPOS_DOCUMENTO,
   TipoDocumento,
 } from './modelos';
+import { DatosRecotizar } from './navegacion-oferta';
 
 /** Quién cotiza: el asesor para un cliente (SOLV-WEB-05) o el cliente para sí mismo (D1). */
 export type Actor = 'asesor' | 'cliente';
@@ -123,6 +124,11 @@ export class FormularioCotizacion implements OnInit {
   readonly autorizacion = input<CajaAutorizacion>({ tipo: 'cargando' });
   /** El asesor solo calcula con la autorización AUTORIZADA (D4); el cliente, siempre. */
   readonly envioHabilitado = input(true);
+  /**
+   * Datos con que se abre al ajustar o recotizar una oferta (SOLVENTAG5-49, CA3). Con el actor
+   * asesor y el documento del cliente, lo vuelve a buscar.
+   */
+  readonly inicial = input<DatosRecotizar | null>(null);
 
   /** El asesor escribió un documento válido: el contenedor busca al cliente (D2, D15). */
   readonly buscarCliente = output<BusquedaCliente>();
@@ -282,6 +288,25 @@ export class FormularioCotizacion implements OnInit {
           this.buscar();
         }
       });
+    }
+    const inicial = this.inicial();
+    if (inicial) {
+      this.llenarCon(inicial);
+    }
+  }
+
+  /** Los datos del crédito de la oferta y, para el asesor, el documento con que se buscó. */
+  private llenarCon({ datosBien, busqueda }: DatosRecotizar): void {
+    const { controls } = this.formulario;
+    controls.montoCredito.setValue(numeroConMiles(datosBien.montoCredito, this.idioma));
+    controls.plazoAnios.setValue(String(datosBien.plazoAnios));
+    controls.ciudadInmueble.setValue(datosBien.ciudadInmueble);
+    controls.entidadAcreedora.setValue(datosBien.entidadAcreedora);
+    if (this.actor() === 'asesor' && busqueda) {
+      // Primero el tipo, con el número vacío: así cambiar el tipo no busca todavía.
+      controls.tipoDocumento.setValue(busqueda.tipoDocumento);
+      controls.numeroDocumento.setValue(busqueda.numeroDocumento);
+      this.buscar();
     }
   }
 
