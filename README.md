@@ -54,8 +54,9 @@ public/          # archivos estáticos, incluido config.json
 
 La URL del BFF se lee en tiempo de ejecución desde `public/config.json`
 (`src/app/core/config/app-config.ts`). Así el mismo build se promueve de DEV a QA y PROD:
-el despliegue solo reemplaza `config.json`. Localmente apunta a `http://localhost:8010`, el
-puerto del `bff-web` en el `docker-compose.yml` del repositorio principal.
+el despliegue solo reemplaza `config.json` con el de cada ambiente (ver «Despliegue»). Localmente
+apunta a `http://localhost:8010`, el puerto del `bff-web` en el `docker-compose.yml` del
+repositorio principal.
 
 ## Internacionalización
 
@@ -78,6 +79,73 @@ El portal está en español (`es-CO`, idioma fuente) y en inglés (`en-US`) con 
 [`ci.yml`](.github/workflows/ci.yml) corre en cada PR y en cada push a `main`: lint y formato,
 Jest con cobertura, build de producción y E2E con Playwright. `ci-gate` es el check
 obligatorio de `main`.
+
+Solo en push a `main`, después de `ci-gate`:
+
+| Job | Qué hace |
+|---|---|
+| Guardar el build del portal | Compila el portal una sola vez por commit y lo guarda en el bucket de artefactos, en `web/commits/<commit>/` |
+| Publicar en DEV | Llama a [«Publicar portal»](.github/workflows/publicar-portal.yml) con `dev` y ese build |
+
+## Despliegue
+
+El portal es un sitio estático: cada ambiente (DEV, QA y PROD) lo sirve desde su bucket privado
+detrás de CloudFront, con `/v1/*` hacia el BFF web del mismo ambiente. La infraestructura y los
+ambientes se describen en `infra/terraform/README.md` del repositorio principal.
+
+### Cómo se despliega
+
+1. Cada merge a `main` compila el portal **una sola vez** y guarda el build, sin `config.json`, en
+   `web/commits/<commit>/` del bucket de artefactos. Si el build de ese commit ya existe, no se
+   compila de nuevo.
+2. «Publicar portal» lo publica en DEV sin compilar nada: copia los archivos al bucket del
+   ambiente (los que tienen hash con caché de un año; `index.html`, `config.json`, `i18n/*` y el
+   resto, sin caché), escribe el `config.json` del ambiente, borra lo que ya no está en el build e
+   invalida `/index.html`, `/config.json` e `/i18n/*` en CloudFront.
+3. Registra lo publicado en `/solventa/<ambiente>/web/version` de SSM (commit, carpeta de origen,
+   fecha y prueba de humo) y corre la prueba de humo: `index.html` y `config.json` con 200 por el
+   dominio del portal. Si falla, el workflow falla.
+
+El job declara el ambiente de GitHub, así el panel de ambientes del repositorio registra cada
+publicación, y el resumen del workflow muestra el origen, el commit, la prueba de humo y la URL.
+
+### De dónde sale cada ambiente
+
+| Ambiente | Build que publica | Cómo llega |
+|---|---|---|
+| DEV | `web/commits/<commit>/` del último merge a `main` | Solo, con la CI |
+| QA | El mismo build que está en DEV | Promoción a QA |
+| PROD | El mismo build que está en QA, copiado a `web/releases/v<versión>/` | Promoción a PROD |
+
+QA y PROD no compilan: publican el build que ya pasó por el ambiente anterior. Lo único que cambia
+entre ambientes es `config.json`.
+
+### Revertir
+
+«Publicar portal» también se corre a mano (Actions → Publicar portal → Run workflow), desde
+`main`, con el ambiente y una carpeta que ya exista en el bucket de artefactos. En PROD solo acepta
+una carpeta `web/releases/v<versión>/` y solo la pueden correr las personas de la variable del
+repositorio `APROBADORES_PROD` (usuarios de GitHub separados por coma).
+
+### Configuración en GitHub
+
+Cada ambiente de GitHub (`dev`, `qa` y `prod`, limitados a `main`) tiene dos variables:
+
+| Variable | Contenido |
+|---|---|
+| `AWS_ROLE_ARN` | ARN del rol `solventa-<ambiente>-github-web` (salida `roles_github` de Terraform, clave `web`). El workflow lo asume por OIDC: no hay llaves de AWS en GitHub |
+| `WEB_CONFIG` | El `config.json` del ambiente, en una línea |
+
+`WEB_CONFIG` es un objeto JSON con la misma forma que `public/config.json`. `apiBaseUrl` es
+obligatorio y va vacío, porque el BFF web está en el mismo dominio (`/v1/*`); `sesionSimulada`
+es opcional y, mientras no haya inicio de sesión real, define el usuario y el rol con que se abre
+el portal (`ASESOR`, `CLIENTE`, `ANALISTA_RIESGO`, `OPERACIONES` o `SOCIO`). Por ejemplo:
+
+```json
+{"apiBaseUrl":"","sesionSimulada":{"usuario":{"id":"asesor-dev","nombre":"Asesor de prueba"},"rol":"ASESOR"}}
+```
+
+«Publicar portal» falla antes de tocar AWS si `WEB_CONFIG` falta o no tiene esa forma.
 
 ## Cómo trabajamos
 
