@@ -118,3 +118,89 @@ jobs:
             exit 1
           fi
           echo "Todos los jobs pasaron."
+
+  # Build del portal para los ambientes (D11 y D12): se compila una sola vez por commit de main y se
+  # guarda en web/commits/<commit>/ del bucket de artefactos; DEV, QA y PROD publican ese mismo
+  # build. Si ya existe (por ejemplo, al volver a correr el job), no se compila de nuevo.
+  portal:
+    name: Guardar el build del portal
+    needs: ci-gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Solo el rol de DEV guarda builds. deployment: false toma su AWS_ROLE_ARN (y la restricción a
+    # main) sin registrar un despliegue en el panel de ambientes: lo registra «Publicar portal».
+    environment:
+      name: dev
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      AWS_REGION: us-east-1
+      COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: portal-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ¿Ya está guardado?
+        id: guardado
+        run: |
+          artefactos=$(aws ssm get-parameter --name /solventa/compartido/artefactos/bucket --query Parameter.Value --output text)
+          destino="web/commits/$COMMIT"
+          clave=$(aws s3api list-objects-v2 --bucket "$artefactos" --prefix "$destino/index.html" \
+            --query "Contents[?Key=='$destino/index.html'].Key | [0]" --output text)
+          if [[ $clave == "$destino/index.html" ]]; then
+            echo "::notice::s3://$artefactos/$destino/ ya existe; no se compila."
+            echo "existe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existe=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "artefactos=$artefactos" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v7
+        if: steps.guardado.outputs.existe == 'false'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - if: steps.guardado.outputs.existe == 'false'
+        run: npm ci
+
+      - if: steps.guardado.outputs.existe == 'false'
+        run: npm run build
+
+      # Sin config.json, que sale de cada ambiente (D1), y con index.html al final: su presencia marca
+      # el build como completo. El commit queda en los metadatos de cada archivo.
+      - name: Guardar en web/commits/<commit>/
+        if: steps.guardado.outputs.existe == 'false'
+        env:
+          ARTEFACTOS: ${{ steps.guardado.outputs.artefactos }}
+        run: |
+          build=dist/solventa-web/browser
+          destino="s3://$ARTEFACTOS/web/commits/$COMMIT"
+          aws s3 cp "$build/" "$destino/" --recursive --only-show-errors \
+            --exclude config.json --exclude index.html --metadata "commit=$COMMIT"
+          aws s3 cp "$build/index.html" "$destino/index.html" --only-show-errors --metadata "commit=$COMMIT"
+          echo "Build guardado en $destino/."
+
+  publicar-dev:
+    name: Publicar en DEV
+    needs: portal
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publicar-portal.yml
+    with:
+      ambiente: dev
+      origen: web/commits/${{ github.sha }}

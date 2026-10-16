@@ -1,0 +1,233 @@
+# «Publicar portal» (D12, «Flujo de despliegue y promoción»): publica en un ambiente un build del
+# portal que ya está en el bucket de artefactos, sin compilar nada, con el config.json del ambiente
+# (variable WEB_CONFIG). Lo llaman la CI (DEV, con cada merge a main) y la promoción a QA y a PROD.
+# A mano solo sirve para revertir: en PROD, solo con una carpeta web/releases/v<versión> anterior
+# y solo para las personas de APROBADORES_PROD.
+name: Publicar portal
+
+on:
+  workflow_call:
+    inputs:
+      ambiente:
+        description: Ambiente de destino (dev, qa o prod).
+        type: string
+        required: true
+      origen:
+        description: Carpeta del build en el bucket de artefactos (web/commits/<commit> o web/releases/v<versión>).
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: Ambiente de destino.
+        type: choice
+        options: [dev, qa, prod]
+      origen:
+        description: Carpeta que ya existe en el bucket de artefactos (web/commits/<commit> o web/releases/v<versión>; en PROD, una web/releases/v<versión> anterior).
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publicar:
+    name: Publicar en ${{ inputs.ambiente }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # El ambiente de GitHub da el AWS_ROLE_ARN del rol de ese ambiente y su WEB_CONFIG, solo desde
+    # main, y registra la publicación en el panel de ambientes.
+    environment:
+      name: ${{ inputs.ambiente }}
+      url: ${{ steps.parametros.outputs.web_url }}
+    concurrency:
+      group: ambiente-${{ inputs.ambiente }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Comprobar quién publica en PROD
+        if: inputs.ambiente == 'prod'
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          APROBADORES: ${{ vars.APROBADORES_PROD }}
+        run: |
+          aprobadores=",${APROBADORES//[[:space:]]/},"
+          if [[ -z $ACTOR || ${aprobadores,,} != *",${ACTOR,,},"* ]]; then
+            echo "::error::$ACTOR no está en APROBADORES_PROD: solo esas personas publican en PROD."
+            exit 1
+          fi
+          echo "$ACTOR está en APROBADORES_PROD."
+
+      - name: Comprobar el origen y WEB_CONFIG
+        id: entradas
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+          ORIGEN: ${{ inputs.origen }}
+          WEB_CONFIG: ${{ vars.WEB_CONFIG }}
+        run: |
+          origen=${ORIGEN%/}
+          case $AMBIENTE in
+            prod)
+              [[ $origen =~ ^web/releases/v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+                || { echo "::error::En PROD solo se publica una carpeta web/releases/v<versión>, por ejemplo web/releases/v0.1.0."; exit 1; } ;;
+            dev | qa)
+              [[ $origen =~ ^web/(commits/[0-9a-f]{40}|releases/v[0-9]+\.[0-9]+\.[0-9]+)$ ]] \
+                || { echo "::error::El origen es web/commits/<commit completo> o web/releases/v<versión>: '$ORIGEN'."; exit 1; } ;;
+            *)
+              echo "::error::Ambiente desconocido: '$AMBIENTE'. Usa dev, qa o prod."; exit 1 ;;
+          esac
+          # config.json del ambiente: un objeto JSON con apiBaseUrl (vacío = mismo dominio).
+          if ! jq -e 'type == "object" and (.apiBaseUrl | type == "string")' <<< "$WEB_CONFIG" > /dev/null 2>&1; then
+            echo "::error::La variable WEB_CONFIG del ambiente $AMBIENTE falta o no es un objeto JSON con apiBaseUrl."
+            exit 1
+          fi
+          echo "origen=$origen" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: publicar-portal-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Parámetros del ambiente
+        id: parametros
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+        run: |
+          leer() { aws ssm get-parameter --name "/solventa/$1" --query Parameter.Value --output text; }
+          {
+            echo "artefactos=$(leer compartido/artefactos/bucket)"
+            echo "bucket=$(leer "$AMBIENTE/web/bucket")"
+            echo "distribucion=$(leer "$AMBIENTE/web/distribucion-id")"
+            echo "web_url=$(leer "$AMBIENTE/web/url")"
+          } >> "$GITHUB_OUTPUT"
+
+      # El build se guarda con index.html al final y el commit en sus metadatos (ci.yml): si
+      # index.html existe, el build está completo y se sabe de qué commit salió.
+      - name: Descargar el build
+        id: build
+        env:
+          ARTEFACTOS: ${{ steps.parametros.outputs.artefactos }}
+          ORIGEN: ${{ steps.entradas.outputs.origen }}
+          WEB_CONFIG: ${{ vars.WEB_CONFIG }}
+        run: |
+          clave=$(aws s3api list-objects-v2 --bucket "$ARTEFACTOS" --prefix "$ORIGEN/index.html" \
+            --query "Contents[?Key=='$ORIGEN/index.html'].Key | [0]" --output text)
+          if [[ $clave != "$ORIGEN/index.html" ]]; then
+            echo "::error::No hay un build completo en s3://$ARTEFACTOS/$ORIGEN/ (falta index.html)."
+            exit 1
+          fi
+          commit=$(aws s3api head-object --bucket "$ARTEFACTOS" --key "$ORIGEN/index.html" \
+            --query Metadata.commit --output text)
+          if [[ ! $commit =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::$ORIGEN/index.html no tiene el commit en sus metadatos."
+            exit 1
+          fi
+          if [[ $ORIGEN == web/commits/* && $ORIGEN != "web/commits/$commit" ]]; then
+            echo "::error::$ORIGEN/index.html tiene en sus metadatos otro commit: $commit."
+            exit 1
+          fi
+          portal="$RUNNER_TEMP/portal"
+          aws s3 cp "s3://$ARTEFACTOS/$ORIGEN/" "$portal/" --recursive --only-show-errors
+          # La configuración no viaja en el build (D1): sale del ambiente.
+          jq . <<< "$WEB_CONFIG" > "$portal/config.json"
+          echo "Build de $commit descargado: $(find "$portal" -type f | wc -l) archivos."
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      # Primero los archivos con hash (caché de un año), luego el resto sin caché y al final
+      # index.html, para que nunca apunte a archivos que todavía no están. Después se borra lo que
+      # ya no está en el build: --size-only evita que sync vuelva a subir algo sin su Cache-Control.
+      - name: Publicar en el bucket del portal
+        env:
+          BUCKET: ${{ steps.parametros.outputs.bucket }}
+        run: |
+          portal="$RUNNER_TEMP/portal"
+          aws s3 cp "$portal/" "s3://$BUCKET/" --recursive --only-show-errors \
+            --exclude '*' --include '*.js' --include '*.css' --include 'media/*' \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$portal/" "s3://$BUCKET/" --recursive --only-show-errors \
+            --exclude '*.js' --exclude '*.css' --exclude 'media/*' --exclude index.html \
+            --cache-control 'no-cache'
+          aws s3 cp "$portal/index.html" "s3://$BUCKET/index.html" --only-show-errors --cache-control 'no-cache'
+          aws s3 sync "$portal/" "s3://$BUCKET/" --delete --size-only --only-show-errors
+
+      - name: Invalidar la caché de CloudFront
+        env:
+          DISTRIBUCION: ${{ steps.parametros.outputs.distribucion }}
+        run: |
+          invalidacion=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUCION" \
+            --paths /index.html /config.json '/i18n/*' --query Invalidation.Id --output text)
+          echo "Invalidación $invalidacion creada; esperando a que termine…"
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUCION" --id "$invalidacion"
+
+      - name: Registrar la versión
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+          COMMIT: ${{ steps.build.outputs.commit }}
+          ORIGEN: ${{ steps.entradas.outputs.origen }}
+        run: |
+          version=$(jq -cn --arg commit "$COMMIT" --arg origen "$ORIGEN" --arg fecha "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{commit: $commit, origen: $origen, prueba_humo: "pendiente", fecha: $fecha}')
+          aws ssm put-parameter --name "/solventa/$AMBIENTE/web/version" --type String --overwrite --value "$version" > /dev/null
+          echo "/solventa/$AMBIENTE/web/version: $version"
+
+      # Prueba de humo del portal: index.html y config.json con 200 por su dominio. Escribe ok o
+      # fallo en web/version y falla con fallo.
+      - name: Prueba de humo
+        id: humo
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+          WEB_URL: ${{ steps.parametros.outputs.web_url }}
+        run: |
+          resultado=ok
+          for archivo in index.html config.json; do
+            echo "GET $WEB_URL/$archivo"
+            if ! curl --fail --silent --show-error --max-time 10 --retry 5 --retry-delay 10 --retry-all-errors \
+              --output "$RUNNER_TEMP/humo-$archivo" "$WEB_URL/$archivo"; then
+              echo "::error::$WEB_URL/$archivo no respondió 200."
+              resultado=fallo
+            fi
+          done
+          if [[ $resultado == ok ]] && ! jq -e 'type == "object"' "$RUNNER_TEMP/humo-config.json" > /dev/null; then
+            echo "::error::$WEB_URL/config.json no es un objeto JSON."
+            resultado=fallo
+          fi
+          version=$(aws ssm get-parameter --name "/solventa/$AMBIENTE/web/version" --query Parameter.Value --output text \
+            | jq -c --arg resultado "$resultado" '.prueba_humo = $resultado')
+          aws ssm put-parameter --name "/solventa/$AMBIENTE/web/version" --type String --overwrite --value "$version" > /dev/null
+          echo "prueba_humo=$resultado" >> "$GITHUB_OUTPUT"
+          if [[ $resultado != ok ]]; then
+            echo "::error::La prueba de humo del portal en $AMBIENTE falló."
+            exit 1
+          fi
+          echo "Prueba de humo del portal en $AMBIENTE en verde."
+
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+          ORIGEN: ${{ inputs.origen }}
+          COMMIT: ${{ steps.build.outputs.commit }}
+          PRUEBA_HUMO: ${{ steps.humo.outputs.prueba_humo }}
+          WEB: ${{ steps.parametros.outputs.web_url }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          {
+            echo "## Publicar portal en $AMBIENTE: $RESULTADO"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Origen | \`$ORIGEN\` |"
+            echo "| Commit | \`${COMMIT:-desconocido}\` |"
+            echo "| Prueba de humo | ${PRUEBA_HUMO:-no corrió} |"
+            echo "| Portal | ${WEB:-desconocido} |"
+          } >> "$GITHUB_STEP_SUMMARY"
