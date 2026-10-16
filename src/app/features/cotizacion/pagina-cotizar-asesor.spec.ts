@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
@@ -42,6 +43,7 @@ const estado = (valor: string, fechaEstado?: string) => ({
 let http: HttpTestingController | undefined;
 
 afterEach(() => {
+  history.replaceState(null, '');
   http?.verify();
   http = undefined;
 });
@@ -141,6 +143,66 @@ describe('PaginaCotizarAsesor · SOLV-WEB-05', () => {
 
     const panel = within(await screen.findByRole('region', { name: 'Prima estimada' }));
     expect(panel.getByText('$ 148.500')).toBeInTheDocument();
+
+    // SOLVENTAG5-49: «Ver la oferta» abre la oferta de esta cotización en el Portal Asesores.
+    const navegar = jest.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await usuario.click(panel.getByRole('button', { name: 'Ver la oferta' }));
+    // El documento viaja con la oferta para poder recotizar con el mismo cliente.
+    expect(navegar).toHaveBeenCalledWith('/asesor/cotizar/oferta/c-1', {
+      state: { busqueda: { tipoDocumento: 'CC', numeroDocumento: '1020305678' } },
+    });
+  });
+
+  it('al recotizar una oferta llena el crédito y vuelve a buscar al cliente (SOLVENTAG5-49)', async () => {
+    history.replaceState(
+      {
+        recotizar: {
+          datosBien: {
+            montoCredito: 280_000_000,
+            plazoAnios: 15,
+            ciudadInmueble: 'Bogotá D.C.',
+            entidadAcreedora: 'Banco de Ejemplo',
+          },
+          busqueda: { tipoDocumento: 'CE', numeroDocumento: '1020305678' },
+        },
+      },
+      '',
+    );
+    const { http } = await renderizar();
+
+    const busqueda = http.expectOne(URL_BUSQUEDA);
+    expect(busqueda.request.body).toEqual({ tipoDocumento: 'CE', numeroDocumento: '1020305678' });
+    busqueda.flush(ENCONTRADO);
+    http.expectOne(URL_ESTADO).flush(estado('AUTORIZADA'));
+
+    expect(await screen.findByDisplayValue('Laura Gómez Pardo')).toBeInTheDocument();
+    expect(campo('Documento de identidad')).toHaveValue('1020305678');
+    expect(campo('Monto del crédito (COP)')).toHaveValue('280.000.000');
+    expect(campo('Plazo (años)')).toHaveValue('15');
+    expect(campo('Ciudad del inmueble')).toHaveValue('Bogotá D.C.');
+    expect(campo('Entidad acreedora')).toHaveValue('Banco de Ejemplo');
+    expect(await screen.findByRole('button', { name: 'Calcular cotización' })).toBeEnabled();
+  });
+
+  it('sin una búsqueda previa abre la oferta sin documento', async () => {
+    history.replaceState(
+      {
+        recotizar: {
+          datosBien: {
+            montoCredito: 280_000_000,
+            plazoAnios: 15,
+            ciudadInmueble: 'Bogotá D.C.',
+            entidadAcreedora: 'Banco de Ejemplo',
+          },
+        },
+      },
+      '',
+    );
+    await renderizar();
+
+    // Sin el documento de la búsqueda, el asesor lo vuelve a escribir: no se busca a nadie.
+    expect(campo('Documento de identidad')).toHaveValue('');
+    expect(campo('Monto del crédito (COP)')).toHaveValue('280.000.000');
   });
 
   it.each([

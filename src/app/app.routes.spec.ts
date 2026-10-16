@@ -134,6 +134,70 @@ describe('routes', () => {
     expect(url).toBe('/asesor');
   });
 
+  it.each<[Rol, string, string]>([
+    ['ASESOR', '/asesor', 'Por qué el cliente recibió este precio'],
+    ['CLIENTE', '/cliente', 'Por qué recibiste este precio'],
+  ])(
+    'con el rol %s, la oferta de una cotización abre en %s/cotizar/oferta (SOLVENTAG5-49)',
+    async (rol, portal, porque) => {
+      const { url, vista } = await navegar(`${portal}/cotizar/oferta/c-1`, sesionDe(rol));
+
+      expect(url).toBe(`${portal}/cotizar/oferta/c-1`);
+      expect(document.title).toBe('Oferta personalizada · Solventa');
+      const migas = within(vista.getByRole('navigation', { name: 'Ruta de navegación' }));
+      expect(migas.getAllByRole('listitem').map((miga) => miga.textContent?.trim())).toEqual([
+        'Solventa',
+        'Cotizar / Oferta',
+      ]);
+      expect(
+        vista.getByRole('heading', { level: 1, name: 'Oferta personalizada' }),
+      ).toBeInTheDocument();
+      expect(vista.getByRole('link', { name: 'Cotizar' })).toHaveAttribute('aria-current', 'page');
+      TestBed.inject(HttpTestingController)
+        .expectOne('http://bff.prueba/v1/cotizaciones/c-1')
+        .flush({
+          cotizacionId: 'c-1',
+          ramo: 'VIDA_HIPOTECARIO',
+          datosBien: {
+            montoCredito: 280_000_000,
+            plazoAnios: 15,
+            ciudadInmueble: 'Bogotá D.C.',
+            entidadAcreedora: 'Banco Andino S.A.',
+          },
+          prima: 70_000,
+          moneda: 'COP',
+          periodicidad: 'MENSUAL',
+          fechaCotizacion: '2026-10-14T15:00:00Z',
+          vigenteHasta: '2026-10-21T15:00:00Z',
+          estado: 'VIGENTE',
+          calculadaSinPerfil: true,
+          motivoSinPerfil: 'SIN_CLIENTE',
+        });
+      expect(await vista.findByRole('heading', { name: porque })).toBeInTheDocument();
+    },
+  );
+
+  it.each<[Rol, string]>([
+    ['ASESOR', '/asesor'],
+    ['CLIENTE', '/cliente'],
+  ])('con el rol %s, continuar con la oferta lleva a su suscripción', async (rol, portal) => {
+    const { url, vista } = await navegar(`${portal}/cotizar/oferta/c-1/suscripcion`, sesionDe(rol));
+
+    expect(url).toBe(`${portal}/cotizar/oferta/c-1/suscripcion`);
+    expect(document.title).toBe('Suscripción · Solventa');
+    expect(vista.getByRole('heading', { level: 1, name: 'Suscripción' })).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Volver a la oferta' })).toHaveAttribute(
+      'href',
+      `${portal}/cotizar/oferta/c-1`,
+    );
+  });
+
+  it('la oferta del cliente no se abre con otro rol', async () => {
+    const { url } = await navegar('/cliente/cotizar/oferta/c-1', sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor');
+  });
+
   it('una ruta que no existe muestra la página no encontrada en el layout público', async () => {
     const { url, vista } = await navegar('/no-existe/de-verdad', sesionDe('ASESOR'));
 

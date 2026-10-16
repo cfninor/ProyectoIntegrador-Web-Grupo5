@@ -81,4 +81,14 @@ describe('CotizacionApi', () => {
       error: { codigo: 'CLIENTE_NO_ENCONTRADO' },
     });
   });
+
+  it('consulta la cotización registrada por GET /v1/cotizaciones/{cotizacionId}', async () => {
+    const respuesta = firstValueFrom(api.obtener('c-1'));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/cotizaciones/c-1');
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush({ cotizacionId: 'c-1', estado: 'VIGENTE' });
+
+    await expect(respuesta).resolves.toEqual({ cotizacionId: 'c-1', estado: 'VIGENTE' });
+  });
 });
