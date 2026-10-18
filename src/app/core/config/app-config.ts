@@ -12,8 +12,9 @@ export interface AppConfig {
   /** URL base del BFF web (conector C1). */
   apiBaseUrl: string;
   /**
-   * Sesión de la implementación simulada (D11), solo en local y DEV. Sin ella no hay sesión y
-   * solo se abren las rutas públicas.
+   * Sesión de la implementación simulada (D11). Mientras no haya inicio de sesión real la llevan
+   * local y todos los ambientes (DEV, QA y PROD), porque las demostraciones se hacen ahí y los
+   * datos son de prueba. Sin ella no hay sesión y solo se abren las rutas públicas.
    */
   sesionSimulada?: Sesion;
 }

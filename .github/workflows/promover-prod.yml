@@ -1,0 +1,236 @@
+# «Promover a PROD» (D1, D11 y D12, «Flujo de despliegue y promoción»): publica en PROD, sin
+# compilar nada, exactamente el build del portal que está en QA, con su prueba de humo en verde.
+# Lo copia a web/releases/v<versión>/ (la versión sale de package.json en ese commit) y, con PROD
+# en verde, crea el tag v<versión> y su GitHub Release. Solo lo corren las personas de
+# APROBADORES_PROD. Si el tag ya existe, falla: hay que subir la versión con un PR a main.
+name: Promover a PROD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # El grupo de concurrencia va en los jobs con pasos y no en el que llama a «Publicar portal», que
+  # ya lo usa: con el mismo grupo en el llamador, GitHub detecta un bloqueo y cancela.
+  preparar:
+    name: Preparar la versión
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # deployment: false toma el AWS_ROLE_ARN de PROD (y la restricción a main) sin registrar un
+    # despliegue en el panel de ambientes: lo registra «Publicar portal».
+    environment:
+      name: prod
+      deployment: false
+    concurrency:
+      group: ambiente-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      commit: ${{ steps.qa.outputs.commit }}
+      version: ${{ steps.version.outputs.version }}
+      origen: ${{ steps.release.outputs.origen }}
+    steps:
+      - name: Comprobar quién promueve a PROD
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          APROBADORES: ${{ vars.APROBADORES_PROD }}
+        run: |
+          aprobadores=",${APROBADORES//[[:space:]]/},"
+          if [[ -z $ACTOR || ${aprobadores,,} != *",${ACTOR,,},"* ]]; then
+            echo "::error::$ACTOR no está en APROBADORES_PROD: solo esas personas promueven a PROD."
+            exit 1
+          fi
+          echo "$ACTOR está en APROBADORES_PROD."
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: promover-prod-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Leer la versión de QA
+        id: qa
+        run: |
+          version=$(aws ssm get-parameter --name /solventa/qa/web/version --query Parameter.Value --output text)
+          echo "/solventa/qa/web/version: $version"
+          commit=$(jq -r '.commit // empty' <<< "$version")
+          prueba_humo=$(jq -r '.prueba_humo // empty' <<< "$version")
+          if [[ ! $commit =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::/solventa/qa/web/version no tiene un commit válido: '$commit'."
+            exit 1
+          fi
+          if [[ $prueba_humo != ok ]]; then
+            echo "::error::La prueba de humo del portal en QA está en '$prueba_humo': solo se promueve a PROD lo que pasó en QA."
+            exit 1
+          fi
+          echo "QA tiene el portal de $commit con la prueba de humo en ok."
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      # La historia completa de main y sus tags, para leer package.json en ese commit.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Leer la versión y comprobar el tag
+        id: version
+        env:
+          COMMIT: ${{ steps.qa.outputs.commit }}
+        run: |
+          if ! git cat-file -e "$COMMIT^{commit}" 2> /dev/null || ! git merge-base --is-ancestor "$COMMIT" origin/main; then
+            echo "::error::El commit $COMMIT de QA no es de main."
+            exit 1
+          fi
+          version=$(git show "$COMMIT:package.json" | jq -r '.version // empty')
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::package.json de $COMMIT no tiene una versión x.y.z: '$version'."
+            exit 1
+          fi
+          estado=0
+          git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null || estado=$?
+          case $estado in
+            0)
+              echo "::error::El tag v$version ya existe: sube la versión en package.json con un PR a main y vuelve a promover."
+              exit 1 ;;
+            2) echo "El tag v$version todavía no existe." ;;
+            *)
+              echo "::error::No se pudo consultar si existe el tag v$version (git ls-remote terminó con $estado)."
+              exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # S3 a S3 con --copy-props metadata-directive: conserva el metadato commit, que exige
+      # «Publicar portal», también en copias multiparte, sin leer ni escribir etiquetas de S3.
+      # index.html va al final, así su presencia marca la copia como completa. Si la carpeta ya
+      # existe (un reintento), no se copia si es del mismo commit y falla si es de otro.
+      - name: Copiar el build a web/releases/v<versión>
+        id: release
+        env:
+          COMMIT: ${{ steps.qa.outputs.commit }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          artefactos=$(aws ssm get-parameter --name /solventa/compartido/artefactos/bucket --query Parameter.Value --output text)
+          # list-objects-v2 y no head-object: el rol solo lista con el prefijo web/*, y un
+          # head-object de un archivo que no existe respondería 403 en lugar de 404.
+          existe() {
+            local clave
+            clave=$(aws s3api list-objects-v2 --bucket "$artefactos" --prefix "$1" \
+              --query "Contents[?Key=='$1'].Key | [0]" --output text)
+            [[ $clave == "$1" ]]
+          }
+          commit_de() { aws s3api head-object --bucket "$artefactos" --key "$1" --query Metadata.commit --output text; }
+          origen="web/commits/$COMMIT"
+          destino="web/releases/v$VERSION"
+          if existe "$destino/index.html"; then
+            actual=$(commit_de "$destino/index.html")
+            if [[ $actual != "$COMMIT" ]]; then
+              echo "::error::s3://$artefactos/$destino/ ya existe con el build de otro commit ($actual). Sube la versión en package.json con un PR a main."
+              exit 1
+            fi
+            echo "::notice::s3://$artefactos/$destino/ ya tiene el build de $COMMIT; no se copia."
+          else
+            if ! existe "$origen/index.html"; then
+              echo "::error::No hay un build completo en s3://$artefactos/$origen/ (falta index.html)."
+              exit 1
+            fi
+            aws s3 cp "s3://$artefactos/$origen/" "s3://$artefactos/$destino/" --recursive --only-show-errors \
+              --exclude index.html --copy-props metadata-directive
+            aws s3 cp "s3://$artefactos/$origen/index.html" "s3://$artefactos/$destino/index.html" --only-show-errors \
+              --copy-props metadata-directive
+            copiado=$(commit_de "$destino/index.html")
+            if [[ $copiado != "$COMMIT" ]]; then
+              echo "::error::$destino/index.html no conservó el metadato commit (tiene '$copiado')."
+              exit 1
+            fi
+            echo "Build de $COMMIT copiado a s3://$artefactos/$destino/."
+          fi
+          echo "origen=$destino" >> "$GITHUB_OUTPUT"
+
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        env:
+          COMMIT: ${{ steps.qa.outputs.commit }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ORIGEN: ${{ steps.release.outputs.origen }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          version=${VERSION:+v$VERSION}
+          {
+            echo "## Promover a PROD: $RESULTADO"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit (el de QA) | \`${COMMIT:-desconocido}\` |"
+            echo "| Versión | ${version:-desconocida} |"
+            echo "| Build | \`${ORIGEN:-sin copiar}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publicar:
+    name: Publicar en PROD
+    needs: preparar
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publicar-portal.yml
+    with:
+      ambiente: prod
+      origen: ${{ needs.preparar.outputs.origen }}
+
+  # Solo corre con «Publicar portal» en verde, y su prueba de humo es parte de ese job.
+  liberar:
+    name: Tag y GitHub Release
+    needs: [preparar, publicar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ambiente-prod
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Crear el tag y el GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ needs.preparar.outputs.commit }}
+          PUBLICADO: ${{ needs.publicar.outputs.commit }}
+          VERSION: ${{ needs.preparar.outputs.version }}
+        run: |
+          if [[ $PUBLICADO != "$COMMIT" ]]; then
+            echo "::error::«Publicar portal» publicó el commit '$PUBLICADO' y no $COMMIT."
+            exit 1
+          fi
+          # Otra vez, por si alguien creó el tag mientras se publicaba: gh release create usaría ese
+          # tag y no el commit de QA.
+          estado=0
+          git ls-remote --exit-code --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "refs/tags/v$VERSION" > /dev/null || estado=$?
+          if [[ $estado != 2 ]]; then
+            echo "::error::El tag v$VERSION ya existe o no se pudo consultar (git ls-remote terminó con $estado)."
+            exit 1
+          fi
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$COMMIT" \
+            --title "v$VERSION" --generate-notes
+          echo "Tag v$VERSION y GitHub Release creados sobre $COMMIT."
+
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        env:
+          VERSION: ${{ needs.preparar.outputs.version }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          {
+            echo "## Tag y GitHub Release: $RESULTADO"
+            echo
+            echo "[v$VERSION]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION)"
+          } >> "$GITHUB_STEP_SUMMARY"

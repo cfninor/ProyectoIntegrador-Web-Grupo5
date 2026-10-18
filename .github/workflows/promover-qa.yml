@@ -1,0 +1,151 @@
+# «Promover a QA» (D1 y D12, «Flujo de despliegue y promoción»): publica en QA, sin compilar
+# nada, el build del portal que está en DEV (el commit de /solventa/dev/web/version) o el de otro
+# commit de main que se indique. El build tiene que estar en web/commits/<commit>/ del bucket de
+# artefactos, que lo conserva 60 días.
+name: Promover a QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit de main que se promueve (completo o abreviado). Vacío = el que está en DEV.
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # El grupo de concurrencia va en los jobs con pasos y no en el que llama a «Publicar portal», que
+  # ya lo usa: con el mismo grupo en el llamador, GitHub detecta un bloqueo y cancela.
+  preparar:
+    name: Elegir el build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # deployment: false toma el AWS_ROLE_ARN de QA (y la restricción a main) sin registrar un
+    # despliegue en el panel de ambientes: lo registra «Publicar portal».
+    environment:
+      name: qa
+      deployment: false
+    concurrency:
+      group: ambiente-qa
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      commit: ${{ steps.main.outputs.commit }}
+    steps:
+      - name: Comprobar el commit indicado
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          if [[ -n $COMMIT && ! $COMMIT =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::El commit es un sha de git en hexadecimal (de 7 a 40 caracteres): '$COMMIT'."
+            exit 1
+          fi
+
+      # La historia completa de main, para saber si el commit es de main.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: promover-qa-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Commit que se promueve
+        id: origen
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          if [[ -n $COMMIT ]]; then
+            echo "Commit indicado: $COMMIT."
+            echo "fuente=indicado" >> "$GITHUB_OUTPUT"
+          else
+            version=$(aws ssm get-parameter --name /solventa/dev/web/version --query Parameter.Value --output text)
+            echo "/solventa/dev/web/version: $version"
+            COMMIT=$(jq -r '.commit // empty' <<< "$version")
+            if [[ ! $COMMIT =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::/solventa/dev/web/version no tiene un commit válido: '$COMMIT'."
+              exit 1
+            fi
+            echo "fuente=dev" >> "$GITHUB_OUTPUT"
+          fi
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Comprobar que es de main
+        id: main
+        env:
+          COMMIT: ${{ steps.origen.outputs.commit }}
+        run: |
+          if ! completo=$(git rev-parse --verify --quiet "$COMMIT^{commit}"); then
+            echo "::error::El commit $COMMIT no existe en el repositorio."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$completo" origin/main; then
+            echo "::error::El commit $completo no es de main: solo se promueve lo que ya está en main."
+            exit 1
+          fi
+          echo "$completo es de main."
+          echo "commit=$completo" >> "$GITHUB_OUTPUT"
+
+      # list-objects-v2 y no head-object: el rol solo lista con el prefijo web/*, y un head-object
+      # de un archivo que no existe respondería 403 en lugar de 404.
+      - name: Comprobar que el build existe
+        env:
+          COMMIT: ${{ steps.main.outputs.commit }}
+        run: |
+          artefactos=$(aws ssm get-parameter --name /solventa/compartido/artefactos/bucket --query Parameter.Value --output text)
+          origen="web/commits/$COMMIT"
+          clave=$(aws s3api list-objects-v2 --bucket "$artefactos" --prefix "$origen/index.html" \
+            --query "Contents[?Key=='$origen/index.html'].Key | [0]" --output text)
+          if [[ $clave != "$origen/index.html" ]]; then
+            echo "::error::No hay un build completo en s3://$artefactos/$origen/ (falta index.html). Los builds por commit se borran a los 60 días."
+            exit 1
+          fi
+          echo "Build en s3://$artefactos/$origen/."
+
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        env:
+          COMMIT: ${{ steps.main.outputs.commit || steps.origen.outputs.commit || inputs.commit }}
+          FUENTE: ${{ steps.origen.outputs.fuente }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          case $FUENTE in
+            dev) fuente='el que está en DEV' ;;
+            indicado) fuente='indicado al correr el workflow' ;;
+            *) fuente='desconocido' ;;
+          esac
+          {
+            echo "## Promover a QA: $RESULTADO"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${COMMIT:-desconocido}\` |"
+            echo "| De dónde sale | $fuente |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publicar:
+    name: Publicar en QA
+    needs: preparar
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publicar-portal.yml
+    with:
+      ambiente: qa
+      origen: web/commits/${{ needs.preparar.outputs.commit }}
