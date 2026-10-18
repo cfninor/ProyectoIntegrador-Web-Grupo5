@@ -18,6 +18,13 @@ export class CotizacionApi {
     return this.http.post<Cotizacion>(`${this.config.apiBaseUrl}/v1/cotizaciones`, solicitud);
   }
 
+  /** La cotización registrada, con su estado de hoy (SOLVENTAG5-49). Un 404 llega como error. */
+  obtener(cotizacionId: string): Observable<Cotizacion> {
+    return this.http.get<Cotizacion>(
+      `${this.config.apiBaseUrl}/v1/cotizaciones/${encodeURIComponent(cotizacionId)}`,
+    );
+  }
+
   /** Búsqueda exacta por documento (D2). Un 404 CLIENTE_NO_ENCONTRADO llega como error. */
   buscarCliente(busqueda: BusquedaCliente): Observable<ClienteEncontrado> {
     return this.http.post<ClienteEncontrado>(

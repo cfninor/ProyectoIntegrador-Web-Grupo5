@@ -1,0 +1,262 @@
+// Marco «Solventa / Cotizar / Oferta» del Figma y A-Oferta.html del prototipo (SOLVENTAG5-49).
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  container-type: inline-size;
+}
+
+p,
+h2 {
+  margin: 0;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.estado-carga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.fila {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.tarjeta {
+  padding: 20px 22px;
+}
+
+.prima {
+  flex: none;
+  width: 360px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.etiqueta-prima,
+.periodicidad {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--on-surface-variant);
+}
+
+.valor-prima {
+  font-family: var(--fuente-titulos);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.anillo-fondo,
+.anillo-valor {
+  fill: none;
+  stroke-width: 14;
+}
+
+.anillo-fondo {
+  stroke: var(--chip-gris-fondo);
+}
+
+.anillo-valor {
+  stroke: var(--chip-verde-texto);
+  stroke-linecap: round;
+}
+
+.anillo-score {
+  font-family: var(--fuente-titulos);
+  font-size: 26px;
+  font-weight: 600;
+  fill: var(--on-surface);
+}
+
+.anillo-maximo {
+  font-size: 11px;
+  fill: var(--on-surface-variant);
+}
+
+.valida-hasta {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--outline-variant);
+  font-size: 13px;
+  color: var(--on-surface-variant);
+
+  strong {
+    color: var(--on-surface);
+  }
+}
+
+.perfil {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.encabezado-perfil {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+
+  > div {
+    flex: 1 1 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .texto-secundario {
+    font-size: 13px;
+  }
+}
+
+.senales {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.senal {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 110px;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--outline-variant);
+  font-size: 14px;
+}
+
+.barra {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--chip-gris-fondo);
+}
+
+.relleno {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+
+  &.favorable {
+    background: var(--chip-verde-texto);
+  }
+
+  &.medio {
+    background: #b07a12;
+  }
+
+  &.desfavorable {
+    background: var(--error);
+  }
+}
+
+.lectura {
+  text-align: right;
+  color: var(--on-surface-variant);
+}
+
+.sin-perfil {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  font-size: 14px;
+}
+
+.fuentes {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.cobertura {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aviso-vencida {
+  padding: 12px 16px;
+  border: 1px solid var(--chip-ambar-texto);
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+// «Descartar oferta» va a la derecha, en rojo, como en el Figma.
+.descartar {
+  margin-left: auto;
+  border-color: #e8b7b3;
+  color: var(--error);
+
+  &:hover {
+    background: var(--chip-rojo-fondo);
+  }
+}
+
+.datos-cobertura {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+
+  dt {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
+// En pantallas angostas las tarjetas van una debajo de otra.
+@container (max-width: 860px) {
+  .fila {
+    flex-direction: column;
+  }
+
+  .prima {
+    width: auto;
+  }
+
+  .datos-cobertura {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .senal {
+    grid-template-columns: minmax(0, 1fr) 90px;
+
+    .barra {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+}

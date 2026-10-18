@@ -34,6 +34,7 @@ import {
   TIPOS_DOCUMENTO,
   TipoDocumento,
 } from './modelos';
+import { DatosRecotizar } from './navegacion-oferta';
 
 /** Quién cotiza: el asesor para un cliente (SOLV-WEB-05) o el cliente para sí mismo (D1). */
 export type Actor = 'asesor' | 'cliente';
@@ -123,6 +124,11 @@ export class FormularioCotizacion implements OnInit {
   readonly autorizacion = input<CajaAutorizacion>({ tipo: 'cargando' });
   /** El asesor solo calcula con la autorización AUTORIZADA (D4); el cliente, siempre. */
   readonly envioHabilitado = input(true);
+  /**
+   * Datos con que se abre al ajustar o recotizar una oferta (SOLVENTAG5-49, CA3). Con el actor
+   * asesor y el documento del cliente, lo vuelve a buscar.
+   */
+  readonly inicial = input<DatosRecotizar | null>(null);
 
   /** El asesor escribió un documento válido: el contenedor busca al cliente (D2, D15). */
   readonly buscarCliente = output<BusquedaCliente>();
@@ -130,6 +136,8 @@ export class FormularioCotizacion implements OnInit {
   readonly reenviarSolicitud = output<void>();
   readonly reintentarAutorizacion = output<void>();
   readonly cotizada = output<Cotizacion>();
+  /** «Ver la oferta» del panel: el contenedor abre la oferta de la cotización (SOLVENTAG5-49). */
+  readonly verOferta = output<Cotizacion>();
 
   private readonly api = inject(CotizacionApi);
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
@@ -281,6 +289,25 @@ export class FormularioCotizacion implements OnInit {
         }
       });
     }
+    const inicial = this.inicial();
+    if (inicial) {
+      this.llenarCon(inicial);
+    }
+  }
+
+  /** Los datos del crédito de la oferta y, para el asesor, el documento con que se buscó. */
+  private llenarCon({ datosBien, busqueda }: DatosRecotizar): void {
+    const { controls } = this.formulario;
+    controls.montoCredito.setValue(numeroConMiles(datosBien.montoCredito, this.idioma));
+    controls.plazoAnios.setValue(String(datosBien.plazoAnios));
+    controls.ciudadInmueble.setValue(datosBien.ciudadInmueble);
+    controls.entidadAcreedora.setValue(datosBien.entidadAcreedora);
+    if (this.actor() === 'asesor' && busqueda) {
+      // Primero el tipo, con el número vacío: así cambiar el tipo no busca todavía.
+      controls.tipoDocumento.setValue(busqueda.tipoDocumento);
+      controls.numeroDocumento.setValue(busqueda.numeroDocumento);
+      this.buscar();
+    }
   }
 
   /** Muestra el error de un campo cuando ya se tocó o cuando el servicio lo rechazó. */
@@ -322,6 +349,11 @@ export class FormularioCotizacion implements OnInit {
   protected alPresionarEnter(evento: Event): void {
     evento.preventDefault();
     this.buscar();
+  }
+
+  /** «Ver la oferta» solo aparece con un resultado: siempre hay una cotización que abrir. */
+  protected abrirOferta(): void {
+    this.verOferta.emit(this.cotizacion() as Cotizacion);
   }
 
   /** Al salir del monto lo muestra con separador de miles, como se lee en el idioma. */

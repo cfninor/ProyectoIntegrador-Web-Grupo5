@@ -1,0 +1,72 @@
+// Pasos de la contratación del Figma y del prototipo (A-Oferta.html, A-Suscripcion.html).
+:host {
+  display: block;
+  container-type: inline-size;
+}
+
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.paso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--chip-gris-fondo);
+  color: var(--chip-gris-texto);
+  font-size: 12px;
+}
+
+.hecho {
+  color: var(--chip-verde-texto);
+
+  .numero {
+    background: var(--chip-verde-texto);
+    color: #fff;
+  }
+}
+
+.actual {
+  color: var(--on-surface);
+  font-weight: 600;
+
+  .numero {
+    background: var(--primary);
+    color: #fff;
+  }
+}
+
+.separador {
+  width: 24px;
+  height: 1px;
+  background: var(--outline);
+}
+
+// En pantallas angostas los pasos pasan a varias líneas: sin las líneas que los unen.
+@container (max-width: 860px) {
+  .pasos {
+    gap: 8px 16px;
+  }
+
+  .separador {
+    display: none;
+  }
+}
