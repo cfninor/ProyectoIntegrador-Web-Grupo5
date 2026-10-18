@@ -16,6 +16,10 @@ on:
         description: Carpeta del build en el bucket de artefactos (web/commits/<commit> o web/releases/v<versión>).
         type: string
         required: true
+    outputs:
+      commit:
+        description: Commit del build publicado, según sus metadatos.
+        value: ${{ jobs.publicar.outputs.commit }}
   workflow_dispatch:
     inputs:
       ambiente:
@@ -53,6 +57,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      commit: ${{ steps.build.outputs.commit }}
     steps:
       - name: Comprobar quién publica en PROD
         if: inputs.ambiente == 'prod'
