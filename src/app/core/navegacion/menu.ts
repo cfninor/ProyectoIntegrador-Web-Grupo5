@@ -30,6 +30,15 @@ function cotizar(rol: Rol): OpcionMenu {
   };
 }
 
+function perfilRiesgo(): OpcionMenu {
+  return {
+    ruta: `${tableroDe('ANALISTA_RIESGO')}/perfil-riesgo`,
+    icono: 'escudo',
+    texto: $localize`:@@menu.perfilRiesgo:Perfil de riesgo`,
+    exacta: false,
+  };
+}
+
 /**
  * Opciones del menú de cada rol. Una pantalla nueva agrega aquí su opción y su ruta dentro del
  * grupo de su rol en `app.routes.ts`; no toca los layouts.
@@ -37,7 +46,7 @@ function cotizar(rol: Rol): OpcionMenu {
 export const MENU: Record<Rol, readonly OpcionMenu[]> = {
   ASESOR: [tablero('ASESOR'), cotizar('ASESOR')],
   CLIENTE: [tablero('CLIENTE'), cotizar('CLIENTE')],
-  ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO')],
+  ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO'), perfilRiesgo()],
   OPERACIONES: [tablero('OPERACIONES')],
   SOCIO: [tablero('SOCIO')],
 };
