@@ -1,0 +1,181 @@
+<section class="tarjeta consulta" aria-labelledby="perfil-riesgo-consulta-titulo">
+  <h2 id="perfil-riesgo-consulta-titulo" i18n="@@perfilRiesgo.consulta.titulo">
+    Consultar el perfil de una solicitud
+  </h2>
+  <p class="texto-secundario" i18n="@@perfilRiesgo.consulta.texto">
+    Es el mismo perfil de riesgo con que se calculó la cotización que el cliente aceptó. No se
+    recalcula.
+  </p>
+  <form class="formulario" novalidate [formGroup]="formulario" (ngSubmit)="consultar()">
+    <div class="campo-solicitud">
+      <label
+        class="etiqueta-campo"
+        for="perfil-riesgo-solicitud"
+        i18n="@@perfilRiesgo.consulta.campo"
+        >Id de la solicitud de suscripción</label
+      >
+      <input
+        id="perfil-riesgo-solicitud"
+        class="campo"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        formControlName="solicitud"
+        [attr.aria-invalid]="campoInvalido()"
+        [attr.aria-describedby]="campoInvalido() ? 'perfil-riesgo-solicitud-error' : null"
+      />
+      @if (campoInvalido()) {
+        <p
+          id="perfil-riesgo-solicitud-error"
+          class="error-campo"
+          i18n="@@perfilRiesgo.consulta.invalido"
+        >
+          Escribe un id de solicitud válido, como 8e3b1f6a-2c4d-4e5f-9a7b-1c2d3e4f5a6b.
+        </p>
+      }
+    </div>
+    <button
+      type="submit"
+      class="boton-primario"
+      [disabled]="carga().tipo === 'cargando'"
+      i18n="@@perfilRiesgo.consulta.boton"
+    >
+      Consultar
+    </button>
+  </form>
+</section>
+
+<div aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <p class="tarjeta estado-carga" i18n="@@perfilRiesgo.cargando">Cargando el perfil…</p>
+    }
+    @case ('no-encontrada') {
+      <p class="tarjeta estado-carga mensaje-error" i18n="@@perfilRiesgo.noEncontrada">
+        No encontramos una solicitud de suscripción con ese id.
+      </p>
+    }
+    @case ('no-coincide') {
+      <p class="tarjeta estado-carga mensaje-error" i18n="@@perfilRiesgo.noCoincide">
+        El perfil guardado en la cotización no coincide con el de la solicitud. No la evalúes y
+        repórtalo a soporte.
+      </p>
+    }
+    @case ('error') {
+      <div class="tarjeta estado-carga">
+        <p class="mensaje-error" i18n="@@perfilRiesgo.error">
+          No pudimos cargar el perfil. Intenta de nuevo.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="reintentar()"
+          i18n="@@perfilRiesgo.reintentar"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+  }
+</div>
+
+@if (vista(); as datos) {
+  <section class="tarjeta resultado" aria-labelledby="perfil-riesgo-resultado-titulo">
+    <div class="encabezado">
+      <h2 id="perfil-riesgo-resultado-titulo" i18n="@@perfilRiesgo.resultado.titulo">
+        Perfil con que se cotizó
+      </h2>
+      @if (datos.perfil; as perfil) {
+        <span class="chip chip-verde-azulado" i18n="@@perfilRiesgo.origen.perfil"
+          >Perfil del cliente · versión {{ perfil.version }}</span
+        >
+      } @else {
+        <span class="chip chip-gris" i18n="@@perfilRiesgo.origen.valorPorDefecto"
+          >Valor por defecto</span
+        >
+      }
+    </div>
+
+    <dl class="datos">
+      <div>
+        <dt class="etiqueta" i18n="@@perfilRiesgo.dato.solicitud">Solicitud</dt>
+        <dd>{{ datos.solicitudId }}</dd>
+      </div>
+      <div>
+        <dt class="etiqueta" i18n="@@perfilRiesgo.dato.cotizacion">Cotización</dt>
+        <dd>{{ datos.cotizacionId }}</dd>
+      </div>
+      @if (datos.perfil; as perfil) {
+        <div>
+          <dt class="etiqueta" i18n="@@perfilRiesgo.dato.perfil">Perfil</dt>
+          <dd>{{ perfil.perfilId }}</dd>
+        </div>
+        <div>
+          <dt class="etiqueta" i18n="@@perfilRiesgo.dato.score">Score</dt>
+          <dd i18n="@@perfilRiesgo.dato.scoreValor">{{ perfil.score }} de 850</dd>
+        </div>
+        <div>
+          <dt class="etiqueta" i18n="@@perfilRiesgo.dato.nivel">Nivel</dt>
+          <dd>
+            <span class="chip {{ perfil.claseNivel }}">{{ perfil.nivel }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt class="etiqueta" i18n="@@perfilRiesgo.dato.calculado">Calculado</dt>
+          <dd i18n="@@perfilRiesgo.dato.calculadoValor">
+            {{ perfil.calculadoFecha }} a las {{ perfil.calculadoHora }}
+          </dd>
+        </div>
+        <div>
+          <dt class="etiqueta" i18n="@@perfilRiesgo.dato.vigenteHasta">Vigente hasta</dt>
+          <dd>{{ perfil.vigenteHasta }}</dd>
+        </div>
+      }
+    </dl>
+
+    @if (datos.perfil; as perfil) {
+      <h3 i18n="@@perfilRiesgo.senales.titulo">Señales del perfil</h3>
+      <ul class="senales">
+        @for (senal of perfil.senales; track senal.senal) {
+          <li class="senal">
+            <span>{{ senal.nombre }}</span>
+            <span class="barra" aria-hidden="true">
+              <span class="relleno {{ senal.tramo }}" [style.width.%]="senal.valor"></span>
+            </span>
+            <span class="lectura"
+              >{{ senal.lectura }}
+              <span class="visualmente-oculto" i18n="@@perfilRiesgo.senal.valor"
+                >({{ senal.valor }} de 100)</span
+              ></span
+            >
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="sin-perfil">
+        @switch (datos.motivoSinPerfil) {
+          @case ('SIN_CLIENTE') {
+            <p i18n="@@perfilRiesgo.motivo.sinCliente">
+              Se cotizó sin perfil de riesgo porque no había un cliente identificado.
+            </p>
+          }
+          @case ('SIN_CONSENTIMIENTO') {
+            <p i18n="@@perfilRiesgo.motivo.sinConsentimiento">
+              Se cotizó sin perfil de riesgo porque el cliente no tenía una autorización de datos
+              vigente.
+            </p>
+          }
+          @default {
+            <p i18n="@@perfilRiesgo.motivo.noDisponible">
+              Se cotizó sin perfil de riesgo porque el perfil no estuvo disponible a tiempo.
+            </p>
+          }
+        }
+        <p class="texto-secundario" i18n="@@perfilRiesgo.valorPorDefecto">
+          La prima se calculó con el valor por defecto del seguro. Evalúa la solicitud con ese mismo
+          valor.
+        </p>
+      </div>
+    }
+  </section>
+}

@@ -25,6 +25,12 @@ tags:
       no está disponible a tiempo, el journey no se bloquea: la prima se calcula con el valor por
       defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Mientras no exista
       login, el id del cliente viaja en la petición.
+  - name: suscripcion
+    description: >
+      Solicitudes de suscripción (SOLVENTAG5-133). Cuando el cliente acepta la oferta, se crea
+      una solicitud que conserva la cotización, la prima, la cobertura y el perfil con que se
+      calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50). El responsable de
+      suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67).
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -385,6 +391,115 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion:
+    post:
+      tags: [suscripcion]
+      operationId: aceptarOferta
+      summary: Aceptar la oferta de una cotización
+      description: >
+        Crea la solicitud de suscripción de la oferta aceptada, con la prima, la cobertura y el
+        perfil de riesgo con que se calculó la cotización. La solicitud queda en
+        PENDIENTE_EVALUACION. Una oferta genera una sola solicitud: si se acepta otra vez (por
+        ejemplo, un doble clic), responde 200 con la solicitud que ya existía, aunque la oferta
+        haya vencido después. Si la oferta ya venció (después de vigenteHasta) y no se había
+        aceptado, no se crea la solicitud: responde 409 OFERTA_VENCIDA y la pantalla ofrece
+        recotizar. El BFF agrega el canal antes de llamar al núcleo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AceptacionOferta'
+            example:
+              cotizacionId: 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+      responses:
+        '200':
+          description: La oferta ya se había aceptado; es la solicitud existente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudSuscripcion'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/SolicitudSuscripcionCreada'
+        '201':
+          description: Solicitud de suscripción creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudSuscripcion'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/SolicitudSuscripcionCreada'
+        '404':
+          $ref: '#/components/responses/CotizacionNoEncontrada'
+        '409':
+          $ref: '#/components/responses/OfertaVencida'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}:
+    get:
+      tags: [suscripcion]
+      operationId: obtenerSolicitudSuscripcion
+      summary: Consultar una solicitud de suscripción
+      description: >
+        Devuelve la solicitud con su estado. Queda en PENDIENTE_EVALUACION hasta que la evalúe
+        la suscripción automática (SOLVENTAG5-50).
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      responses:
+        '200':
+          description: Solicitud de suscripción registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudSuscripcion'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/SolicitudSuscripcionCreada'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}/perfil-riesgo:
+    get:
+      tags: [suscripcion]
+      operationId: obtenerPerfilRiesgoSolicitud
+      summary: Consultar el perfil de riesgo con que se cotizó una solicitud
+      description: >
+        Devuelve al responsable de suscripción el mismo perfil de riesgo con que se calculó la
+        cotización de la solicitud (SOLVENTAG5-67): la foto que la cotización guardó al cotizar,
+        con su versión, score, nivel y señales. No se recalcula ni se consulta otra vez a
+        ms-perfilamiento, aunque el perfil del cliente haya cambiado después. Si la prima se
+        calculó con el valor por defecto de BA-01, origen es VALOR_POR_DEFECTO y motivoSinPerfil
+        dice por qué. Si la foto de la cotización no coincide con el perfil y la versión que
+        guardó la solicitud, responde 409 PERFIL_NO_COINCIDE.
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      responses:
+        '200':
+          description: Perfil de riesgo con que se cotizó la solicitud.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerfilRiesgoSolicitud'
+              examples:
+                conPerfil:
+                  $ref: '#/components/examples/PerfilRiesgoConPerfil'
+                sinPerfil:
+                  $ref: '#/components/examples/PerfilRiesgoSinPerfil'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+        '409':
+          $ref: '#/components/responses/PerfilNoCoincide'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
 components:
   parameters:
     ClienteId:
@@ -413,6 +528,14 @@ components:
       name: cotizacionId
       in: path
       required: true
+      schema:
+        type: string
+        format: uuid
+    SolicitudSuscripcionId:
+      name: solicitudId
+      in: path
+      required: true
+      description: Id (UUID v4) de la solicitud de suscripción.
       schema:
         type: string
         format: uuid
@@ -584,6 +707,49 @@ components:
               - loc: [path, clienteId]
                 msg: 'Input should be a valid UUID'
                 type: uuid_parsing
+    OfertaVencida:
+      description: >
+        La oferta se aceptó después de su vigencia. No se crea la solicitud: la pantalla ofrece
+        recotizar con los mismos datos.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: OFERTA_VENCIDA
+          example:
+            codigo: OFERTA_VENCIDA
+            detalle: La oferta venció. Cotiza de nuevo para obtener una oferta vigente.
+    SolicitudSuscripcionNoEncontrada:
+      description: La solicitud de suscripción no existe.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: SOLICITUD_SUSCRIPCION_NO_ENCONTRADA
+          example:
+            codigo: SOLICITUD_SUSCRIPCION_NO_ENCONTRADA
+            detalle: No encontramos la solicitud de suscripción.
+    PerfilNoCoincide:
+      description: >
+        La foto del perfil que guardó la cotización no coincide con el perfil y la versión de la
+        solicitud. No se devuelve un perfil distinto al cotizado.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: PERFIL_NO_COINCIDE
+          example:
+            codigo: PERFIL_NO_COINCIDE
+            detalle: El perfil de riesgo de la cotización no coincide con el de la solicitud.
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -1031,6 +1197,113 @@ components:
         perfil:
           $ref: '#/components/schemas/PerfilUsado'
           description: Solo cuando calculadaSinPerfil es false.
+    AceptacionOferta:
+      type: object
+      required: [cotizacionId]
+      properties:
+        cotizacionId:
+          type: string
+          format: uuid
+    CanalOrigen:
+      type: string
+      description: Canal por el que el cliente aceptó la oferta; lo pone el BFF.
+      enum: [web, movil, socio]
+    EstadoSolicitudSuscripcion:
+      type: string
+      description: >
+        PENDIENTE_EVALUACION al crearse; la evaluación automática (SOLVENTAG5-50) agrega los
+        estados siguientes.
+      enum: [PENDIENTE_EVALUACION]
+    Cobertura:
+      type: object
+      required: [ramo, datosBien]
+      properties:
+        ramo:
+          type: string
+          description: Código del ramo cotizado, p. ej. VIDA_HIPOTECARIO.
+        datosBien:
+          type: object
+          additionalProperties: true
+          description: Datos del bien con que se cotizó (para vida hipotecario, DatosBienVidaHipotecario).
+    PerfilRiesgo:
+      type: object
+      required: [perfilId, version]
+      properties:
+        perfilId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+    SolicitudSuscripcion:
+      type: object
+      required:
+        - solicitudId
+        - cotizacionId
+        - estado
+        - cobertura
+        - prima
+        - moneda
+        - periodicidad
+        - canal
+        - aceptadaEn
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitudSuscripcion'
+        cobertura:
+          $ref: '#/components/schemas/Cobertura'
+        prima:
+          type: integer
+          minimum: 0
+          description: Prima en COP de la oferta aceptada, redondeada al peso.
+        moneda:
+          type: string
+        periodicidad:
+          type: string
+        perfilRiesgo:
+          $ref: '#/components/schemas/PerfilRiesgo'
+          description: Perfil con que se calculó la prima; ausente si se cotizó sin perfil.
+        motivoSinPerfil:
+          type: string
+          description: SIN_CLIENTE, SIN_CONSENTIMIENTO o PERFIL_NO_DISPONIBLE; solo sin perfil.
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        aceptadaEn:
+          type: string
+          format: date-time
+    OrigenPerfil:
+      type: string
+      description: >
+        PERFIL si la prima se calculó con el perfil del cliente; VALOR_POR_DEFECTO si se calculó
+        con el valor por defecto de BA-01 porque no había perfil.
+      enum: [PERFIL, VALOR_POR_DEFECTO]
+    PerfilRiesgoSolicitud:
+      type: object
+      required: [solicitudId, cotizacionId, origen]
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        origen:
+          $ref: '#/components/schemas/OrigenPerfil'
+        perfil:
+          $ref: '#/components/schemas/PerfilUsado'
+          description: Solo cuando origen es PERFIL.
+        motivoSinPerfil:
+          $ref: '#/components/schemas/MotivoSinPerfil'
+          description: Solo cuando origen es VALOR_POR_DEFECTO.
     Error:
       type: object
       required: [codigo, detalle]
@@ -1041,8 +1314,8 @@ components:
             Código estable del error. Los de esta versión son SOLICITUD_NO_ENCONTRADA,
             SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA, CONSENTIMIENTO_NO_ENCONTRADO,
             CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO, CLIENTE_NO_ENCONTRADO,
-            DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO, COTIZACION_NO_ENCONTRADA y
-            NUCLEO_NO_DISPONIBLE.
+            DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO, COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA,
+            SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, PERFIL_NO_COINCIDE y NUCLEO_NO_DISPONIBLE.
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -1141,4 +1414,51 @@ components:
         vigenteHasta: '2026-10-20T15:00:00Z'
         estado: VIGENTE
         calculadaSinPerfil: true
+        motivoSinPerfil: PERFIL_NO_DISPONIBLE
+    SolicitudSuscripcionCreada:
+      summary: Oferta aceptada, con el perfil de riesgo con que se cotizó
+      value:
+        solicitudId: 8e3b1f6a-2c4d-4e5f-9a7b-1c2d3e4f5a6b
+        cotizacionId: 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_EVALUACION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 59500
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+    PerfilRiesgoConPerfil:
+      summary: Cotizada con el perfil MEDIO versión 3 del cliente
+      value:
+        solicitudId: 8e3b1f6a-2c4d-4e5f-9a7b-1c2d3e4f5a6b
+        cotizacionId: 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+        origen: PERFIL
+        perfil:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+          score: 640
+          nivel: MEDIO
+          senales:
+            comportamientoPago: 72
+            estabilidadIngresos: 65
+            ubicacion: 58
+            endeudamiento: 41
+          calculadoEn: '2026-10-13T14:59:59Z'
+          vigenteHasta: '2026-10-14T14:59:59Z'
+    PerfilRiesgoSinPerfil:
+      summary: Cotizada con el valor por defecto porque ms-perfilamiento no respondió a tiempo
+      value:
+        solicitudId: 1c9e7a5b-3d2f-4b6a-8e1d-7f6a5b4c3d2e
+        cotizacionId: 8f1e2d3c-4b5a-4c6d-9e7f-0a1b2c3d4e5f
+        origen: VALOR_POR_DEFECTO
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
