@@ -72,6 +72,21 @@ function suscripcion(actor: Actor): Route {
   };
 }
 
+const DATOS_PERFIL_RIESGO = datosPagina(
+  $localize`:@@perfilRiesgo.miga:Suscripción / Perfil de riesgo`,
+  $localize`:@@perfilRiesgo.titulo:Perfil de riesgo de la solicitud`,
+);
+
+function perfilRiesgo(path: string): Route {
+  return {
+    path,
+    title: $localize`:@@perfilRiesgo.tituloPestana:Perfil de riesgo · Solventa`,
+    data: DATOS_PERFIL_RIESGO,
+    loadComponent: () =>
+      import('./features/suscripcion/pagina-perfil-riesgo').then((m) => m.PaginaPerfilRiesgo),
+  };
+}
+
 /**
  * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
  * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
@@ -89,7 +104,11 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
   portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor'), suscripcion('asesor')]),
   portal('CLIENTE', [tablero, cotizarCliente, oferta('cliente'), suscripcion('cliente')]),
-  portal('ANALISTA_RIESGO', [tablero]),
+  portal('ANALISTA_RIESGO', [
+    tablero,
+    perfilRiesgo('perfil-riesgo'),
+    perfilRiesgo('perfil-riesgo/:solicitudId'),
+  ]),
   portal('OPERACIONES', [tablero]),
   portal('SOCIO', [tablero]),
   {

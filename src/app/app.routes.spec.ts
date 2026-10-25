@@ -192,6 +192,38 @@ describe('routes', () => {
     );
   });
 
+  it('el analista de riesgo abre la consulta del perfil de riesgo (SOLVENTAG5-67)', async () => {
+    const { url, vista } = await navegar('/riesgo/perfil-riesgo', sesionDe('ANALISTA_RIESGO'));
+
+    expect(url).toBe('/riesgo/perfil-riesgo');
+    expect(document.title).toBe('Perfil de riesgo · Solventa');
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Perfil de riesgo de la solicitud' }),
+    ).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Perfil de riesgo' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('el perfil de una solicitud se consulta con su id en la ruta', async () => {
+    const { url } = await navegar(
+      `/riesgo/perfil-riesgo/${SOLICITUD_ID}`,
+      sesionDe('ANALISTA_RIESGO'),
+    );
+
+    expect(url).toBe(`/riesgo/perfil-riesgo/${SOLICITUD_ID}`);
+    TestBed.inject(HttpTestingController).expectOne(
+      `http://bff.prueba/v1/solicitudes-suscripcion/${SOLICITUD_ID}/perfil-riesgo`,
+    );
+  });
+
+  it('el perfil de riesgo no se abre con otro rol', async () => {
+    const { url } = await navegar('/riesgo/perfil-riesgo', sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor');
+  });
+
   it('la oferta del cliente no se abre con otro rol', async () => {
     const { url } = await navegar('/cliente/cotizar/oferta/c-1', sesionDe('ASESOR'));
 
