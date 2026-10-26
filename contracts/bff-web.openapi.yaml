@@ -34,10 +34,6 @@ tags:
     description: >
       Cotización en línea según el perfil de riesgo del cliente (SOLVENTAG5-47). Si el perfil
       no está disponible a tiempo, el journey no se bloquea: la prima se calcula con el valor por
-<<<<<<< Updated upstream
-      defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Mientras no exista
-      login, el id del cliente viaja en la petición.
-=======
       defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Con la sesión del
       asesor, el id del cliente viaja en la petición; con la del cliente, el BFF usa el id del
       cliente de su token.
@@ -50,17 +46,12 @@ tags:
     description: >
       Reconstrucción de las decisiones automáticas para actuaría y cumplimiento
       (SOLVENTAG5-128, ADR 0006). Solo para el analista de riesgo y operaciones.
->>>>>>> Stashed changes
   - name: suscripcion
     description: >
       Solicitudes de suscripción (SOLVENTAG5-133). Cuando el cliente acepta la oferta, se crea
       una solicitud que conserva la cotización, la prima, la cobertura y el perfil con que se
-<<<<<<< Updated upstream
       calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50). El responsable de
       suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67).
-=======
-      calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50).
->>>>>>> Stashed changes
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -470,8 +461,6 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
-<<<<<<< Updated upstream
-=======
   /v1/cuenta:
     post:
       tags: [cuenta]
@@ -581,7 +570,6 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
->>>>>>> Stashed changes
   /v1/solicitudes-suscripcion:
     post:
       tags: [suscripcion]
@@ -594,14 +582,10 @@ paths:
         ejemplo, un doble clic), responde 200 con la solicitud que ya existía, aunque la oferta
         haya vencido después. Si la oferta ya venció (después de vigenteHasta) y no se había
         aceptado, no se crea la solicitud: responde 409 OFERTA_VENCIDA y la pantalla ofrece
-<<<<<<< Updated upstream
-        recotizar. El BFF agrega el canal antes de llamar al núcleo.
-=======
         recotizar. El BFF agrega el canal antes de llamar al núcleo. El asesor acepta en nombre
         del cliente; con la sesión del cliente, una cotización que no es suya (sin clienteId o
         con otro) responde 404 COTIZACION_NO_ENCONTRADA y no se acepta.
       x-roles: [ASESOR, CLIENTE]
->>>>>>> Stashed changes
       requestBody:
         required: true
         content:
@@ -629,13 +613,10 @@ paths:
               examples:
                 conPerfil:
                   $ref: '#/components/examples/SolicitudSuscripcionCreada'
-<<<<<<< Updated upstream
-=======
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
->>>>>>> Stashed changes
         '404':
           $ref: '#/components/responses/CotizacionNoEncontrada'
         '409':
@@ -651,14 +632,10 @@ paths:
       summary: Consultar una solicitud de suscripción
       description: >
         Devuelve la solicitud con su estado. Queda en PENDIENTE_EVALUACION hasta que la evalúe
-<<<<<<< Updated upstream
-        la suscripción automática (SOLVENTAG5-50).
-=======
         la suscripción automática (SOLVENTAG5-50). Con la sesión del cliente, una solicitud que
         no es suya (sin clienteId o con otro) responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
         para no revelar que existe.
       x-roles: [ASESOR, CLIENTE]
->>>>>>> Stashed changes
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
       responses:
@@ -671,20 +648,16 @@ paths:
               examples:
                 conPerfil:
                   $ref: '#/components/examples/SolicitudSuscripcionCreada'
-<<<<<<< Updated upstream
-=======
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
->>>>>>> Stashed changes
         '404':
           $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
         '422':
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
-<<<<<<< Updated upstream
   /v1/solicitudes-suscripcion/{solicitudId}/perfil-riesgo:
     get:
       tags: [suscripcion]
@@ -698,6 +671,7 @@ paths:
         calculó con el valor por defecto de BA-01, origen es VALOR_POR_DEFECTO y motivoSinPerfil
         dice por qué. Si la foto de la cotización no coincide con el perfil y la versión que
         guardó la solicitud, responde 409 PERFIL_NO_COINCIDE.
+      x-roles: [ANALISTA_RIESGO]
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
       responses:
@@ -712,6 +686,10 @@ paths:
                   $ref: '#/components/examples/PerfilRiesgoConPerfil'
                 sinPerfil:
                   $ref: '#/components/examples/PerfilRiesgoSinPerfil'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
         '409':
@@ -720,8 +698,6 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
-=======
->>>>>>> Stashed changes
 components:
   securitySchemes:
     tokenCognito:
@@ -1057,7 +1033,6 @@ components:
           example:
             codigo: SOLICITUD_SUSCRIPCION_NO_ENCONTRADA
             detalle: No encontramos la solicitud de suscripción.
-<<<<<<< Updated upstream
     PerfilNoCoincide:
       description: >
         La foto del perfil que guardó la cotización no coincide con el perfil y la versión de la
@@ -1073,8 +1048,6 @@ components:
           example:
             codigo: PERFIL_NO_COINCIDE
             detalle: El perfil de riesgo de la cotización no coincide con el de la solicitud.
-=======
->>>>>>> Stashed changes
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -1608,32 +1581,6 @@ components:
         aceptadaEn:
           type: string
           format: date-time
-<<<<<<< Updated upstream
-    OrigenPerfil:
-      type: string
-      description: >
-        PERFIL si la prima se calculó con el perfil del cliente; VALOR_POR_DEFECTO si se calculó
-        con el valor por defecto de BA-01 porque no había perfil.
-      enum: [PERFIL, VALOR_POR_DEFECTO]
-    PerfilRiesgoSolicitud:
-      type: object
-      required: [solicitudId, cotizacionId, origen]
-      properties:
-        solicitudId:
-          type: string
-          format: uuid
-        cotizacionId:
-          type: string
-          format: uuid
-        origen:
-          $ref: '#/components/schemas/OrigenPerfil'
-        perfil:
-          $ref: '#/components/schemas/PerfilUsado'
-          description: Solo cuando origen es PERFIL.
-        motivoSinPerfil:
-          $ref: '#/components/schemas/MotivoSinPerfil'
-          description: Solo cuando origen es VALOR_POR_DEFECTO.
-=======
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -1829,7 +1776,30 @@ components:
           $ref: '#/components/schemas/VerificacionDecision'
         explicacion:
           type: string
->>>>>>> Stashed changes
+    OrigenPerfil:
+      type: string
+      description: >
+        PERFIL si la prima se calculó con el perfil del cliente; VALOR_POR_DEFECTO si se calculó
+        con el valor por defecto de BA-01 porque no había perfil.
+      enum: [PERFIL, VALOR_POR_DEFECTO]
+    PerfilRiesgoSolicitud:
+      type: object
+      required: [solicitudId, cotizacionId, origen]
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        origen:
+          $ref: '#/components/schemas/OrigenPerfil'
+        perfil:
+          $ref: '#/components/schemas/PerfilUsado'
+          description: Solo cuando origen es PERFIL.
+        motivoSinPerfil:
+          $ref: '#/components/schemas/MotivoSinPerfil'
+          description: Solo cuando origen es VALOR_POR_DEFECTO.
     Error:
       type: object
       required: [codigo, detalle]
@@ -1837,21 +1807,13 @@ components:
         codigo:
           type: string
           description: >
-<<<<<<< Updated upstream
-            Código estable del error. Los de esta versión son SOLICITUD_NO_ENCONTRADA,
-            SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA, CONSENTIMIENTO_NO_ENCONTRADO,
-            CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO, CLIENTE_NO_ENCONTRADO,
-            DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO, COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA,
-            SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, PERFIL_NO_COINCIDE y NUCLEO_NO_DISPONIBLE.
-=======
             Código estable del error. Los de esta versión son NO_AUTENTICADO, SIN_PERMISO,
             SOLICITUD_NO_ENCONTRADA, SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA,
             CONSENTIMIENTO_NO_ENCONTRADO, CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO,
             CLIENTE_NO_ENCONTRADO, DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO,
             COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA, SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
-            CUENTA_NO_ENLAZABLE, DECISION_NO_ENCONTRADA, NUCLEO_NO_DISPONIBLE e
-            IDENTIDAD_NO_DISPONIBLE.
->>>>>>> Stashed changes
+            PERFIL_NO_COINCIDE, CUENTA_NO_ENLAZABLE, DECISION_NO_ENCONTRADA,
+            NUCLEO_NO_DISPONIBLE e IDENTIDAD_NO_DISPONIBLE.
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -1951,8 +1913,6 @@ components:
         estado: VIGENTE
         calculadaSinPerfil: true
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
-<<<<<<< Updated upstream
-=======
     ReconstruccionConSolicitante:
       summary: Cotización del asesor con perfil MEDIO, reconstruible
       description: >
@@ -2018,7 +1978,6 @@ components:
           con las señales de Open Finance/Open Data: comportamientoPago 72, estabilidadIngresos
           65, ubicacion 58, endeudamiento 41 (indicadores de 0 a 100). La pidió el usuario
           4c1f7a2e-9d3b-4e8a-b6f0-2a7c9e1d3b5f con el rol ASESOR.
->>>>>>> Stashed changes
     SolicitudSuscripcionCreada:
       summary: Oferta aceptada, con el perfil de riesgo con que se cotizó
       value:
@@ -2041,7 +2000,6 @@ components:
           version: 3
         canal: web
         aceptadaEn: '2026-10-14T16:30:00Z'
-<<<<<<< Updated upstream
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:
@@ -2067,5 +2025,3 @@ components:
         cotizacionId: 8f1e2d3c-4b5a-4c6d-9e7f-0a1b2c3d4e5f
         origen: VALOR_POR_DEFECTO
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
-=======
->>>>>>> Stashed changes
