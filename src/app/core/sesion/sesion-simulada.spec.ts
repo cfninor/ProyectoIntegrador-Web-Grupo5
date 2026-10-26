@@ -43,3 +43,56 @@ describe('SesionSimulada', () => {
     expect(sesiones.actual()?.rol).toBe('ASESOR');
   });
 });
+
+describe('SesionSimulada · ingresar y cerrar (SOLVENTAG5-207)', () => {
+  const sesion: Sesion = { usuario: { id: 'asesor-local', nombre: 'Asesor' }, rol: 'ASESOR' };
+
+  it('restaurar no cambia nada: la sesión sale de config.json', async () => {
+    const sesiones = servicio({ apiBaseUrl: '', sesionSimulada: sesion });
+
+    await sesiones.restaurar();
+
+    expect(sesiones.actual()).toEqual(sesion);
+  });
+
+  it('cerrar la quita, e iniciar con cualquier credencial la devuelve', async () => {
+    const sesiones = servicio({ apiBaseUrl: '', sesionSimulada: sesion });
+
+    await sesiones.cerrar('inactividad');
+    expect(sesiones.actual()).toBeNull();
+
+    expect(await sesiones.iniciar('cualquiera', 'x')).toEqual({ tipo: 'sesion', sesion });
+    expect(sesiones.actual()).toEqual(sesion);
+  });
+
+  it('sin sesionSimulada, iniciar responde SIN_CONEXION', async () => {
+    expect(await servicio({ apiBaseUrl: '' }).iniciar('a@b.co', 'x')).toEqual({
+      tipo: 'error',
+      error: 'SIN_CONEXION',
+    });
+  });
+
+  it('no tiene token ni cuenta sin registrar', async () => {
+    const sesiones = servicio({ apiBaseUrl: '', sesionSimulada: sesion });
+
+    expect(await sesiones.token()).toBeNull();
+    expect(sesiones.cuentaSinRegistrar()).toBeNull();
+  });
+
+  it('crear cuenta no está disponible sin Cognito', async () => {
+    const sesiones = servicio({ apiBaseUrl: '', sesionSimulada: sesion });
+    const noDisponible = { tipo: 'error', error: 'NO_DISPONIBLE' };
+
+    expect(sesiones.puedeCrearCuenta()).toBe(false);
+    expect(await sesiones.registrar('a@b.co', 'x')).toEqual(noDisponible);
+    expect(await sesiones.confirmar('a@b.co', '123456')).toEqual(noDisponible);
+    expect(await sesiones.reenviarCodigo('a@b.co')).toEqual(noDisponible);
+    expect(
+      await sesiones.completarRegistro({
+        documento: { tipo: 'CC', numero: '1020304050' },
+        nombre: { nombres: 'Ana', apellidos: 'Ruiz' },
+        celular: '3001234567',
+      }),
+    ).toEqual(noDisponible);
+  });
+});

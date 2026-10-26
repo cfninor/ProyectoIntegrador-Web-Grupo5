@@ -31,6 +31,14 @@
           <p class="nombre">{{ sesion.usuario.nombre }}</p>
           <p class="cargo">{{ nombreRol }}</p>
         </div>
+        <button
+          type="button"
+          class="boton-secundario cerrar-sesion"
+          i18n="@@portal.cerrarSesion"
+          (click)="cerrarSesion()"
+        >
+          Cerrar sesión
+        </button>
       </div>
     }
   </aside>

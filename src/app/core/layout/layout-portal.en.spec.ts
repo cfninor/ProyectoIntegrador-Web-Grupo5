@@ -76,6 +76,28 @@ describe('Base del portal · en inglés', () => {
     expect(vista.getByText(nombreRol)).toBeInTheDocument();
   });
 
+  it('«Cerrar sesión» está en inglés en la tarjeta del usuario (SOLVENTAG5-207)', async () => {
+    const vista = await navegar('/', 'ASESOR');
+
+    expect(vista.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  it('sin sesión, el portal lleva a ingresar, en inglés', async () => {
+    const vista = await navegar('/asesor');
+
+    expect(vista.getByRole('heading', { level: 1, name: 'Sign in' })).toBeInTheDocument();
+    expect(document.title).toBe('Sign in · Solventa');
+  });
+
+  it('crear cuenta tiene su título en inglés', async () => {
+    const vista = await navegar('/crear-cuenta');
+
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Create your account' }),
+    ).toBeInTheDocument();
+    expect(document.title).toBe('Create account · Solventa');
+  });
+
   it('la página no encontrada está en inglés, en el layout público con su selector', async () => {
     const vista = await navegar('/no-existe');
 

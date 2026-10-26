@@ -14,6 +14,7 @@ import { SelectorIdioma } from '../idioma/selector-idioma';
 import { Icono } from '../navegacion/icono';
 import { MENU } from '../navegacion/menu';
 import { NOMBRE_ROL } from '../sesion/roles';
+import { RUTA_INGRESAR } from '../sesion/rol-guard';
 import { SERVICIO_SESION } from '../sesion/sesion';
 import { paginaActiva } from './pagina';
 
@@ -45,8 +46,10 @@ export class LayoutPortal {
   private readonly router = inject(Router);
   private readonly ruta = inject(ActivatedRoute);
 
+  private readonly servicioSesion = inject(SERVICIO_SESION);
+
   /** El `rolGuard` del portal ya comprobó que hay sesión con el rol del portal. */
-  protected readonly sesion = inject(SERVICIO_SESION).actual();
+  protected readonly sesion = this.servicioSesion.actual();
   protected readonly menu = this.sesion ? MENU[this.sesion.rol] : [];
   protected readonly nombreRol = this.sesion ? NOMBRE_ROL[this.sesion.rol] : '';
   protected readonly iniciales = iniciales(this.sesion?.usuario.nombre ?? '');
@@ -73,5 +76,11 @@ export class LayoutPortal {
 
   protected cerrarMenu(): void {
     this.menuAbierto.set(false);
+  }
+
+  /** «Cerrar sesión» (D11 de la SOLVENTAG5-207): revoca el refresco y vuelve a `/ingresar`. */
+  protected async cerrarSesion(): Promise<void> {
+    await this.servicioSesion.cerrar();
+    await this.router.navigateByUrl(RUTA_INGRESAR);
   }
 }

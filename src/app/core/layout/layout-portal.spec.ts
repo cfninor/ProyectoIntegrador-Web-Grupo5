@@ -1,6 +1,6 @@
 import { LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { routes } from '../../app.routes';
 import { APP_CONFIG } from '../config/app-config';
 import { provideSesionSimulada } from '../sesion/sesion-simulada';
-import { Rol } from '../sesion/sesion';
+import { Rol, SERVICIO_SESION } from '../sesion/sesion';
 import { LayoutPortal, iniciales } from './layout-portal';
 
 /** Abre el tablero del portal del rol, con un `config.json` simulado de ese rol. */
@@ -128,6 +128,29 @@ describe('LayoutPortal', () => {
     expect(boton).toHaveAttribute('aria-expanded', 'true');
     await harness.navigateByUrl('/asesor?vista=2');
     expect(boton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('«Cerrar sesión» cierra la sesión y lleva a /ingresar (SOLVENTAG5-207, D11)', async () => {
+    const { harness, vista, usuario } = await abrirPortal('ASESOR');
+    const cerrar = jest.spyOn(TestBed.inject(SERVICIO_SESION), 'cerrar');
+
+    await usuario.click(vista.getByRole('button', { name: 'Cerrar sesión' }));
+    await harness.fixture.whenStable();
+
+    expect(cerrar).toHaveBeenCalledWith();
+    expect(TestBed.inject(Router).url).toBe('/ingresar');
+    expect(vista.getByRole('heading', { level: 1, name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(vista.queryByRole('navigation', { name: 'Menú principal' })).not.toBeInTheDocument();
+  });
+
+  it('después de cerrar sesión, volver a abrir el portal pide ingresar', async () => {
+    const { harness, vista, usuario } = await abrirPortal('CLIENTE');
+
+    await usuario.click(vista.getByRole('button', { name: 'Cerrar sesión' }));
+    await harness.fixture.whenStable();
+    await harness.navigateByUrl('/cliente');
+
+    expect(TestBed.inject(Router).url).toBe('/ingresar?volver=%2Fcliente');
   });
 
   it('sin sesión ni datos de la pantalla no se rompe: sin opciones, sin tarjeta y sin título', async () => {

@@ -19,14 +19,82 @@ export interface Sesion {
   documentoEnmascarado?: string;
 }
 
+/** Por qué se cerró la sesión sin que el usuario lo pidiera (R9 de la SOLVENTAG5-207). */
+export type MotivoCierre = 'inactividad' | 'expirada';
+
+/** Errores del ingreso, uno por mensaje de R9. */
+export type ErrorIngreso = 'CREDENCIALES' | 'BLOQUEO' | 'SIN_CONEXION' | 'SIN_PORTAL';
+
 /**
- * Da la sesión actual (D11). La implementación es intercambiable: hoy es la simulada de
- * `config.json`; un inicio de sesión real solo cambia el proveedor, no las pantallas, las rutas
- * ni el menú.
+ * Resultado de ingresar: la sesión de un portal, la cuenta de un cliente que todavía no termina su
+ * registro (sin grupo, R2) o el error.
+ */
+export type ResultadoIngreso =
+  | { tipo: 'sesion'; sesion: Sesion }
+  | { tipo: 'sinRegistrar'; correo: string }
+  | { tipo: 'error'; error: ErrorIngreso };
+
+/** Errores de crear cuenta, uno por mensaje de R13, más `NO_DISPONIBLE` sin Cognito. */
+export type ErrorCuenta =
+  | 'CORREO_EXISTE'
+  | 'CONTRASENA_INVALIDA'
+  | 'CODIGO_ERRADO'
+  | 'CODIGO_VENCIDO'
+  | 'DEMASIADOS_INTENTOS'
+  | 'CUENTA_NO_ENLAZABLE'
+  | 'VALIDACION'
+  | 'SIN_CONEXION'
+  | 'NO_DISPONIBLE';
+
+/** Un campo que el BFF rechazó (422), con la forma de FastAPI: `loc` lleva la ruta del campo. */
+export interface DetalleValidacion {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+}
+
+export type ResultadoCuenta =
+  { tipo: 'ok' } | { tipo: 'error'; error: ErrorCuenta; detalle?: DetalleValidacion[] };
+
+export type ResultadoRegistro =
+  | { tipo: 'sesion'; sesion: Sesion }
+  | { tipo: 'error'; error: ErrorCuenta; detalle?: DetalleValidacion[] };
+
+export type TipoDocumento = 'CC' | 'CE' | 'PA' | 'PPT';
+
+/** Cuerpo de `registrarCuentaCliente` (`POST /v1/cuenta`): el correo sale del token. */
+export interface DatosCuenta {
+  documento: { tipo: TipoDocumento; numero: string };
+  nombre: { nombres: string; apellidos: string };
+  celular: string;
+}
+
+/**
+ * La sesión del portal (D11 de la SOLVENTAG5-132 y D4 de la SOLVENTAG5-207). La implementación
+ * se elige por `config.json`: Cognito si trae `cognito`, si no la simulada. Las pantallas, las
+ * rutas y el menú solo usan esta interfaz.
  */
 export interface ServicioSesion {
-  /** La sesión actual, o null si no hay. */
+  /** La sesión actual, o null si no hay. Una cuenta sin registrar no tiene sesión. */
   actual(): Sesion | null;
+  /** Restaura la sesión guardada al arrancar la aplicación, después de cargar `config.json`. */
+  restaurar(): Promise<void>;
+  iniciar(correo: string, contrasena: string): Promise<ResultadoIngreso>;
+  /** Cierra la sesión: revoca el token de refresco y borra los tokens. */
+  cerrar(motivo?: MotivoCierre): Promise<void>;
+  /** El ID token vigente, renovado si hace falta, o null. */
+  token(): Promise<string | null>;
+  /** El correo de la cuenta de un cliente sin registrar (R2), o null. */
+  cuentaSinRegistrar(): string | null;
+  /** Si el portal puede crear cuentas de cliente: solo con Cognito. */
+  puedeCrearCuenta(): boolean;
+  /** Crea la cuenta en Cognito, que envía un código al correo (D21). */
+  registrar(correo: string, contrasena: string): Promise<ResultadoCuenta>;
+  /** Confirma el correo con el código e ingresa con las credenciales de `registrar`. */
+  confirmar(correo: string, codigo: string): Promise<ResultadoCuenta>;
+  reenviarCodigo(correo: string): Promise<ResultadoCuenta>;
+  /** Envía los datos a `POST /v1/cuenta`, renueva los tokens y deja la sesión del cliente. */
+  completarRegistro(datos: DatosCuenta): Promise<ResultadoRegistro>;
 }
 
 export const SERVICIO_SESION = new InjectionToken<ServicioSesion>('SERVICIO_SESION');

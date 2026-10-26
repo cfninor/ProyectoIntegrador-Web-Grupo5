@@ -1,36 +1,66 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.0.0
+  version: 1.1.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
     Dentro de /v1 solo se admiten cambios compatibles; un cambio incompatible va en /v2 (BA-04).
+
+    Autenticación (SOLVENTAG5-207, ADR 0008): toda operación exige el ID token de Cognito del
+    portal en `Authorization: Bearer`, salvo las que declaran `security: []`. Sin un token
+    válido el BFF responde 401 NO_AUTENTICADO; si el rol del token no puede llamar la
+    operación, 403 SIN_PERMISO. La extensión `x-roles` lista los roles (grupos de Cognito) que
+    pueden llamar cada operación protegida, y `x-cuenta-sin-rol: true` marca la única operación
+    que atiende la cuenta de un cliente que todavía no termina su registro.
 servers:
   - url: http://localhost:8010
     description: Local (docker compose)
+security:
+  - tokenCognito: []
 tags:
   - name: autorizacion-datos
     description: >
       Operaciones del cliente sobre la autorización de consulta de datos de Open Data y
-      Open Finance para el perfilamiento (SOLVENTAG5-65). Mientras no exista login, el
-      cliente entra con el id aleatorio de la solicitud que recibe en el enlace.
+      Open Finance para el perfilamiento (SOLVENTAG5-65). Ver y decidir la solicitud son
+      públicas: el cliente entra sin iniciar sesión, con el id aleatorio de la solicitud que
+      recibe en el enlace del correo. Revocar un consentimiento exige la sesión del cliente.
   - name: asesor
     description: >
-      Operaciones del asesor. Mientras no exista login, los datos del asesor viajan en la
-      petición (deuda técnica hasta la HU transversal de login).
+      Operaciones que inicia el asesor. El asesor sale del token: el BFF no confía en datos del
+      asesor que lleguen en la petición. El cliente también consulta el estado de su propia
+      autorización.
   - name: cotizacion
     description: >
       Cotización en línea según el perfil de riesgo del cliente (SOLVENTAG5-47). Si el perfil
       no está disponible a tiempo, el journey no se bloquea: la prima se calcula con el valor por
+<<<<<<< Updated upstream
       defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Mientras no exista
       login, el id del cliente viaja en la petición.
+=======
+      defecto de BA-01 y la cotización queda marcada con calculadaSinPerfil. Con la sesión del
+      asesor, el id del cliente viaja en la petición; con la del cliente, el BFF usa el id del
+      cliente de su token.
+  - name: cuenta
+    description: >
+      Cuenta del cliente en el portal (SOLVENTAG5-207). El cliente crea su cuenta de Cognito
+      desde el portal y aquí la enlaza con su registro del núcleo. El personal y los socios no se
+      registran: los crea el administrador.
+  - name: trazabilidad
+    description: >
+      Reconstrucción de las decisiones automáticas para actuaría y cumplimiento
+      (SOLVENTAG5-128, ADR 0006). Solo para el analista de riesgo y operaciones.
+>>>>>>> Stashed changes
   - name: suscripcion
     description: >
       Solicitudes de suscripción (SOLVENTAG5-133). Cuando el cliente acepta la oferta, se crea
       una solicitud que conserva la cotización, la prima, la cobertura y el perfil con que se
+<<<<<<< Updated upstream
       calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50). El responsable de
       suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67).
+=======
+      calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50).
+>>>>>>> Stashed changes
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -40,7 +70,9 @@ paths:
       description: >
         Si el cliente ya tiene una solicitud PENDIENTE, se reenvía esa misma (200, reenviada
         true); si no, se crea una nueva (201). El correo se simula: el núcleo escribe el
-        enlace en su log.
+        enlace en su log. El asesor que pide la autorización es el del token (su id y su
+        nombre): el BFF ignora el campo asesor del cuerpo, que queda obsoleto.
+      x-roles: [ASESOR]
       parameters:
         - $ref: '#/components/parameters/ClienteId'
       requestBody:
@@ -49,10 +81,16 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PedirAutorizacion'
-            example:
-              asesor:
-                id: asesor-017
-                nombre: Laura Gómez
+            examples:
+              sinAsesor:
+                summary: Sin el campo obsoleto
+                value: {}
+              conAsesorObsoleto:
+                summary: Con el campo obsoleto, que el BFF ignora
+                value:
+                  asesor:
+                    id: asesor-017
+                    nombre: Laura Gómez
       responses:
         '201':
           description: Solicitud nueva creada y enviada.
@@ -80,6 +118,10 @@ paths:
                 envios: 2
                 reenviada: true
                 enlace: http://localhost:4200/autorizar/3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '409':
           $ref: '#/components/responses/ClienteYaAutorizado'
         '422':
@@ -91,6 +133,10 @@ paths:
       tags: [asesor]
       operationId: consultarEstadoAutorizacionCliente
       summary: Consultar el estado de la autorización de datos de un cliente
+      description: >
+        El cliente solo consulta la suya: con su sesión, un clienteId distinto del de su token
+        responde 403 SIN_PERMISO.
+      x-roles: [ASESOR, CLIENTE]
       parameters:
         - $ref: '#/components/parameters/ClienteId'
       responses:
@@ -107,6 +153,10 @@ paths:
                 solicitudId: 3f8a2c1e-6b7d-4e9a-9c2f-1a2b3c4d5e6f
                 consentimientoId: 7c6e5d4b-3a2f-4e1d-9c8b-0a1f2e3d4c5b
                 fechaVencimiento: '2027-10-09T15:02:11Z'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '422':
           $ref: '#/components/responses/Validacion'
         '503':
@@ -123,6 +173,7 @@ paths:
         URL para que no quede en los logs. El BFF valida solo la forma del cuerpo (tipos y
         campos obligatorios) y lo reenvía al núcleo; el patrón del número sirve para que la
         pantalla valide antes de buscar.
+      x-roles: [ASESOR]
       requestBody:
         required: true
         content:
@@ -144,6 +195,10 @@ paths:
                 nombres: María Fernanda
                 apellidos: López Rojas
                 documentoEnmascarado: CC ••••5678
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/ClienteNoEncontrado'
         '422':
@@ -168,6 +223,8 @@ paths:
         Devuelve quién pide la autorización, qué datos se consultan y de qué fuentes, y las
         condiciones, en la versión del catálogo con que se creó la solicitud. Solo trae
         códigos: la web pone los textos. No incluye el id del cliente ni el del asesor.
+        Pública: el cliente llega por el enlace del correo (SOLV-WEB-20) sin iniciar sesión.
+      security: []
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       responses:
@@ -220,7 +277,9 @@ paths:
       description: >
         Solo se decide una solicitud PENDIENTE. AUTORIZAR exige aceptaPolitica true y la
         versión vigente de la política, y crea un consentimiento VIGENTE por 12 meses.
-        NO_AUTORIZAR no crea consentimiento ni exige la casilla.
+        NO_AUTORIZAR no crea consentimiento ni exige la casilla. Pública: el cliente llega por
+        el enlace del correo (SOLV-WEB-20) sin iniciar sesión.
+      security: []
       parameters:
         - $ref: '#/components/parameters/SolicitudId'
       requestBody:
@@ -291,6 +350,8 @@ paths:
       description: >
         Solo se revoca un consentimiento VIGENTE y no vencido. Después de confirmar la
         revocación se avisa a ms-perfilamiento para que deje de usar los datos en caché.
+        Que el consentimiento sea del cliente de la sesión lo valida la SOLVENTAG5-84.
+      x-roles: [CLIENTE]
       parameters:
         - $ref: '#/components/parameters/ConsentimientoId'
       responses:
@@ -316,6 +377,10 @@ paths:
                 fechaOtorga: '2026-10-09T15:02:11Z'
                 fechaVencimiento: '2027-10-09T15:02:11Z'
                 fechaRevoca: '2026-11-20T10:45:00Z'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/ConsentimientoNoEncontrado'
         '409':
@@ -336,6 +401,9 @@ paths:
         autorización vigente o si el perfil no responde a tiempo, usa el valor por defecto
         (nivel MEDIO) y responde calculadaSinPerfil true con su motivoSinPerfil. La oferta es
         válida 7 días desde fechaCotizacion. El BFF agrega el canal antes de llamar al núcleo.
+        Con la sesión del cliente, si el cuerpo trae otro clienteId responde 403 SIN_PERMISO,
+        y si no lo trae, el BFF pone el del token.
+      x-roles: [ASESOR, CLIENTE]
       requestBody:
         required: true
         content:
@@ -359,6 +427,10 @@ paths:
                   $ref: '#/components/examples/CotizacionConPerfil'
                 sinPerfil:
                   $ref: '#/components/examples/CotizacionSinPerfil'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '422':
           $ref: '#/components/responses/SolicitudCotizacionInvalida'
         '503':
@@ -370,7 +442,10 @@ paths:
       summary: Consultar una cotización registrada
       description: >
         Devuelve la cotización como se calculó, con la foto del perfil usado. El estado se
-        calcula en cada consulta: VENCIDA cuando ya pasó vigenteHasta.
+        calcula en cada consulta: VENCIDA cuando ya pasó vigenteHasta. Con la sesión del
+        cliente, una cotización que no es suya (sin clienteId o con otro) responde 404
+        COTIZACION_NO_ENCONTRADA, para no revelar que existe.
+      x-roles: [ASESOR, CLIENTE]
       parameters:
         - $ref: '#/components/parameters/CotizacionId'
       responses:
@@ -385,12 +460,128 @@ paths:
                   $ref: '#/components/examples/CotizacionConPerfil'
                 sinPerfil:
                   $ref: '#/components/examples/CotizacionSinPerfil'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/CotizacionNoEncontrada'
         '422':
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+<<<<<<< Updated upstream
+=======
+  /v1/cuenta:
+    post:
+      tags: [cuenta]
+      operationId: registrarCuentaCliente
+      summary: Enlazar la cuenta del cliente con su registro del núcleo
+      description: >
+        Último paso de crear cuenta: el cliente ya creó su cuenta de Cognito con su correo y su
+        contraseña, confirmó el correo con el código e ingresó. El correo no viaja en el cuerpo:
+        el BFF toma el email verificado del token (un correo sin verificar responde 401). El
+        núcleo busca al cliente más reciente con ese documento: si no existe lo crea con el
+        onboarding de la app (ONBOARDING_EN_CURSO, 201); si existe y su correo coincide con el
+        de la cuenta, lo reconoce sin cambiar sus datos (200); si el correo no coincide, el BFF
+        responde 409 CUENTA_NO_ENLAZABLE sin decir si el documento existe. Con 200 o 201, el BFF
+        escribe en Cognito el nombre, el id del cliente y el documento enmascarado, y agrega la
+        cuenta al rol CLIENTE; el portal renueva los tokens para tomarlos. Se puede repetir: con
+        los mismos datos responde lo mismo, y una cuenta CLIENTE ya registrada recibe 200 con su
+        clienteId. Una cuenta solo se enlaza con un cliente: una cuenta CLIENTE ya registrada
+        recibe 200 con su clienteId sin crear otro registro, aunque el cuerpo traiga otro
+        documento. El BFF valida el formato con las mismas reglas del onboarding de la app
+        (422).
+      x-cuenta-sin-rol: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroCuentaCliente'
+            example:
+              documento:
+                tipo: CC
+                numero: '1020304050'
+              nombre:
+                nombres: María Fernanda
+                apellidos: López Rojas
+              celular: '3001234567'
+      responses:
+        '201':
+          description: Cliente nuevo creado con el onboarding en curso y enlazado a la cuenta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CuentaCliente'
+              example:
+                clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+                registro: CREADO
+        '200':
+          description: >
+            El cliente ya existía con ese documento y ese correo (por ejemplo, desde la app), o la
+            cuenta ya estaba registrada: queda enlazada a su registro.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CuentaCliente'
+              example:
+                clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+                registro: ENLAZADO
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/CuentaNoEnlazable'
+        '422':
+          description: El cuerpo no cumple el contrato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+              example:
+                detail:
+                  - loc: [body, celular]
+                    msg: "String should match pattern '^3\\d{9}$'"
+                    type: string_pattern_mismatch
+        '503':
+          $ref: '#/components/responses/NucleoOIdentidadNoDisponible'
+  /v1/trazabilidad/decisiones-precio/{cotizacionId}:
+    get:
+      tags: [trazabilidad]
+      operationId: reconstruirDecisionPrecio
+      summary: Reconstruir la decisión de precio de una cotización
+      description: >
+        La reconstrucción del núcleo tal como la define la SOLVENTAG5-128 (ADR 0006): entradas,
+        regla con sus parámetros tal como se aplicaron, resultado, explicación en texto y
+        verificación (prima recalculada solo con lo guardado y huella de integridad). Las
+        entradas incluyen el solicitante (id y rol de quien pidió la cotización) cuando lo hubo.
+        El BFF la reenvía sin cambios.
+      x-roles: [ANALISTA_RIESGO, OPERACIONES]
+      parameters:
+        - $ref: '#/components/parameters/CotizacionId'
+      responses:
+        '200':
+          description: Decisión de precio reconstruida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconstruccionDecision'
+              examples:
+                conSolicitante:
+                  $ref: '#/components/examples/ReconstruccionConSolicitante'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/DecisionNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+>>>>>>> Stashed changes
   /v1/solicitudes-suscripcion:
     post:
       tags: [suscripcion]
@@ -403,7 +594,14 @@ paths:
         ejemplo, un doble clic), responde 200 con la solicitud que ya existía, aunque la oferta
         haya vencido después. Si la oferta ya venció (después de vigenteHasta) y no se había
         aceptado, no se crea la solicitud: responde 409 OFERTA_VENCIDA y la pantalla ofrece
+<<<<<<< Updated upstream
         recotizar. El BFF agrega el canal antes de llamar al núcleo.
+=======
+        recotizar. El BFF agrega el canal antes de llamar al núcleo. El asesor acepta en nombre
+        del cliente; con la sesión del cliente, una cotización que no es suya (sin clienteId o
+        con otro) responde 404 COTIZACION_NO_ENCONTRADA y no se acepta.
+      x-roles: [ASESOR, CLIENTE]
+>>>>>>> Stashed changes
       requestBody:
         required: true
         content:
@@ -431,6 +629,13 @@ paths:
               examples:
                 conPerfil:
                   $ref: '#/components/examples/SolicitudSuscripcionCreada'
+<<<<<<< Updated upstream
+=======
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+>>>>>>> Stashed changes
         '404':
           $ref: '#/components/responses/CotizacionNoEncontrada'
         '409':
@@ -446,7 +651,14 @@ paths:
       summary: Consultar una solicitud de suscripción
       description: >
         Devuelve la solicitud con su estado. Queda en PENDIENTE_EVALUACION hasta que la evalúe
+<<<<<<< Updated upstream
         la suscripción automática (SOLVENTAG5-50).
+=======
+        la suscripción automática (SOLVENTAG5-50). Con la sesión del cliente, una solicitud que
+        no es suya (sin clienteId o con otro) responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
+        para no revelar que existe.
+      x-roles: [ASESOR, CLIENTE]
+>>>>>>> Stashed changes
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
       responses:
@@ -459,12 +671,20 @@ paths:
               examples:
                 conPerfil:
                   $ref: '#/components/examples/SolicitudSuscripcionCreada'
+<<<<<<< Updated upstream
+=======
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+>>>>>>> Stashed changes
         '404':
           $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
         '422':
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+<<<<<<< Updated upstream
   /v1/solicitudes-suscripcion/{solicitudId}/perfil-riesgo:
     get:
       tags: [suscripcion]
@@ -500,7 +720,19 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+=======
+>>>>>>> Stashed changes
 components:
+  securitySchemes:
+    tokenCognito:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        ID token que emite el user pool de Cognito del ambiente al cliente del portal web (no el
+        token de acceso). El BFF valida la firma con las llaves públicas del user pool, el
+        emisor, la audiencia, token_use = id y el vencimiento. El rol es el único grupo de
+        Cognito del usuario.
   parameters:
     ClienteId:
       name: clienteId
@@ -540,6 +772,96 @@ components:
         type: string
         format: uuid
   responses:
+    NoAutenticado:
+      description: >
+        Sin token, o con un token que no es válido (firma, emisor, audiencia, tipo o vencimiento)
+        o que no corresponde a una sesión completa: sin exactamente un rol, o un CLIENTE sin su
+        id de cliente. La cuenta de un cliente sin registrar solo se atiende en
+        registrarCuentaCliente; en cualquier otra operación responde 401.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            const: Bearer
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: NO_AUTENTICADO
+          example:
+            codigo: NO_AUTENTICADO
+            detalle: Inicia sesión para continuar.
+    SinPermiso:
+      description: >
+        El rol de la sesión no puede llamar esta operación (x-roles), o el cliente pide datos
+        de otro cliente.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: SIN_PERMISO
+          example:
+            codigo: SIN_PERMISO
+            detalle: No tienes permiso para esta operación.
+    CuentaNoEnlazable:
+      description: >
+        La cuenta no se puede enlazar con esos datos: el cliente con ese documento tiene otro
+        correo, o la cuenta ya está enlazada con otro cliente. No dice si el documento existe.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CUENTA_NO_ENLAZABLE
+          example:
+            codigo: CUENTA_NO_ENLAZABLE
+            detalle: No pudimos crear la cuenta con esos datos.
+    DecisionNoEncontrada:
+      description: No hay un registro de decisión de precio para esa cotización.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: DECISION_NO_ENCONTRADA
+          example:
+            codigo: DECISION_NO_ENCONTRADA
+            detalle: No hay un registro de decisión de precio para esa cotización.
+    NucleoOIdentidadNoDisponible:
+      description: >
+        El BFF no alcanza al núcleo (NUCLEO_NO_DISPONIBLE) o no pudo escribir en Cognito los
+        datos o el rol de la cuenta (IDENTIDAD_NO_DISPONIBLE). Repetir la llamada es seguro.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    enum: [NUCLEO_NO_DISPONIBLE, IDENTIDAD_NO_DISPONIBLE]
+          examples:
+            nucleoNoDisponible:
+              summary: El núcleo no responde
+              value:
+                codigo: NUCLEO_NO_DISPONIBLE
+                detalle: El servicio no está disponible. Intenta de nuevo en unos minutos.
+            identidadNoDisponible:
+              summary: Cognito no responde
+              value:
+                codigo: IDENTIDAD_NO_DISPONIBLE
+                detalle: >-
+                  El servicio de identidad no está disponible. Intenta de nuevo en unos
+                  minutos.
     ClienteYaAutorizado:
       description: El cliente ya tiene un consentimiento vigente y no vencido.
       content:
@@ -735,6 +1057,7 @@ components:
           example:
             codigo: SOLICITUD_SUSCRIPCION_NO_ENCONTRADA
             detalle: No encontramos la solicitud de suscripción.
+<<<<<<< Updated upstream
     PerfilNoCoincide:
       description: >
         La foto del perfil que guardó la cotización no coincide con el perfil y la versión de la
@@ -750,6 +1073,8 @@ components:
           example:
             codigo: PERFIL_NO_COINCIDE
             detalle: El perfil de riesgo de la cotización no coincide con el de la solicitud.
+=======
+>>>>>>> Stashed changes
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -802,16 +1127,19 @@ components:
       enum: [LEY_1581_2012, DECRETO_1297_2022]
     PedirAutorizacion:
       type: object
-      required: [asesor]
       properties:
         asesor:
           type: object
+          deprecated: true
+          description: >
+            Obsoleto y opcional. El BFF lo ignora: envía al núcleo el asesor del token (su id y
+            su nombre).
           required: [id, nombre]
           properties:
             id:
               type: string
               minLength: 1
-              description: Id del asesor. Llega en la petición mientras no haya login.
+              description: Id del asesor.
             nombre:
               type: string
               minLength: 1
@@ -1280,6 +1608,7 @@ components:
         aceptadaEn:
           type: string
           format: date-time
+<<<<<<< Updated upstream
     OrigenPerfil:
       type: string
       description: >
@@ -1304,6 +1633,203 @@ components:
         motivoSinPerfil:
           $ref: '#/components/schemas/MotivoSinPerfil'
           description: Solo cuando origen es VALOR_POR_DEFECTO.
+=======
+    Rol:
+      type: string
+      description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
+      enum: [ASESOR, CLIENTE, ANALISTA_RIESGO, OPERACIONES, SOCIO]
+    Nombre:
+      type: string
+      description: >
+        Solo letras (con tildes y ñ), separadas por un espacio, un apóstrofo o un guion.
+      minLength: 2
+      maxLength: 60
+      pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+([ '\\-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$"
+      examples: [María Fernanda, O'Neill, Pérez-Gómez]
+    RegistroCuentaCliente:
+      type: object
+      description: >
+        Datos básicos del cliente, con las mismas reglas de formato del onboarding de la app
+        (DatosBasicosCliente del contrato del BFF móvil). El correo no va en el cuerpo: es el
+        email verificado del token. Se quitan los espacios al inicio y al final de cada texto.
+      additionalProperties: false
+      required: [documento, nombre, celular]
+      properties:
+        documento:
+          type: object
+          additionalProperties: false
+          required: [tipo, numero]
+          properties:
+            tipo:
+              $ref: '#/components/schemas/TipoDocumento'
+            numero:
+              type: string
+              description: >
+                CC, CE y PPT: de 6 a 10 dígitos. PA: de 6 a 12 letras o dígitos.
+              pattern: '^[A-Za-z0-9]{6,12}$'
+              examples: ['1020304050', AB123456]
+        nombre:
+          type: object
+          additionalProperties: false
+          required: [nombres, apellidos]
+          properties:
+            nombres:
+              $ref: '#/components/schemas/Nombre'
+            apellidos:
+              $ref: '#/components/schemas/Nombre'
+        celular:
+          type: string
+          description: Celular colombiano de 10 dígitos, sin indicativo ni separadores.
+          pattern: '^3\d{9}$'
+          examples: ['3001234567']
+    RegistroCuenta:
+      type: string
+      description: >
+        CREADO el cliente no existía y se creó con el onboarding en curso (201). ENLAZADO el
+        cliente ya existía con ese documento y ese correo, o la cuenta ya estaba registrada
+        (200).
+      enum: [CREADO, ENLAZADO]
+    CuentaCliente:
+      type: object
+      description: >
+        Solo el id del cliente y el resultado (minimización). El nombre y el documento
+        enmascarado llegan en el token renovado.
+      required: [clienteId, registro]
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        registro:
+          $ref: '#/components/schemas/RegistroCuenta'
+    Solicitante:
+      type: object
+      description: >
+        Quién pidió la cotización: el usuario de la sesión que llegó hasta el núcleo.
+      required: [id, rol]
+      properties:
+        id:
+          type: string
+          description: Id del usuario en Cognito (sub).
+        rol:
+          $ref: '#/components/schemas/Rol'
+    EntradasDecisionPrecio:
+      type: object
+      description: >
+        Entradas tal como se guardaron en el registro de la decisión. Los opcionales que no
+        aplican van en null. Los registros anteriores a la SOLVENTAG5-207 no tienen la llave
+        solicitante.
+      required:
+        - ramo
+        - canal
+        - clienteId
+        - socioId
+        - datosBien
+        - perfil
+        - motivoSinPerfil
+        - nivelRiesgo
+        - origenNivel
+      properties:
+        ramo:
+          type: string
+        canal:
+          type: string
+          enum: [web, movil, socio]
+        clienteId:
+          type: [string, 'null']
+          format: uuid
+        socioId:
+          type: [string, 'null']
+        datosBien:
+          type: object
+          description: Datos del bien validados, con la forma de los del ramo.
+        perfil:
+          type: [object, 'null']
+          description: Foto del perfil usado, con la forma de PerfilUsado; null sin perfil.
+        motivoSinPerfil:
+          anyOf:
+            - $ref: '#/components/schemas/MotivoSinPerfil'
+            - type: 'null'
+        nivelRiesgo:
+          $ref: '#/components/schemas/NivelRiesgo'
+        origenNivel:
+          type: string
+          enum: [PERFIL, VALOR_POR_DEFECTO]
+        solicitante:
+          description: >
+            Quién pidió la cotización; null si llegó sin usuario (por ejemplo, desde la app).
+            Falta en los registros anteriores a la SOLVENTAG5-207.
+          anyOf:
+            - $ref: '#/components/schemas/Solicitante'
+            - type: 'null'
+    VerificacionDecision:
+      type: object
+      required: [primaRecalculada, primaCoincide, huellaValida, reconstruible]
+      properties:
+        primaRecalculada:
+          type: integer
+          description: Prima recalculada solo con el registro guardado.
+        primaCoincide:
+          type: boolean
+        huellaValida:
+          type: boolean
+          description: El registro no cambió desde que se escribió.
+        reconstruible:
+          type: boolean
+          description: Íntegro y explica exactamente la prima cobrada.
+    ReconstruccionDecision:
+      type: object
+      description: >
+        Decisión de precio reconstruida para actuaría y cumplimiento (SOLVENTAG5-128, ADR 0006),
+        con la forma de la respuesta del núcleo.
+      required:
+        - cotizacionId
+        - tipo
+        - registradaEn
+        - regla
+        - parametros
+        - entradas
+        - resultado
+        - retenerHasta
+        - huella
+        - verificacion
+        - explicacion
+      properties:
+        cotizacionId:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          const: PRECIO
+        registradaEn:
+          type: string
+          format: date-time
+        regla:
+          type: string
+          description: Código y versión de la regla, p. ej. VIDA_HIPOTECARIO.TARIFA.v1
+        parametros:
+          type: object
+          description: Parámetros de la regla tal como se aplicaron, como texto.
+          additionalProperties:
+            type: string
+        entradas:
+          $ref: '#/components/schemas/EntradasDecisionPrecio'
+        resultado:
+          type: object
+          description: Prima, moneda y periodicidad, como texto.
+          additionalProperties:
+            type: string
+        retenerHasta:
+          type: string
+          format: date-time
+          description: 'Retención de 10 años: no se borra antes.'
+        huella:
+          type: string
+          description: SHA-256 del contenido del registro.
+        verificacion:
+          $ref: '#/components/schemas/VerificacionDecision'
+        explicacion:
+          type: string
+>>>>>>> Stashed changes
     Error:
       type: object
       required: [codigo, detalle]
@@ -1311,11 +1837,21 @@ components:
         codigo:
           type: string
           description: >
+<<<<<<< Updated upstream
             Código estable del error. Los de esta versión son SOLICITUD_NO_ENCONTRADA,
             SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA, CONSENTIMIENTO_NO_ENCONTRADO,
             CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO, CLIENTE_NO_ENCONTRADO,
             DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO, COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA,
             SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, PERFIL_NO_COINCIDE y NUCLEO_NO_DISPONIBLE.
+=======
+            Código estable del error. Los de esta versión son NO_AUTENTICADO, SIN_PERMISO,
+            SOLICITUD_NO_ENCONTRADA, SOLICITUD_YA_RESPONDIDA, POLITICA_NO_ACEPTADA,
+            CONSENTIMIENTO_NO_ENCONTRADO, CONSENTIMIENTO_NO_VIGENTE, CLIENTE_YA_AUTORIZADO,
+            CLIENTE_NO_ENCONTRADO, DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO,
+            COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA, SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
+            CUENTA_NO_ENLAZABLE, DECISION_NO_ENCONTRADA, NUCLEO_NO_DISPONIBLE e
+            IDENTIDAD_NO_DISPONIBLE.
+>>>>>>> Stashed changes
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -1415,6 +1951,74 @@ components:
         estado: VIGENTE
         calculadaSinPerfil: true
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
+<<<<<<< Updated upstream
+=======
+    ReconstruccionConSolicitante:
+      summary: Cotización del asesor con perfil MEDIO, reconstruible
+      description: >
+        Generado con el código del núcleo de la SOLVENTAG5-128 más el solicitante de la
+        SOLVENTAG5-207. La frase de quién pidió la cotización al final de la explicación es
+        ilustrativa: su redacción exacta la fija el núcleo.
+      value:
+        cotizacionId: 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+        tipo: PRECIO
+        registradaEn: '2026-10-13T15:00:00Z'
+        regla: VIDA_HIPOTECARIO.TARIFA.v1
+        parametros:
+          campoBase: montoCredito
+          tasaPorMil: '0.35'
+          nivel: MEDIO
+          factor: '1.00'
+          redondeo: AL_PESO_MITAD_ARRIBA
+        entradas:
+          ramo: VIDA_HIPOTECARIO
+          canal: web
+          clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+          socioId: null
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+          perfil:
+            perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+            version: 3
+            score: 640
+            nivel: MEDIO
+            senales:
+              comportamientoPago: 72
+              estabilidadIngresos: 65
+              ubicacion: 58
+              endeudamiento: 41
+            calculadoEn: '2026-10-13T14:59:59Z'
+            vigenteHasta: '2026-10-14T14:59:59Z'
+          motivoSinPerfil: null
+          nivelRiesgo: MEDIO
+          origenNivel: PERFIL
+          solicitante:
+            id: 4c1f7a2e-9d3b-4e8a-b6f0-2a7c9e1d3b5f
+            rol: ASESOR
+        resultado:
+          prima: '70000'
+          moneda: COP
+          periodicidad: MENSUAL
+        retenerHasta: '2036-10-13T15:00:00Z'
+        huella: 17e2504cf167574ba0d262ee28a51e2bb8656e0eccee2f89f855828a96ba4b78
+        verificacion:
+          primaRecalculada: 70000
+          primaCoincide: true
+          huellaValida: true
+          reconstruible: true
+        explicacion: >-
+          Prima mensual de COP 70.000 para la cotización 5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d
+          del ramo VIDA_HIPOTECARIO (canal web), calculada el 2026-10-13 15:00 UTC con la regla
+          VIDA_HIPOTECARIO.TARIFA.v1. Fórmula: montoCredito 200.000.000 × 0,35 por mil × factor
+          1,00 del nivel de riesgo MEDIO = 70.000, redondeado al peso. El nivel MEDIO viene del
+          perfil de riesgo 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d versión 3 (score 640), calculado
+          con las señales de Open Finance/Open Data: comportamientoPago 72, estabilidadIngresos
+          65, ubicacion 58, endeudamiento 41 (indicadores de 0 a 100). La pidió el usuario
+          4c1f7a2e-9d3b-4e8a-b6f0-2a7c9e1d3b5f con el rol ASESOR.
+>>>>>>> Stashed changes
     SolicitudSuscripcionCreada:
       summary: Oferta aceptada, con el perfil de riesgo con que se cotizó
       value:
@@ -1437,6 +2041,7 @@ components:
           version: 3
         canal: web
         aceptadaEn: '2026-10-14T16:30:00Z'
+<<<<<<< Updated upstream
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:
@@ -1462,3 +2067,5 @@ components:
         cotizacionId: 8f1e2d3c-4b5a-4c6d-9e7f-0a1b2c3d4e5f
         origen: VALOR_POR_DEFECTO
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
+=======
+>>>>>>> Stashed changes

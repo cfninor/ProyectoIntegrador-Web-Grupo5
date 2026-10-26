@@ -1,6 +1,6 @@
 # «Publicar portal» (D12, «Flujo de despliegue y promoción»): publica en un ambiente un build del
 # portal que ya está en el bucket de artefactos, sin compilar nada, con el config.json del ambiente
-# (variable WEB_CONFIG). Lo llaman la CI (DEV, con cada merge a main) y la promoción a QA y a PROD.
+# (variable WEB_CONFIG más los ids de Cognito del ambiente, D9 de la SOLVENTAG5-207). Lo llaman la CI (DEV, con cada merge a main) y la promoción a QA y a PROD.
 # A mano solo sirve para revertir: en PROD, solo con una carpeta web/releases/v<versión> anterior
 # y solo para las personas de APROBADORES_PROD.
 name: Publicar portal
@@ -110,6 +110,15 @@ jobs:
           AMBIENTE: ${{ inputs.ambiente }}
         run: |
           leer() { aws ssm get-parameter --name "/solventa/$1" --query Parameter.Value --output text; }
+          # User pool y cliente del portal del ambiente (SOLVENTAG5-207, D9): los crea Terraform con el
+          # módulo identidad. Sin ellos el portal no tendría inicio de sesión.
+          for parametro in user-pool-id cliente-portal-id; do
+            if ! valor=$(leer "$AMBIENTE/cognito/$parametro" 2> /dev/null) || [[ -z $valor || $valor == None ]]; then
+              echo "::error::No existe /solventa/$AMBIENTE/cognito/$parametro en SSM. Aplica Terraform del ambiente (módulo identidad, SOLVENTAG5-207) antes de publicar el portal."
+              exit 1
+            fi
+            echo "cognito_${parametro//-/_}=$valor" >> "$GITHUB_OUTPUT"
+          done
           {
             echo "artefactos=$(leer compartido/artefactos/bucket)"
             echo "bucket=$(leer "$AMBIENTE/web/bucket")"
@@ -122,9 +131,12 @@ jobs:
       - name: Descargar el build
         id: build
         env:
+          AMBIENTE: ${{ inputs.ambiente }}
           ARTEFACTOS: ${{ steps.parametros.outputs.artefactos }}
           ORIGEN: ${{ steps.entradas.outputs.origen }}
           WEB_CONFIG: ${{ vars.WEB_CONFIG }}
+          USER_POOL_ID: ${{ steps.parametros.outputs.cognito_user_pool_id }}
+          CLIENTE_PORTAL_ID: ${{ steps.parametros.outputs.cognito_cliente_portal_id }}
         run: |
           clave=$(aws s3api list-objects-v2 --bucket "$ARTEFACTOS" --prefix "$ORIGEN/index.html" \
             --query "Contents[?Key=='$ORIGEN/index.html'].Key | [0]" --output text)
@@ -144,8 +156,14 @@ jobs:
           fi
           portal="$RUNNER_TEMP/portal"
           aws s3 cp "s3://$ARTEFACTOS/$ORIGEN/" "$portal/" --recursive --only-show-errors
-          # La configuración no viaja en el build (D1): sale del ambiente.
-          jq . <<< "$WEB_CONFIG" > "$portal/config.json"
+          # La configuración no viaja en el build (D1): sale del ambiente. En AWS el portal ingresa
+          # con Cognito y nunca con la sesión simulada (D9 de la SOLVENTAG5-207).
+          if jq -e 'has("sesionSimulada")' <<< "$WEB_CONFIG" > /dev/null; then
+            echo "::warning::WEB_CONFIG de $AMBIENTE trae sesionSimulada: se descarta, el portal usa Cognito. Quítala de la variable."
+          fi
+          jq --arg region "$AWS_REGION" --arg userPoolId "$USER_POOL_ID" --arg clienteId "$CLIENTE_PORTAL_ID" \
+            'del(.sesionSimulada) + {cognito: {region: $region, userPoolId: $userPoolId, clienteId: $clienteId}}' \
+            <<< "$WEB_CONFIG" > "$portal/config.json"
           echo "Build de $commit descargado: $(find "$portal" -type f | wc -l) archivos."
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
@@ -186,8 +204,8 @@ jobs:
           aws ssm put-parameter --name "/solventa/$AMBIENTE/web/version" --type String --overwrite --value "$version" > /dev/null
           echo "/solventa/$AMBIENTE/web/version: $version"
 
-      # Prueba de humo del portal: index.html y config.json con 200 por su dominio. Escribe ok o
-      # fallo en web/version y falla con fallo.
+      # Prueba de humo del portal: index.html y config.json con 200 por su dominio, y config.json con
+      # el user pool de Cognito. Escribe ok o fallo en web/version y falla con fallo.
       - name: Prueba de humo
         id: humo
         env:
@@ -205,6 +223,10 @@ jobs:
           done
           if [[ $resultado == ok ]] && ! jq -e 'type == "object"' "$RUNNER_TEMP/humo-config.json" > /dev/null; then
             echo "::error::$WEB_URL/config.json no es un objeto JSON."
+            resultado=fallo
+          elif [[ $resultado == ok ]] && ! jq -e '.cognito.userPoolId | type == "string" and length > 0' \
+            "$RUNNER_TEMP/humo-config.json" > /dev/null; then
+            echo "::error::$WEB_URL/config.json no trae cognito.userPoolId: el portal no tendría inicio de sesión."
             resultado=fallo
           fi
           version=$(aws ssm get-parameter --name "/solventa/$AMBIENTE/web/version" --query Parameter.Value --output text \

@@ -12,9 +12,14 @@
     "suscripcion.tituloPestana": "Suscripción · Solventa",
     "suscripcion.miga": "Cotizar / Suscripción",
     "suscripcion.tituloPagina": "Suscripción",
+<<<<<<< Updated upstream
     "perfilRiesgo.miga": "Suscripción / Perfil de riesgo",
     "perfilRiesgo.titulo": "Perfil de riesgo de la solicitud",
     "perfilRiesgo.tituloPestana": "Perfil de riesgo · Solventa",
+=======
+    "ingreso.tituloPestana": "Iniciar sesión · Solventa",
+    "crearCuenta.tituloPestana": "Crear cuenta · Solventa",
+>>>>>>> Stashed changes
     "autorizacion.tituloPestana": "Autorizar la consulta de tus datos · Solventa",
     "portal.noEncontrada.tituloPestana": "Página no encontrada · Solventa",
     "idioma.selector": "Idioma",
@@ -24,6 +29,7 @@
     "idioma.en.nombre": "English",
     "portal.marca": "Solventa",
     "menu.etiqueta": "Menú principal",
+    "portal.cerrarSesion": " Cerrar sesión ",
     "portal.migas": "Ruta de navegación",
     "portal.migaInicio": "Solventa",
     "menu.alternar": "Menú",
@@ -223,6 +229,8 @@
     "oferta.nivel.bajo": "Riesgo bajo",
     "oferta.nivel.medio": "Riesgo medio",
     "oferta.nivel.alto": "Riesgo alto",
+    "crearCuenta.titulo": "Crea tu cuenta",
+    "ingreso.titulo": "Iniciar sesión",
     "portal.noEncontrada.titulo": "No encontramos esta página",
     "portal.noEncontrada.texto": " Revisa la dirección o vuelve a abrir el enlace que recibiste. ",
     "perfilRiesgo.consulta.titulo": " Consultar el perfil de una solicitud ",

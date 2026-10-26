@@ -254,6 +254,11 @@
     "suscripcion.texto.asesor": "The client accepted the offer. The next step, the evaluation with the underwriting rules, isn't available in the portal yet.",
     "suscripcion.texto.cliente": "You chose to continue with your offer. The next step, the evaluation of your application, isn't available in the portal yet.",
     "suscripcion.volverOferta": "Back to the offer",
-    "suscripcion.irTablero": "Go to the dashboard"
+    "suscripcion.irTablero": "Go to the dashboard",
+    "ingreso.tituloPestana": "Sign in · Solventa",
+    "ingreso.titulo": "Sign in",
+    "crearCuenta.tituloPestana": "Create account · Solventa",
+    "crearCuenta.titulo": "Create your account",
+    "portal.cerrarSesion": " Sign out "
   }
 }

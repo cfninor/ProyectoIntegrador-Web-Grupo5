@@ -2,7 +2,12 @@ import { Route, Routes } from '@angular/router';
 
 import { datosPagina } from './core/layout/pagina';
 import { PREFIJO_PORTAL } from './core/sesion/roles';
-import { redirigirAlPortal, rolGuard } from './core/sesion/rol-guard';
+import {
+  crearCuentaGuard,
+  ingresarGuard,
+  redirigirAlPortal,
+  rolGuard,
+} from './core/sesion/rol-guard';
 import { Rol } from './core/sesion/sesion';
 import type { Actor } from './features/cotizacion/formulario-cotizacion';
 
@@ -116,6 +121,22 @@ export const routes: Routes = [
     path: '',
     loadComponent: () => import('./core/layout/layout-publico').then((m) => m.LayoutPublico),
     children: [
+      {
+        // SOLV-WEB-01: ingreso de todos los perfiles (SOLVENTAG5-207, D10).
+        path: 'ingresar',
+        title: $localize`:@@ingreso.tituloPestana:Iniciar sesión · Solventa`,
+        canActivate: [ingresarGuard],
+        loadComponent: () =>
+          import('./features/ingreso/pagina-ingreso').then((m) => m.PaginaIngreso),
+      },
+      {
+        // El cliente crea su cuenta, o termina el registro de una cuenta sin grupo (CA8, D20).
+        path: 'crear-cuenta',
+        title: $localize`:@@crearCuenta.tituloPestana:Crear cuenta · Solventa`,
+        canActivate: [crearCuentaGuard],
+        loadComponent: () =>
+          import('./features/ingreso/pagina-crear-cuenta').then((m) => m.PaginaCrearCuenta),
+      },
       {
         // Enlace que recibe el cliente para autorizar la consulta de sus datos (SOLVENTAG5-65).
         path: 'autorizar/:solicitudId',

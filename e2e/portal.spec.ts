@@ -50,15 +50,15 @@ test('el cliente entra a su portal y no al del asesor', async ({ page }) => {
   await expect(page).toHaveURL('/cliente');
 });
 
-test('sin sesión, un portal lleva a la página no encontrada del layout público', async ({
+test('sin sesión, un portal lleva a ingresar en el layout público (SOLVENTAG5-207)', async ({
   page,
 }) => {
   await usarSesion(page);
 
   await page.goto('/asesor');
 
-  await expect(page).toHaveURL('/no-encontrada');
-  await expect(page.getByRole('heading', { name: 'No encontramos esta página' })).toBeVisible();
+  await expect(page).toHaveURL('/ingresar?volver=%2Fasesor');
+  await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Menú principal' })).toHaveCount(0);
 });
 
