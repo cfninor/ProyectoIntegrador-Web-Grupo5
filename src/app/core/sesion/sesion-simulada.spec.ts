@@ -77,6 +77,7 @@ describe('SesionSimulada · ingresar y cerrar (SOLVENTAG5-207)', () => {
 
     expect(await sesiones.token()).toBeNull();
     expect(sesiones.cuentaSinRegistrar()).toBeNull();
+    expect(sesiones.correoPorConfirmar()).toBeNull();
   });
 
   it('crear cuenta no está disponible sin Cognito', async () => {

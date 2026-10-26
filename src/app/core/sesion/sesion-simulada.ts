@@ -58,6 +58,10 @@ export class SesionSimulada implements ServicioSesion {
     return null;
   }
 
+  correoPorConfirmar(): string | null {
+    return null;
+  }
+
   puedeCrearCuenta(): boolean {
     return false;
   }

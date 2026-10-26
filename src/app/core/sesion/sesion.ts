@@ -22,8 +22,12 @@ export interface Sesion {
 /** Por qué se cerró la sesión sin que el usuario lo pidiera (R9 de la SOLVENTAG5-207). */
 export type MotivoCierre = 'inactividad' | 'expirada';
 
-/** Errores del ingreso, uno por mensaje de R9. */
-export type ErrorIngreso = 'CREDENCIALES' | 'BLOQUEO' | 'SIN_CONEXION' | 'SIN_PORTAL';
+/**
+ * Errores del ingreso, uno por mensaje de R9. `SIN_CONFIRMAR` es una cuenta creada sin confirmar
+ * el correo (D32): el portal pidió un código nuevo y lleva al paso «Código» de crear cuenta.
+ */
+export type ErrorIngreso =
+  'CREDENCIALES' | 'BLOQUEO' | 'SIN_CONEXION' | 'SIN_PORTAL' | 'SIN_CONFIRMAR';
 
 /**
  * Resultado de ingresar: la sesión de un portal, la cuenta de un cliente que todavía no termina su
@@ -86,11 +90,17 @@ export interface ServicioSesion {
   token(): Promise<string | null>;
   /** El correo de la cuenta de un cliente sin registrar (R2), o null. */
   cuentaSinRegistrar(): string | null;
+  /**
+   * El correo de una cuenta creada en esta pestaña que falta confirmar con el código, al registrarla
+   * o al ingresar con ella (D32), o null. Sus credenciales quedan en memoria para ingresar al
+   * confirmar.
+   */
+  correoPorConfirmar(): string | null;
   /** Si el portal puede crear cuentas de cliente: solo con Cognito. */
   puedeCrearCuenta(): boolean;
   /** Crea la cuenta en Cognito, que envía un código al correo (D21). */
   registrar(correo: string, contrasena: string): Promise<ResultadoCuenta>;
-  /** Confirma el correo con el código e ingresa con las credenciales de `registrar`. */
+  /** Confirma el correo con el código e ingresa con las credenciales que tiene en memoria. */
   confirmar(correo: string, codigo: string): Promise<ResultadoCuenta>;
   reenviarCodigo(correo: string): Promise<ResultadoCuenta>;
   /** Envía los datos a `POST /v1/cuenta`, renueva los tokens y deja la sesión del cliente. */

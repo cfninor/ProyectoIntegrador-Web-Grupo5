@@ -63,7 +63,10 @@ function nombreError(error: unknown): string {
   return error instanceof Error ? error.name : '';
 }
 
-/** R9: Cognito no dice si el usuario existe (`prevent_user_existence_errors`). */
+/**
+ * R9: Cognito no dice si el usuario existe (`prevent_user_existence_errors`). La cuenta sin
+ * confirmar sí se distingue (D32), como ya lo hace crear cuenta (R13).
+ */
 export function errorIngreso(error: unknown): ErrorIngreso {
   const nombre = nombreError(error);
   if (nombre === 'NotAuthorizedException' && /attempts exceeded/i.test((error as Error).message)) {
@@ -72,13 +75,13 @@ export function errorIngreso(error: unknown): ErrorIngreso {
   if (nombre === 'LimitExceededException' || nombre === 'TooManyRequestsException') {
     return 'BLOQUEO';
   }
+  if (nombre === 'UserNotConfirmedException') {
+    return 'SIN_CONFIRMAR';
+  }
   if (
-    [
-      'NotAuthorizedException',
-      'UserNotFoundException',
-      'UserNotConfirmedException',
-      'PasswordResetRequiredException',
-    ].includes(nombre)
+    ['NotAuthorizedException', 'UserNotFoundException', 'PasswordResetRequiredException'].includes(
+      nombre,
+    )
   ) {
     return 'CREDENCIALES';
   }
@@ -130,7 +133,10 @@ export class SesionCognito implements ServicioSesion {
   private amplify?: Promise<Amplify>;
   private sesion: Sesion | null = null;
   private sinRegistrar: string | null = null;
-  /** Solo entre `registrar` y `confirmar`, para ingresar sin depender de `autoSignIn`. */
+  /**
+   * Solo entre `registrar`, o un ingreso con la cuenta sin confirmar (D32), y `confirmar`, para
+   * ingresar sin depender de `autoSignIn`.
+   */
   private credenciales: Credenciales | null = null;
 
   actual(): Sesion | null {
@@ -139,6 +145,10 @@ export class SesionCognito implements ServicioSesion {
 
   cuentaSinRegistrar(): string | null {
     return this.sinRegistrar;
+  }
+
+  correoPorConfirmar(): string | null {
+    return this.credenciales?.correo ?? null;
   }
 
   puedeCrearCuenta(): boolean {
@@ -159,11 +169,16 @@ export class SesionCognito implements ServicioSesion {
   }
 
   async iniciar(correo: string, contrasena: string): Promise<ResultadoIngreso> {
+    this.credenciales = null;
+    let resultado: ResultadoIngreso;
     try {
-      return await this.ingresar(await this.cargar(), correo, contrasena);
+      resultado = await this.ingresar(await this.cargar(), correo, contrasena);
     } catch (error) {
-      return { tipo: 'error', error: errorIngreso(error) };
+      resultado = { tipo: 'error', error: errorIngreso(error) };
     }
+    return resultado.tipo === 'error' && resultado.error === 'SIN_CONFIRMAR'
+      ? this.pedirCodigo(correo, contrasena)
+      : resultado;
   }
 
   async cerrar(): Promise<void> {
@@ -205,7 +220,7 @@ export class SesionCognito implements ServicioSesion {
   }
 
   /**
-   * Confirma el correo e ingresa con las credenciales de `registrar`, que se borran al terminar.
+   * Confirma el correo e ingresa con las credenciales en memoria, que se borran al terminar.
    * Si no las tiene (por ejemplo, se recargó la página), solo confirma: el cliente ingresa después.
    */
   async confirmar(correo: string, codigo: string): Promise<ResultadoCuenta> {
@@ -215,8 +230,12 @@ export class SesionCognito implements ServicioSesion {
       const credenciales = this.credenciales;
       this.credenciales = null;
       if (credenciales?.correo === correo) {
-        const ingreso = await this.ingresar(amplify, correo, credenciales.contrasena);
-        if (ingreso.tipo === 'error') {
+        const ingreso = await this.ingresar(amplify, correo, credenciales.contrasena).catch(
+          (error: unknown): ResultadoIngreso => ({ tipo: 'error', error: errorIngreso(error) }),
+        );
+        // El correo ya quedó confirmado: si el ingreso falla por otra cosa que la conexión (por
+        // ejemplo, D32 con una contraseña errada), responde ok sin sesión y el cliente ingresa.
+        if (ingreso.tipo === 'error' && ingreso.error === 'SIN_CONEXION') {
           return { tipo: 'error', error: 'SIN_CONEXION' };
         }
       }
@@ -285,14 +304,32 @@ export class SesionCognito implements ServicioSesion {
       salida = await amplify.signIn(credenciales);
     }
     if (!salida.isSignedIn) {
-      // Un paso que el portal no maneja (por ejemplo, confirmar el registro): no hay sesión.
-      return { tipo: 'error', error: 'CREDENCIALES' };
+      // Amplify no lanza UserNotConfirmedException: la devuelve como el paso CONFIRM_SIGN_UP.
+      // Cualquier otro paso el portal no lo maneja: no hay sesión.
+      return {
+        tipo: 'error',
+        error: salida.nextStep.signInStep === 'CONFIRM_SIGN_UP' ? 'SIN_CONFIRMAR' : 'CREDENCIALES',
+      };
     }
     const resultado = await this.leerSesion(amplify, false);
     if (resultado.tipo === 'error') {
       await this.cerrar();
     }
     return resultado;
+  }
+
+  /**
+   * D32: una cuenta creada sin confirmar el correo. Pide un código nuevo y guarda las credenciales
+   * para ingresar al confirmar. Si no se puede pedir el código, responde el error de R9.
+   */
+  private async pedirCodigo(correo: string, contrasena: string): Promise<ResultadoIngreso> {
+    try {
+      await (await this.cargar()).resendSignUpCode({ username: correo });
+    } catch (error) {
+      return { tipo: 'error', error: errorIngreso(error) };
+    }
+    this.credenciales = { correo, contrasena };
+    return { tipo: 'error', error: 'SIN_CONFIRMAR' };
   }
 
   /** Lee el ID token (renovado si `forzar`) y deja la sesión o la cuenta sin registrar. */

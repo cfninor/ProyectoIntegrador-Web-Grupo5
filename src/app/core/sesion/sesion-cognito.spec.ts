@@ -228,7 +228,6 @@ describe('SesionCognito · iniciar', () => {
       'CREDENCIALES',
     ],
     ['usuario que no existe', errorDe('UserNotFoundException'), 'CREDENCIALES'],
-    ['cuenta sin confirmar', errorDe('UserNotConfirmedException'), 'CREDENCIALES'],
     [
       'bloqueo temporal',
       errorDe('NotAuthorizedException', 'Password attempts exceeded'),
@@ -260,7 +259,7 @@ describe('SesionCognito · iniciar', () => {
   it('un paso que el portal no maneja no da sesión', async () => {
     amplify.signIn.mockResolvedValue({
       isSignedIn: false,
-      nextStep: { signInStep: 'CONFIRM_SIGN_UP' },
+      nextStep: { signInStep: 'RESET_PASSWORD' },
     } as Awaited<ReturnType<typeof auth.signIn>>);
     const sesion = servicio();
 
@@ -301,6 +300,103 @@ describe('SesionCognito · iniciar', () => {
     expect(sesion.actual()).toBeNull();
     expect(sesion.cuentaSinRegistrar()).toBe('maria@correo.com');
     expect(amplify.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('SesionCognito · cuenta sin confirmar (D32)', () => {
+  const PASO_CONFIRMAR = {
+    isSignedIn: false,
+    nextStep: { signInStep: 'CONFIRM_SIGN_UP' },
+  } as Awaited<ReturnType<typeof auth.signIn>>;
+
+  it('Amplify devuelve el paso CONFIRM_SIGN_UP: pide un código nuevo y guarda las credenciales', async () => {
+    amplify.signIn.mockResolvedValue(PASO_CONFIRMAR);
+    const sesion = servicio();
+
+    const resultado = await sesion.iniciar('maria@correo.com', 'Clave-Segura-1');
+
+    expect(resultado).toEqual({ tipo: 'error', error: 'SIN_CONFIRMAR' });
+    expect(amplify.resendSignUpCode).toHaveBeenCalledWith({ username: 'maria@correo.com' });
+    expect(sesion.correoPorConfirmar()).toBe('maria@correo.com');
+    expect(sesion.actual()).toBeNull();
+    expect(sesion.cuentaSinRegistrar()).toBeNull();
+  });
+
+  it('con la contraseña errada, al confirmar el correo responde ok sin sesión', async () => {
+    amplify.signIn
+      .mockResolvedValueOnce(PASO_CONFIRMAR)
+      .mockRejectedValueOnce(errorDe('NotAuthorizedException', 'Incorrect username or password.'));
+    const sesion = servicio();
+    await sesion.iniciar('maria@correo.com', 'Clave-Errada-1');
+
+    expect(await sesion.confirmar('maria@correo.com', '123456')).toEqual({ tipo: 'ok' });
+    expect(amplify.confirmSignUp).toHaveBeenCalledTimes(1);
+    expect(sesion.actual()).toBeNull();
+    expect(sesion.cuentaSinRegistrar()).toBeNull();
+    expect(sesion.correoPorConfirmar()).toBeNull();
+  });
+
+  it('también con UserNotConfirmedException', async () => {
+    amplify.signIn.mockRejectedValue(errorDe('UserNotConfirmedException'));
+    const sesion = servicio();
+
+    expect(await sesion.iniciar('maria@correo.com', 'clave')).toEqual({
+      tipo: 'error',
+      error: 'SIN_CONFIRMAR',
+    });
+    expect(amplify.resendSignUpCode).toHaveBeenCalledWith({ username: 'maria@correo.com' });
+    expect(sesion.correoPorConfirmar()).toBe('maria@correo.com');
+  });
+
+  it('al confirmar ingresa con las credenciales en memoria y queda como cuenta sin registrar', async () => {
+    amplify.signIn.mockResolvedValueOnce(PASO_CONFIRMAR).mockResolvedValueOnce(INGRESADO);
+    amplify.fetchAuthSession.mockResolvedValue(conTokens(SIN_GRUPO));
+    const sesion = servicio();
+    await sesion.iniciar('maria@correo.com', 'Clave-Segura-1');
+
+    const resultado = await sesion.confirmar('maria@correo.com', '123456');
+
+    expect(resultado).toEqual({ tipo: 'ok' });
+    expect(amplify.signIn).toHaveBeenLastCalledWith({
+      username: 'maria@correo.com',
+      password: 'Clave-Segura-1',
+    });
+    expect(sesion.cuentaSinRegistrar()).toBe('maria@correo.com');
+    expect(sesion.correoPorConfirmar()).toBeNull();
+  });
+
+  it.each<[string, string]>([
+    ['LimitExceededException', 'BLOQUEO'],
+    ['NetworkError', 'SIN_CONEXION'],
+  ])('si no se puede pedir el código (%s) → %s, sin credenciales', async (nombre, esperado) => {
+    amplify.signIn.mockResolvedValue(PASO_CONFIRMAR);
+    amplify.resendSignUpCode.mockRejectedValue(errorDe(nombre));
+    const sesion = servicio();
+
+    expect(await sesion.iniciar('maria@correo.com', 'clave')).toEqual({
+      tipo: 'error',
+      error: esperado,
+    });
+    expect(sesion.correoPorConfirmar()).toBeNull();
+  });
+
+  it('un ingreso nuevo olvida las credenciales de la cuenta sin confirmar', async () => {
+    amplify.signIn.mockResolvedValueOnce(PASO_CONFIRMAR);
+    const sesion = servicio();
+    await sesion.iniciar('maria@correo.com', 'clave');
+
+    await sesion.iniciar('asesor@solventa.example', 'clave');
+
+    expect(sesion.correoPorConfirmar()).toBeNull();
+    expect(sesion.actual()?.rol).toBe('ASESOR');
+  });
+
+  it('registrar también deja el correo por confirmar', async () => {
+    const sesion = servicio();
+
+    await sesion.registrar('maria@correo.com', 'Clave-Segura-1');
+
+    expect(sesion.correoPorConfirmar()).toBe('maria@correo.com');
   });
 });
 
@@ -422,7 +518,7 @@ describe('SesionCognito · crear cuenta (D21)', () => {
     expect(amplify.signIn).not.toHaveBeenCalled();
   });
 
-  it('si el ingreso después de confirmar falla, responde SIN_CONEXION', async () => {
+  it('si el ingreso después de confirmar falla por la conexión, responde SIN_CONEXION', async () => {
     const sesion = servicio();
     await sesion.registrar('maria@correo.com', 'clave');
     amplify.signIn.mockRejectedValue(errorDe('NetworkError'));
@@ -636,15 +732,13 @@ describe('SesionCognito · bordes', () => {
     expect(await sesion.token()).toBeNull();
   });
 
-  it('si después de confirmar la cuenta no tiene portal, confirmar responde SIN_CONEXION', async () => {
+  it('si después de confirmar la cuenta no tiene portal, confirmar responde ok sin sesión', async () => {
     amplify.fetchAuthSession.mockResolvedValue(conTokens({ ...SIN_GRUPO, email_verified: false }));
     const sesion = servicio();
     await sesion.registrar('maria@correo.com', 'clave');
 
-    expect(await sesion.confirmar('maria@correo.com', '123456')).toEqual({
-      tipo: 'error',
-      error: 'SIN_CONEXION',
-    });
+    expect(await sesion.confirmar('maria@correo.com', '123456')).toEqual({ tipo: 'ok' });
     expect(amplify.signOut).toHaveBeenCalled();
+    expect(sesion.cuentaSinRegistrar()).toBeNull();
   });
 });

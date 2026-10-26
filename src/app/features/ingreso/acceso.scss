@@ -1,0 +1,134 @@
+// Ingreso (SOLV-WEB-01) y crear cuenta: no hay marco en el Figma, así que siguen los estilos del
+// portal (tarjeta, campos y botones de styles.scss) en un recuadro centrado.
+:host {
+  display: block;
+}
+
+p {
+  margin: 0;
+}
+
+.acceso {
+  display: flex;
+  justify-content: center;
+}
+
+.recuadro {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 440px;
+  box-sizing: border-box;
+  padding: 32px;
+
+  &.ancho {
+    max-width: 640px;
+  }
+}
+
+.encabezado {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  h2:focus {
+    outline: none;
+  }
+}
+
+.campos {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.grilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+
+  .completa {
+    grid-column: 1 / -1;
+  }
+}
+
+// El campo con su botón «Mostrar» u «Ocultar», o el tipo de documento con su número.
+.con-boton {
+  display: flex;
+  gap: 8px;
+
+  .campo {
+    flex: 1;
+    min-width: 0;
+  }
+
+  select.campo {
+    flex: none;
+    width: 84px;
+  }
+}
+
+.boton-ver {
+  flex: none;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.ayuda {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+// Aviso informativo (motivo de llegada, código reenviado), no un error.
+.aviso {
+  padding: 12px 16px;
+  border: 1px solid #c6d6d3;
+  border-radius: var(--radio-control);
+  background: var(--info-container);
+}
+
+.mensajes {
+  &:focus {
+    outline: none;
+  }
+
+  &:empty {
+    display: none;
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+
+  a {
+    color: var(--primary);
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 600px) {
+  .recuadro {
+    padding: 24px 16px;
+  }
+
+  .grilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
