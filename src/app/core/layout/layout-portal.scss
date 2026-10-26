@@ -89,6 +89,7 @@ p {
 
 .usuario {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 20px 24px;
@@ -117,6 +118,11 @@ p {
 .cargo {
   font-size: 12px;
   color: var(--on-surface-variant);
+}
+
+// «Cerrar sesión» ocupa su propia fila bajo el nombre y el rol (SOLVENTAG5-207).
+.cerrar-sesion {
+  flex-basis: 100%;
 }
 
 .principal {

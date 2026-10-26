@@ -1,0 +1,99 @@
+<div class="acceso">
+  <form
+    class="tarjeta recuadro"
+    [formGroup]="formulario"
+    (ngSubmit)="ingresar()"
+    novalidate
+    aria-labelledby="ingreso-titulo"
+  >
+    <div class="encabezado">
+      <h1 id="ingreso-titulo" i18n="@@ingreso.titulo">Iniciar sesión</h1>
+      <p class="texto-secundario" i18n="@@ingreso.subtitulo">
+        Ingresa con tu correo y tu contraseña.
+      </p>
+    </div>
+
+    @if (aviso(); as aviso) {
+      <output class="aviso">{{ aviso }}</output>
+    }
+
+    <fieldset class="campos" [disabled]="enviando()">
+      <div>
+        <label class="etiqueta-campo" for="ingreso-correo" i18n="@@ingreso.campo.correo"
+          >Correo</label
+        >
+        <input
+          id="ingreso-correo"
+          class="campo"
+          type="email"
+          autocomplete="username"
+          formControlName="correo"
+          [attr.aria-invalid]="errorCampo('correo') !== null"
+          aria-describedby="ingreso-correo-error"
+        />
+        <div id="ingreso-correo-error">
+          @if (errorCampo('correo'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="etiqueta-campo" for="ingreso-contrasena" i18n="@@ingreso.campo.contrasena"
+          >Contraseña</label
+        >
+        <div class="con-boton">
+          <input
+            id="ingreso-contrasena"
+            class="campo"
+            [type]="mostrarContrasena() ? 'text' : 'password'"
+            autocomplete="current-password"
+            formControlName="contrasena"
+            [attr.aria-invalid]="errorCampo('contrasena') !== null"
+            aria-describedby="ingreso-contrasena-error"
+          />
+          <button
+            type="button"
+            class="boton-secundario boton-ver"
+            aria-controls="ingreso-contrasena"
+            [attr.aria-pressed]="mostrarContrasena()"
+            (click)="alternarContrasena()"
+          >
+            @if (mostrarContrasena()) {
+              <ng-container i18n="@@ingreso.ocultarContrasena">Ocultar</ng-container>
+            } @else {
+              <ng-container i18n="@@ingreso.mostrarContrasena">Mostrar</ng-container>
+            }
+          </button>
+        </div>
+        <div id="ingreso-contrasena-error">
+          @if (errorCampo('contrasena'); as mensaje) {
+            <p class="error-campo">{{ mensaje }}</p>
+          }
+        </div>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="boton-primario" [disabled]="enviando()">
+      @if (enviando()) {
+        <ng-container i18n="@@ingreso.enviando">Ingresando…</ng-container>
+      } @else {
+        <ng-container i18n="@@ingreso.continuar">Continuar</ng-container>
+      }
+    </button>
+
+    <!-- R9: el mensaje del ingreso, que recibe el foco cuando hay un error. -->
+    <div #mensajes class="mensajes" tabindex="-1" aria-live="assertive">
+      @if (error(); as error) {
+        <p class="mensaje-error">{{ error }}</p>
+      }
+    </div>
+
+    @if (puedeCrearCuenta) {
+      <p class="pie">
+        <span i18n="@@ingreso.sinCuenta">¿Aún no tienes cuenta como cliente?</span>
+        <a routerLink="/crear-cuenta" i18n="@@ingreso.registrarse">Regístrate como cliente</a>
+      </p>
+    }
+  </form>
+</div>

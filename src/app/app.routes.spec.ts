@@ -52,18 +52,18 @@ describe('routes', () => {
     expect(vista.getByText('Hola de nuevo, Ana Sofía Reyes.')).toBeInTheDocument();
   });
 
-  it('sin sesión, la raíz lleva a la página no encontrada', async () => {
+  it('sin sesión, la raíz lleva a ingresar (SOLVENTAG5-207, D10)', async () => {
     const { url, vista } = await navegar('/');
 
-    expect(url).toBe('/no-encontrada');
-    expect(vista.getByRole('heading', { name: 'No encontramos esta página' })).toBeInTheDocument();
+    expect(url).toBe('/ingresar');
+    expect(vista.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
 
-  it('sin sesión, un portal lleva a la página no encontrada, sin menú', async () => {
+  it('sin sesión, un portal lleva a ingresar con la ruta para volver, sin menú', async () => {
     const { url, vista } = await navegar('/asesor');
 
-    expect(url).toBe('/no-encontrada');
-    expect(vista.getByRole('heading', { name: 'No encontramos esta página' })).toBeInTheDocument();
+    expect(url).toBe('/ingresar?volver=%2Fasesor');
+    expect(vista.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
     expect(vista.queryByRole('navigation', { name: 'Menú principal' })).not.toBeInTheDocument();
   });
 
@@ -228,6 +228,34 @@ describe('routes', () => {
     const { url } = await navegar('/cliente/cotizar/oferta/c-1', sesionDe('ASESOR'));
 
     expect(url).toBe('/asesor');
+  });
+
+  it('/ingresar abre en el layout público, sin menú, con su título (SOLVENTAG5-207)', async () => {
+    const { url, pagina, vista } = await navegar('/ingresar');
+
+    expect(url).toBe('/ingresar');
+    expect(document.title).toBe('Iniciar sesión · Solventa');
+    expect(pagina.querySelector('app-layout-publico')).not.toBeNull();
+    expect(vista.getByRole('heading', { level: 1, name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(vista.queryByRole('navigation', { name: 'Menú principal' })).not.toBeInTheDocument();
+  });
+
+  it.each<[Rol, string]>([
+    ['ASESOR', '/asesor'],
+    ['CLIENTE', '/cliente'],
+  ])('con el rol %s, /ingresar y /crear-cuenta llevan a su tablero %s', async (rol, tablero) => {
+    expect((await navegar('/ingresar', sesionDe(rol))).url).toBe(tablero);
+    TestBed.resetTestingModule();
+    expect((await navegar('/crear-cuenta', sesionDe(rol))).url).toBe(tablero);
+  });
+
+  it('/crear-cuenta abre sin sesión en el layout público, con su título', async () => {
+    const { url, pagina, vista } = await navegar('/crear-cuenta');
+
+    expect(url).toBe('/crear-cuenta');
+    expect(document.title).toBe('Crear cuenta · Solventa');
+    expect(pagina.querySelector('app-layout-publico')).not.toBeNull();
+    expect(vista.getByRole('heading', { level: 1, name: 'Crea tu cuenta' })).toBeInTheDocument();
   });
 
   it('una ruta que no existe muestra la página no encontrada en el layout público', async () => {

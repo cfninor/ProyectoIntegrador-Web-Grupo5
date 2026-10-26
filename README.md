@@ -184,18 +184,25 @@ Cada ambiente de GitHub (`dev`, `qa` y `prod`, limitados a `main`) tiene dos var
 | `AWS_ROLE_ARN` | ARN del rol `solventa-<ambiente>-github-web` (salida `roles_github` de Terraform, clave `web`). El workflow lo asume por OIDC: no hay llaves de AWS en GitHub |
 | `WEB_CONFIG` | El `config.json` del ambiente, en una línea |
 
-`WEB_CONFIG` es un objeto JSON con la misma forma que `public/config.json`. `apiBaseUrl` es
-obligatorio y va vacío, porque el BFF web está en el mismo dominio (`/v1/*`); `sesionSimulada`
-es opcional y, mientras no haya inicio de sesión real, define el usuario y el rol con que se abre
-el portal (`ASESOR`, `CLIENTE`, `ANALISTA_RIESGO`, `OPERACIONES` o `SOCIO`). La llevan los tres
-ambientes, también QA y PROD, porque las demostraciones se hacen ahí y los datos son de prueba.
-Por ejemplo:
+`WEB_CONFIG` es un objeto JSON con `apiBaseUrl`, obligatorio y vacío, porque el BFF web está en
+el mismo dominio (`/v1/*`). No lleva `sesionSimulada`: en DEV, QA y PROD se ingresa con Cognito
+(SOLVENTAG5-207), y la sesión simulada solo existe en el `public/config.json` local. En los tres
+ambientes queda así:
 
 ```json
-{"apiBaseUrl":"","sesionSimulada":{"usuario":{"id":"asesor-dev","nombre":"Asesor de prueba"},"rol":"ASESOR"}}
+{"apiBaseUrl":""}
 ```
 
-«Publicar portal» falla antes de tocar AWS si `WEB_CONFIG` falta o no tiene esa forma.
+«Publicar portal» lee los ids de Cognito del ambiente en SSM
+(`/solventa/<ambiente>/cognito/user-pool-id` y `/solventa/<ambiente>/cognito/cliente-portal-id`, que
+crea Terraform) y escribe el `config.json` con `WEB_CONFIG` más el objeto `cognito`:
+
+```json
+{"apiBaseUrl":"","cognito":{"region":"us-east-1","userPoolId":"<id>","clienteId":"<id>"}}
+```
+
+Si `WEB_CONFIG` todavía trae `sesionSimulada`, la descarta con un aviso. Falla antes de tocar AWS
+si `WEB_CONFIG` falta o no tiene esa forma, y antes de publicar si faltan los parámetros de SSM.
 
 Además, el repositorio tiene la variable `APROBADORES_PROD` (ver «Quién aprueba PROD»).
 

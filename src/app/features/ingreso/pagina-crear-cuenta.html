@@ -1,0 +1,366 @@
+<div class="acceso">
+  @switch (paso()) {
+    @case ('datos') {
+      <form
+        class="tarjeta recuadro ancho"
+        [formGroup]="formulario"
+        (ngSubmit)="enviarDatos()"
+        novalidate
+        aria-labelledby="crear-cuenta-titulo"
+      >
+        <div class="encabezado">
+          <h1 id="crear-cuenta-titulo" i18n="@@crearCuenta.titulo">Crea tu cuenta</h1>
+          <h2 tabindex="-1" i18n="@@crearCuenta.datos.titulo">Tus datos</h2>
+          @if (cuentaExistente()) {
+            <p class="texto-secundario" i18n="@@crearCuenta.datos.ayudaCuentaExistente">
+              Tu correo ya está confirmado. Completa tus datos para terminar tu registro.
+            </p>
+          } @else {
+            <p class="texto-secundario" i18n="@@crearCuenta.datos.ayuda">
+              Con estos datos creamos tu cuenta de cliente. Te enviaremos un código para confirmar
+              tu correo.
+            </p>
+          }
+        </div>
+
+        <fieldset class="campos grilla" [disabled]="enviando()">
+          <div class="completa">
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-documento"
+              i18n="@@crearCuenta.campo.documento"
+              >Documento de identidad</label
+            >
+            <div class="con-boton">
+              <!-- Un aria-label no contendría el texto visible del selector (WCAG 2.5.3). -->
+              <label
+                class="visualmente-oculto"
+                for="crear-cuenta-tipo-documento"
+                i18n="@@crearCuenta.campo.tipoDocumento"
+                >Tipo de documento</label
+              >
+              <select
+                id="crear-cuenta-tipo-documento"
+                class="campo"
+                formControlName="tipoDocumento"
+              >
+                @for (tipo of tiposDocumento; track tipo) {
+                  <option [value]="tipo">{{ textoTipo(tipo) }}</option>
+                }
+              </select>
+              <input
+                id="crear-cuenta-documento"
+                class="campo"
+                type="text"
+                autocomplete="off"
+                formControlName="numeroDocumento"
+                [attr.aria-invalid]="errorCampo('numeroDocumento') !== null"
+                aria-describedby="crear-cuenta-documento-error"
+              />
+            </div>
+            <div id="crear-cuenta-documento-error">
+              @if (errorCampo('numeroDocumento'); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+
+          <div>
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-nombres"
+              i18n="@@crearCuenta.campo.nombres"
+              >Nombres</label
+            >
+            <input
+              id="crear-cuenta-nombres"
+              class="campo"
+              type="text"
+              autocomplete="given-name"
+              formControlName="nombres"
+              [attr.aria-invalid]="errorCampo('nombres') !== null"
+              aria-describedby="crear-cuenta-nombres-error"
+            />
+            <div id="crear-cuenta-nombres-error">
+              @if (errorCampo('nombres'); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+
+          <div>
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-apellidos"
+              i18n="@@crearCuenta.campo.apellidos"
+              >Apellidos</label
+            >
+            <input
+              id="crear-cuenta-apellidos"
+              class="campo"
+              type="text"
+              autocomplete="family-name"
+              formControlName="apellidos"
+              [attr.aria-invalid]="errorCampo('apellidos') !== null"
+              aria-describedby="crear-cuenta-apellidos-error"
+            />
+            <div id="crear-cuenta-apellidos-error">
+              @if (errorCampo('apellidos'); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+
+          <div>
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-celular"
+              i18n="@@crearCuenta.campo.celular"
+              >Celular</label
+            >
+            <input
+              id="crear-cuenta-celular"
+              class="campo"
+              type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              formControlName="celular"
+              [attr.aria-invalid]="errorCampo('celular') !== null"
+              aria-describedby="crear-cuenta-celular-error"
+            />
+            <div id="crear-cuenta-celular-error">
+              @if (errorCampo('celular'); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+
+          <div>
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-correo"
+              i18n="@@crearCuenta.campo.correo"
+              >Correo</label
+            >
+            <input
+              id="crear-cuenta-correo"
+              class="campo"
+              type="email"
+              autocomplete="email"
+              formControlName="correo"
+              [readonly]="cuentaExistente()"
+              [attr.aria-invalid]="errorCampo('correo') !== null"
+              aria-describedby="crear-cuenta-correo-error"
+            />
+            <div id="crear-cuenta-correo-error">
+              @if (errorCampo('correo'); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+
+          @if (!cuentaExistente()) {
+            <div class="completa">
+              <label
+                class="etiqueta-campo"
+                for="crear-cuenta-contrasena"
+                i18n="@@crearCuenta.campo.contrasena"
+                >Contraseña</label
+              >
+              <div class="con-boton">
+                <input
+                  id="crear-cuenta-contrasena"
+                  class="campo"
+                  [type]="mostrarContrasena() ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  formControlName="contrasena"
+                  [attr.aria-invalid]="errorCampo('contrasena') !== null"
+                  aria-describedby="crear-cuenta-contrasena-politica crear-cuenta-contrasena-error"
+                />
+                <button
+                  type="button"
+                  class="boton-secundario boton-ver"
+                  aria-controls="crear-cuenta-contrasena"
+                  [attr.aria-pressed]="mostrarContrasena()"
+                  (click)="alternar('contrasena')"
+                >
+                  @if (mostrarContrasena()) {
+                    <ng-container i18n="@@crearCuenta.ocultarContrasena"
+                      >Ocultar contraseña</ng-container
+                    >
+                  } @else {
+                    <ng-container i18n="@@crearCuenta.mostrarContrasena"
+                      >Mostrar contraseña</ng-container
+                    >
+                  }
+                </button>
+              </div>
+              <p id="crear-cuenta-contrasena-politica" class="ayuda" i18n="@@crearCuenta.politica">
+                Al menos 12 caracteres, con mayúsculas, minúsculas y números.
+              </p>
+              <div id="crear-cuenta-contrasena-error">
+                @if (errorCampo('contrasena'); as mensaje) {
+                  <p class="error-campo">{{ mensaje }}</p>
+                }
+              </div>
+            </div>
+
+            <div class="completa">
+              <label
+                class="etiqueta-campo"
+                for="crear-cuenta-confirmacion"
+                i18n="@@crearCuenta.campo.confirmacion"
+                >Confirma tu contraseña</label
+              >
+              <div class="con-boton">
+                <input
+                  id="crear-cuenta-confirmacion"
+                  class="campo"
+                  [type]="mostrarConfirmacion() ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  formControlName="confirmacion"
+                  [attr.aria-invalid]="errorCampo('confirmacion') !== null"
+                  aria-describedby="crear-cuenta-confirmacion-error"
+                />
+                <button
+                  type="button"
+                  class="boton-secundario boton-ver"
+                  aria-controls="crear-cuenta-confirmacion"
+                  [attr.aria-pressed]="mostrarConfirmacion()"
+                  (click)="alternar('confirmacion')"
+                >
+                  @if (mostrarConfirmacion()) {
+                    <ng-container i18n="@@crearCuenta.ocultarConfirmacion"
+                      >Ocultar confirmación</ng-container
+                    >
+                  } @else {
+                    <ng-container i18n="@@crearCuenta.mostrarConfirmacion"
+                      >Mostrar confirmación</ng-container
+                    >
+                  }
+                </button>
+              </div>
+              <div id="crear-cuenta-confirmacion-error">
+                @if (errorCampo('confirmacion'); as mensaje) {
+                  <p class="error-campo">{{ mensaje }}</p>
+                }
+              </div>
+            </div>
+          }
+        </fieldset>
+
+        <p class="aviso" i18n="@@crearCuenta.leyDatos">
+          Tus datos se cifran y se tratan según la Ley 1581 de 2012.
+        </p>
+
+        <button type="submit" class="boton-primario" [disabled]="enviando()">
+          @if (enviando()) {
+            <ng-container i18n="@@crearCuenta.enviando">Enviando…</ng-container>
+          } @else if (cuentaExistente()) {
+            <ng-container i18n="@@crearCuenta.terminar">Terminar registro</ng-container>
+          } @else {
+            <ng-container i18n="@@crearCuenta.continuar">Continuar</ng-container>
+          }
+        </button>
+
+        <!-- R13: el mensaje de crear cuenta, que recibe el foco cuando hay un error. -->
+        <div class="mensajes" tabindex="-1" aria-live="assertive">
+          @if (error(); as error) {
+            <p class="mensaje-error">{{ error }}</p>
+          }
+        </div>
+
+        @if (!cuentaExistente()) {
+          <p class="pie">
+            <span i18n="@@crearCuenta.conCuenta">¿Ya tienes cuenta?</span>
+            <a routerLink="/ingresar" i18n="@@crearCuenta.ingresar">Inicia sesión</a>
+          </p>
+        }
+      </form>
+    }
+
+    @case ('codigo') {
+      <form
+        class="tarjeta recuadro"
+        [formGroup]="formularioCodigo"
+        (ngSubmit)="enviarCodigo()"
+        novalidate
+        aria-labelledby="crear-cuenta-titulo"
+      >
+        <div class="encabezado">
+          <h1 id="crear-cuenta-titulo" i18n="@@crearCuenta.titulo">Crea tu cuenta</h1>
+          <h2 tabindex="-1" i18n="@@crearCuenta.codigo.titulo">Confirma tu correo</h2>
+          <p class="texto-secundario" i18n="@@crearCuenta.codigo.ayuda">
+            Escribe el código de 6 dígitos que enviamos a <strong>{{ correoCodigo() }}</strong
+            >.
+          </p>
+        </div>
+
+        @switch (avisoCodigo()) {
+          @case ('sinConfirmar') {
+            <output class="aviso" i18n="@@crearCuenta.aviso.sinConfirmar">
+              Tu correo aún no está confirmado. Te enviamos un código nuevo.
+            </output>
+          }
+          @case ('reenviado') {
+            <output class="aviso" i18n="@@crearCuenta.aviso.reenviado">
+              Te enviamos un código nuevo.
+            </output>
+          }
+        }
+
+        <fieldset class="campos" [disabled]="enviando()">
+          <div>
+            <label
+              class="etiqueta-campo"
+              for="crear-cuenta-codigo"
+              i18n="@@crearCuenta.campo.codigo"
+              >Código</label
+            >
+            <input
+              id="crear-cuenta-codigo"
+              class="campo"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              formControlName="codigo"
+              [attr.aria-invalid]="errorCodigo() !== null"
+              aria-describedby="crear-cuenta-codigo-error"
+            />
+            <div id="crear-cuenta-codigo-error">
+              @if (errorCodigo(); as mensaje) {
+                <p class="error-campo">{{ mensaje }}</p>
+              }
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="acciones">
+          <button type="submit" class="boton-primario" [disabled]="enviando()">
+            @if (enviando()) {
+              <ng-container i18n="@@crearCuenta.confirmando">Confirmando…</ng-container>
+            } @else {
+              <ng-container i18n="@@crearCuenta.confirmar">Confirmar</ng-container>
+            }
+          </button>
+          <button
+            type="button"
+            class="boton-secundario"
+            [disabled]="enviando()"
+            (click)="reenviar()"
+            i18n="@@crearCuenta.reenviar"
+          >
+            Reenviar código
+          </button>
+        </div>
+
+        <div class="mensajes" tabindex="-1" aria-live="assertive">
+          @if (error(); as error) {
+            <p class="mensaje-error">{{ error }}</p>
+          }
+        </div>
+      </form>
+    }
+  }
+</div>
