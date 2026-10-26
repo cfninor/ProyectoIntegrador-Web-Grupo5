@@ -369,9 +369,9 @@ describe('PaginaCrearCuenta · un solo envío', () => {
 describe('PaginaCrearCuenta · registro completo (D21)', () => {
   /** Después de confirmar, la cuenta ingresó y no tiene grupo (R2). */
   function alConfirmarIngresa(servicio: ReturnType<typeof sesionFalsa>) {
-    servicio.confirmar.mockImplementation(async () => {
+    servicio.confirmar.mockImplementation(() => {
       servicio.cuentaSinRegistrar.mockReturnValue(CORREO);
-      return OK;
+      return Promise.resolve(OK);
     });
   }
 
@@ -562,9 +562,9 @@ describe('PaginaCrearCuenta · cuenta sin confirmar (D32)', () => {
   it('al confirmar ingresa y sigue a «Tus datos» sin contraseñas, y termina el registro', async () => {
     const servicio = cuentaSinConfirmar();
     const { navegar, usuario } = await renderizar(servicio);
-    servicio.confirmar.mockImplementation(async () => {
+    servicio.confirmar.mockImplementation(() => {
       servicio.cuentaSinRegistrar.mockReturnValue(CORREO);
-      return OK;
+      return Promise.resolve(OK);
     });
     servicio.completarRegistro.mockResolvedValue({ tipo: 'sesion', sesion: CLIENTE });
 

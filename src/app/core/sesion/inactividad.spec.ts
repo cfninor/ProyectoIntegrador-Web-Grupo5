@@ -12,11 +12,12 @@ function preparar(rol: Rol | null) {
   const eventos = new Subject<unknown>();
   const servicio = {
     actual: jest.fn(() => sesion),
-    cerrar: jest.fn(async () => {
+    cerrar: jest.fn(() => {
       sesion = null;
+      return Promise.resolve();
     }),
   };
-  const router = { events: eventos, navigate: jest.fn(async () => true) };
+  const router = { events: eventos, navigate: jest.fn(() => Promise.resolve(true)) };
   TestBed.configureTestingModule({
     providers: [
       { provide: SERVICIO_SESION, useValue: servicio },

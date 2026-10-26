@@ -88,19 +88,20 @@ export function errorIngreso(error: unknown): ErrorIngreso {
   return 'SIN_CONEXION';
 }
 
-const ERRORES_CUENTA: Record<string, ErrorCuenta> = {
-  UsernameExistsException: 'CORREO_EXISTE',
-  InvalidPasswordException: 'CONTRASENA_INVALIDA',
-  CodeMismatchException: 'CODIGO_ERRADO',
-  ExpiredCodeException: 'CODIGO_VENCIDO',
-  LimitExceededException: 'DEMASIADOS_INTENTOS',
-  TooManyRequestsException: 'DEMASIADOS_INTENTOS',
-  TooManyFailedAttemptsException: 'DEMASIADOS_INTENTOS',
-};
+/** Cada código de error de Cognito, con su error de R13. */
+const ERRORES_CUENTA = new Map<string, ErrorCuenta>([
+  ['UsernameExistsException', 'CORREO_EXISTE'],
+  ['InvalidPasswordException', 'CONTRASENA_INVALIDA'],
+  ['CodeMismatchException', 'CODIGO_ERRADO'],
+  ['ExpiredCodeException', 'CODIGO_VENCIDO'],
+  ['LimitExceededException', 'DEMASIADOS_INTENTOS'],
+  ['TooManyRequestsException', 'DEMASIADOS_INTENTOS'],
+  ['TooManyFailedAttemptsException', 'DEMASIADOS_INTENTOS'],
+]);
 
 /** R13: los errores de Cognito al registrar, confirmar o reenviar el código. */
 export function errorCuenta(error: unknown): ResultadoCuenta {
-  return { tipo: 'error', error: ERRORES_CUENTA[nombreError(error)] ?? 'SIN_CONEXION' };
+  return { tipo: 'error', error: ERRORES_CUENTA.get(nombreError(error)) ?? 'SIN_CONEXION' };
 }
 
 /** R13: las respuestas del BFF en `POST /v1/cuenta`. */

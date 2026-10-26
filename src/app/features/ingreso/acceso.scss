@@ -87,6 +87,7 @@ p {
 
 // Aviso informativo (motivo de llegada, código reenviado), no un error.
 .aviso {
+  display: block;
   padding: 12px 16px;
   border: 1px solid #c6d6d3;
   border-radius: var(--radio-control);

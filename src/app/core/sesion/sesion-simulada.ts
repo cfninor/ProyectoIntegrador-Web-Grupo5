@@ -31,27 +31,29 @@ export class SesionSimulada implements ServicioSesion {
     return this.cerrada ? null : this.deConfig();
   }
 
-  async restaurar(): Promise<void> {
+  restaurar(): Promise<void> {
     // Nada que restaurar: la sesión sale de config.json en cada consulta.
+    return Promise.resolve();
   }
 
   /** Con cualquier credencial: el ambiente local no tiene usuarios. */
-  async iniciar(): Promise<ResultadoIngreso> {
+  iniciar(): Promise<ResultadoIngreso> {
     const sesion = this.deConfig();
     if (!sesion) {
-      return { tipo: 'error', error: 'SIN_CONEXION' };
+      return Promise.resolve({ tipo: 'error', error: 'SIN_CONEXION' });
     }
     this.cerrada = false;
-    return { tipo: 'sesion', sesion };
+    return Promise.resolve({ tipo: 'sesion', sesion });
   }
 
-  async cerrar(): Promise<void> {
+  cerrar(): Promise<void> {
     this.cerrada = true;
+    return Promise.resolve();
   }
 
   /** Sin tokens: el BFF local atiende con su propio usuario simulado (R7). */
-  async token(): Promise<string | null> {
-    return null;
+  token(): Promise<string | null> {
+    return Promise.resolve(null);
   }
 
   cuentaSinRegistrar(): string | null {
@@ -66,20 +68,20 @@ export class SesionSimulada implements ServicioSesion {
     return false;
   }
 
-  async registrar(): Promise<ResultadoCuenta> {
-    return NO_DISPONIBLE;
+  registrar(): Promise<ResultadoCuenta> {
+    return Promise.resolve(NO_DISPONIBLE);
   }
 
-  async confirmar(): Promise<ResultadoCuenta> {
-    return NO_DISPONIBLE;
+  confirmar(): Promise<ResultadoCuenta> {
+    return Promise.resolve(NO_DISPONIBLE);
   }
 
-  async reenviarCodigo(): Promise<ResultadoCuenta> {
-    return NO_DISPONIBLE;
+  reenviarCodigo(): Promise<ResultadoCuenta> {
+    return Promise.resolve(NO_DISPONIBLE);
   }
 
-  async completarRegistro(): Promise<ResultadoRegistro> {
-    return NO_DISPONIBLE;
+  completarRegistro(): Promise<ResultadoRegistro> {
+    return Promise.resolve(NO_DISPONIBLE);
   }
 
   private deConfig(): Sesion | null {

@@ -31,6 +31,8 @@ const CONFIG: AppConfig = {
   cognito: { region: 'us-east-1', userPoolId: 'us-east-1_Prueba', clienteId: 'cliente-portal' },
 };
 const CLIENTE_ID = '9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e';
+/** Contraseña de prueba: Amplify está simulado y no llega a ningún user pool. */
+const CONTRASENA = 'Clave-Segura-1';
 const DATOS: DatosCuenta = {
   documento: { tipo: 'CC', numero: '1020304050' },
   nombre: { nombres: 'María Fernanda', apellidos: 'López Rojas' },
@@ -195,11 +197,11 @@ describe('SesionCognito · restaurar al arrancar', () => {
 
 describe('SesionCognito · iniciar', () => {
   it('ingresa con SRP y arma la sesión del ID token', async () => {
-    const resultado = await servicio().iniciar('asesor@solventa.example', 'Clave-Segura-1');
+    const resultado = await servicio().iniciar('asesor@solventa.example', CONTRASENA);
 
     expect(amplify.signIn).toHaveBeenCalledWith({
       username: 'asesor@solventa.example',
-      password: 'Clave-Segura-1',
+      password: CONTRASENA,
     });
     expect(resultado).toEqual({
       tipo: 'sesion',
@@ -313,7 +315,7 @@ describe('SesionCognito · cuenta sin confirmar (D32)', () => {
     amplify.signIn.mockResolvedValue(PASO_CONFIRMAR);
     const sesion = servicio();
 
-    const resultado = await sesion.iniciar('maria@correo.com', 'Clave-Segura-1');
+    const resultado = await sesion.iniciar('maria@correo.com', CONTRASENA);
 
     expect(resultado).toEqual({ tipo: 'error', error: 'SIN_CONFIRMAR' });
     expect(amplify.resendSignUpCode).toHaveBeenCalledWith({ username: 'maria@correo.com' });
@@ -352,14 +354,14 @@ describe('SesionCognito · cuenta sin confirmar (D32)', () => {
     amplify.signIn.mockResolvedValueOnce(PASO_CONFIRMAR).mockResolvedValueOnce(INGRESADO);
     amplify.fetchAuthSession.mockResolvedValue(conTokens(SIN_GRUPO));
     const sesion = servicio();
-    await sesion.iniciar('maria@correo.com', 'Clave-Segura-1');
+    await sesion.iniciar('maria@correo.com', CONTRASENA);
 
     const resultado = await sesion.confirmar('maria@correo.com', '123456');
 
     expect(resultado).toEqual({ tipo: 'ok' });
     expect(amplify.signIn).toHaveBeenLastCalledWith({
       username: 'maria@correo.com',
-      password: 'Clave-Segura-1',
+      password: CONTRASENA,
     });
     expect(sesion.cuentaSinRegistrar()).toBe('maria@correo.com');
     expect(sesion.correoPorConfirmar()).toBeNull();
@@ -394,7 +396,7 @@ describe('SesionCognito · cuenta sin confirmar (D32)', () => {
   it('registrar también deja el correo por confirmar', async () => {
     const sesion = servicio();
 
-    await sesion.registrar('maria@correo.com', 'Clave-Segura-1');
+    await sesion.registrar('maria@correo.com', CONTRASENA);
 
     expect(sesion.correoPorConfirmar()).toBe('maria@correo.com');
   });
@@ -454,11 +456,11 @@ describe('SesionCognito · cerrar y token', () => {
 
 describe('SesionCognito · crear cuenta (D21)', () => {
   it('registra con el correo y la contraseña: Cognito envía el código', async () => {
-    const resultado = await servicio().registrar('maria@correo.com', 'Clave-Segura-1');
+    const resultado = await servicio().registrar('maria@correo.com', CONTRASENA);
 
     expect(amplify.signUp).toHaveBeenCalledWith({
       username: 'maria@correo.com',
-      password: 'Clave-Segura-1',
+      password: CONTRASENA,
       options: { userAttributes: { email: 'maria@correo.com' } },
     });
     expect(resultado).toEqual({ tipo: 'ok' });
@@ -481,7 +483,7 @@ describe('SesionCognito · crear cuenta (D21)', () => {
   it('confirmar ingresa con las credenciales de registrar, sin autoSignIn, y las borra', async () => {
     amplify.fetchAuthSession.mockResolvedValue(conTokens(SIN_GRUPO));
     const sesion = servicio();
-    await sesion.registrar('maria@correo.com', 'Clave-Segura-1');
+    await sesion.registrar('maria@correo.com', CONTRASENA);
 
     const resultado = await sesion.confirmar('maria@correo.com', '123456');
 
@@ -491,7 +493,7 @@ describe('SesionCognito · crear cuenta (D21)', () => {
     });
     expect(amplify.signIn).toHaveBeenCalledWith({
       username: 'maria@correo.com',
-      password: 'Clave-Segura-1',
+      password: CONTRASENA,
     });
     expect(resultado).toEqual({ tipo: 'ok' });
     expect(sesion.cuentaSinRegistrar()).toBe('maria@correo.com');
@@ -576,7 +578,7 @@ describe('SesionCognito · crear cuenta (D21)', () => {
     amplify.fetchAuthSession.mockResolvedValue(conTokens(SIN_GRUPO));
     const sesion = servicio();
 
-    expect(await sesion.registrar('maria@correo.com', 'Clave-Segura-1')).toEqual({ tipo: 'ok' });
+    expect(await sesion.registrar('maria@correo.com', CONTRASENA)).toEqual({ tipo: 'ok' });
     expect(await sesion.confirmar('maria@correo.com', '123456')).toEqual({ tipo: 'ok' });
     expect(sesion.cuentaSinRegistrar()).toBe('maria@correo.com');
     amplify.fetchAuthSession.mockResolvedValue(conTokens(CLIENTE));

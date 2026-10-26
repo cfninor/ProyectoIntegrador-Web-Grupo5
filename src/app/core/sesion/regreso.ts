@@ -20,7 +20,8 @@ function esRutaInterna(volver: string): boolean {
     return false;
   }
   // Ni caracteres de control (un navegador los quita y `/\t/dominio` se vuelve `//dominio`)...
-  if ([...volver].some((caracter) => caracter.charCodeAt(0) < 0x20)) {
+  // Cada carácter del spread es un code point completo: codePointAt(0) siempre tiene valor.
+  if ([...volver].some((caracter) => (caracter.codePointAt(0) as number) < 0x20)) {
     return false;
   }
   // ...ni segmentos que suban de nivel y salgan del portal.

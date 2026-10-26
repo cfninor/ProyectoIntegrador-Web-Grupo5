@@ -26,10 +26,10 @@ function preparar({
   const servicio = {
     actual: jest.fn(() => sesion),
     cuentaSinRegistrar: jest.fn(() => sinRegistrar),
-    token: jest.fn(async () => token),
-    cerrar: jest.fn(async () => undefined),
+    token: jest.fn(() => Promise.resolve(token)),
+    cerrar: jest.fn(() => Promise.resolve()),
   };
-  const router = { navigate: jest.fn(async () => true) };
+  const router = { navigate: jest.fn(() => Promise.resolve(true)) };
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([interceptorToken])),

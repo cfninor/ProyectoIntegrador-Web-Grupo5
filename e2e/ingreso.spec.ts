@@ -40,7 +40,7 @@ const ESPANOL = { correo: 'Correo', contrasena: 'Contraseña', continuar: 'Conti
 const INGLES = { correo: 'Email', contrasena: 'Password', continuar: 'Continue' };
 
 /** Las claves de sessionStorage y localStorage (sin la preferencia de idioma). */
-async function almacenamiento(page: Page) {
+function almacenamiento(page: Page) {
   return page.evaluate((clave) => {
     const claves = (almacen: Storage) =>
       Array.from({ length: almacen.length }, (_, indice) => almacen.key(indice) as string);

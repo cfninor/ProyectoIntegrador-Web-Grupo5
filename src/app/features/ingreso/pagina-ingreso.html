@@ -14,7 +14,7 @@
     </div>
 
     @if (aviso(); as aviso) {
-      <p class="aviso" role="status">{{ aviso }}</p>
+      <output class="aviso">{{ aviso }}</output>
     }
 
     <fieldset class="campos" [disabled]="enviando()">

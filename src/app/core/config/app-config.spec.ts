@@ -28,7 +28,7 @@ describe('provideAppConfig', () => {
     const original = globalThis.fetch;
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ apiBaseUrl: 'https://bff.qa', cognito: { userPoolId: 'p' } }),
+      json: () => Promise.resolve({ apiBaseUrl: 'https://bff.qa', cognito: { userPoolId: 'p' } }),
     }) as unknown as typeof fetch;
     try {
       TestBed.configureTestingModule({ providers: [provideAppConfig()] });

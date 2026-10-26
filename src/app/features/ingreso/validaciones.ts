@@ -7,7 +7,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
  * tipo es `PATRON_DOCUMENTO` de la cotización, que ya sigue esa regla.
  */
 const LETRAS = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
-export const PATRON_NOMBRE = new RegExp(`^[${LETRAS}]+([ '\\-][${LETRAS}]+)*$`);
+export const PATRON_NOMBRE = new RegExp(String.raw`^[${LETRAS}]+([ '\-][${LETRAS}]+)*$`);
 export const LARGO_NOMBRE = { minimo: 2, maximo: 60 };
 export const PATRON_CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 export const PATRON_CELULAR = /^3\d{9}$/;

@@ -123,7 +123,7 @@
               class="campo"
               type="tel"
               inputmode="numeric"
-              autocomplete="tel-national"
+              autocomplete="tel"
               formControlName="celular"
               [attr.aria-invalid]="errorCampo('celular') !== null"
               aria-describedby="crear-cuenta-celular-error"
@@ -298,14 +298,14 @@
 
         @switch (avisoCodigo()) {
           @case ('sinConfirmar') {
-            <p class="aviso" role="status" i18n="@@crearCuenta.aviso.sinConfirmar">
+            <output class="aviso" i18n="@@crearCuenta.aviso.sinConfirmar">
               Tu correo aún no está confirmado. Te enviamos un código nuevo.
-            </p>
+            </output>
           }
           @case ('reenviado') {
-            <p class="aviso" role="status" i18n="@@crearCuenta.aviso.reenviado">
+            <output class="aviso" i18n="@@crearCuenta.aviso.reenviado">
               Te enviamos un código nuevo.
-            </p>
+            </output>
           }
         }
 

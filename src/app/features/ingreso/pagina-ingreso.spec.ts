@@ -193,7 +193,7 @@ describe('PaginaIngreso · mensajes (R9)', () => {
     await renderizar({ motivo });
 
     const texto = screen.getByText(aviso);
-    expect(texto).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('status')).toBe(texto);
     expect(texto).not.toHaveClass('mensaje-error');
   });
 

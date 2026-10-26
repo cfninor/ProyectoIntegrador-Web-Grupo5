@@ -8,10 +8,10 @@ import { ServicioSesion } from '../app/core/sesion/sesion';
 export function sesionFalsa(): jest.Mocked<ServicioSesion> {
   return {
     actual: jest.fn(() => null),
-    restaurar: jest.fn(async () => undefined),
+    restaurar: jest.fn(() => Promise.resolve()),
     iniciar: jest.fn(),
-    cerrar: jest.fn(async () => undefined),
-    token: jest.fn(async () => null),
+    cerrar: jest.fn(() => Promise.resolve()),
+    token: jest.fn(() => Promise.resolve(null)),
     cuentaSinRegistrar: jest.fn(() => null),
     correoPorConfirmar: jest.fn(() => null),
     puedeCrearCuenta: jest.fn(() => true),
