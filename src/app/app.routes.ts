@@ -92,6 +92,17 @@ function perfilRiesgo(path: string): Route {
   };
 }
 
+/** SOLVENTAG5-84: los consentimientos que el cliente ha otorgado. */
+const misAutorizaciones: Route = {
+  path: 'autorizaciones',
+  title: $localize`:@@misAutorizaciones.tituloPestana:Mis autorizaciones · Solventa`,
+  data: datosPagina($localize`:@@misAutorizaciones.titulo:Mis autorizaciones`),
+  loadComponent: () =>
+    import('./features/mis-autorizaciones/pagina-mis-autorizaciones').then(
+      (m) => m.PaginaMisAutorizaciones,
+    ),
+};
+
 /**
  * Grupo de rutas del portal de un rol, dentro del layout del portal y protegido por `rolGuard`.
  * Una pantalla nueva se agrega en `pantallas` de su rol, con su opción en `core/navegacion/menu.ts`.
@@ -108,7 +119,13 @@ function portal(rol: Rol, pantallas: Routes): Route {
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
   portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor'), suscripcion('asesor')]),
-  portal('CLIENTE', [tablero, cotizarCliente, oferta('cliente'), suscripcion('cliente')]),
+  portal('CLIENTE', [
+    tablero,
+    cotizarCliente,
+    oferta('cliente'),
+    suscripcion('cliente'),
+    misAutorizaciones,
+  ]),
   portal('ANALISTA_RIESGO', [
     tablero,
     perfilRiesgo('perfil-riesgo'),

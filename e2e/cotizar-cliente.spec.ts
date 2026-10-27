@@ -97,7 +97,7 @@ test('el cliente entra desde su tablero y cotiza con sus datos de la sesión', a
     page.getByRole('heading', { level: 1, name: 'Cotizar seguro de vida hipotecario' }),
   ).toBeVisible();
   const menu = page.getByRole('navigation', { name: 'Menú principal' });
-  await expect(menu.getByRole('link')).toHaveText(['Tablero', 'Cotizar']);
+  await expect(menu.getByRole('link')).toHaveText(['Tablero', 'Cotizar', 'Mis autorizaciones']);
   await expect(menu.getByRole('link', { name: 'Cotizar' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByLabel('Nombre completo')).toHaveValue('Laura Gómez Pardo');
   await expect(page.getByLabel('Documento de identidad')).toHaveValue('CC ••••5678');

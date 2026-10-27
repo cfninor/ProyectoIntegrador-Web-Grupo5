@@ -39,13 +39,23 @@ function perfilRiesgo(): OpcionMenu {
   };
 }
 
+/** Los consentimientos que el cliente ha otorgado (SOLVENTAG5-84). */
+function misAutorizaciones(): OpcionMenu {
+  return {
+    ruta: `${tableroDe('CLIENTE')}/autorizaciones`,
+    icono: 'escudo',
+    texto: $localize`:@@menu.misAutorizaciones:Mis autorizaciones`,
+    exacta: false,
+  };
+}
+
 /**
  * Opciones del menú de cada rol. Una pantalla nueva agrega aquí su opción y su ruta dentro del
  * grupo de su rol en `app.routes.ts`; no toca los layouts.
  */
 export const MENU: Record<Rol, readonly OpcionMenu[]> = {
   ASESOR: [tablero('ASESOR'), cotizar('ASESOR')],
-  CLIENTE: [tablero('CLIENTE'), cotizar('CLIENTE')],
+  CLIENTE: [tablero('CLIENTE'), cotizar('CLIENTE'), misAutorizaciones()],
   ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO'), perfilRiesgo()],
   OPERACIONES: [tablero('OPERACIONES')],
   SOCIO: [tablero('SOCIO')],
