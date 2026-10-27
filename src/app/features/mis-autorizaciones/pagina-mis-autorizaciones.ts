@@ -37,8 +37,14 @@ type Revocacion =
   | { tipo: 'revocando'; id: string }
   | { tipo: 'error'; id: string; error: ErrorRevocacion };
 
-/** `no-vigente` (409) y `no-encontrado` (404) no se reintentan; `fallo`, sí. */
-type ErrorRevocacion = 'no-vigente' | 'no-encontrado' | 'fallo';
+/** `no-encontrado` (404) no se reintenta; `fallo`, sí. El 409 no es un error: ver `Aviso`. */
+type ErrorRevocacion = 'no-encontrado' | 'fallo';
+
+/**
+ * Lo que pasó con la última revocación (CA4): se hizo, o el consentimiento ya no estaba vigente
+ * (409) y la lista se actualizó con su estado real.
+ */
+type Aviso = 'revocada' | 'ya-no-vigente';
 
 const NINGUNA: Revocacion = { tipo: 'ninguna' };
 
@@ -75,8 +81,8 @@ export class PaginaMisAutorizaciones {
 
   protected readonly carga = signal<Carga>({ tipo: 'cargando' });
   protected readonly revocacion = signal<Revocacion>(NINGUNA);
-  /** El aviso de que la revocación se hizo, hasta la siguiente acción. */
-  protected readonly revocada = signal(false);
+  /** El aviso de la última revocación, hasta la siguiente acción. */
+  protected readonly aviso = signal<Aviso | null>(null);
 
   /** CA1: los vigentes, con lo que cubren, a quién autorizan y sus fechas. */
   protected readonly vigentes = computed(() => this.lista((c) => c.estado === 'VIGENTE'));
@@ -112,7 +118,7 @@ export class PaginaMisAutorizaciones {
 
   /** CA3: antes de revocar se pide confirmación; el foco pasa a la pregunta. */
   protected pedirConfirmacion(id: string): void {
-    this.revocada.set(false);
+    this.aviso.set(null);
     this.revocacion.set({ tipo: 'confirmando', id });
     this.enfocar(`confirmar-${id}`);
   }
@@ -128,12 +134,14 @@ export class PaginaMisAutorizaciones {
     this.revocacion.set({ tipo: 'revocando', id });
     this.revocacionEnCurso = this.api.revocar(id).subscribe({
       next: (revocado) => this.alRevocar(revocado),
-      error: (error: HttpErrorResponse) =>
-        this.revocacion.set({ tipo: 'error', id, error: this.errorDe(error) }),
+      error: (error: HttpErrorResponse) => this.alFallar(id, error),
     });
   }
 
-  /** El consentimiento revocado pasa al historial con el estado que respondió el BFF. */
+  /**
+   * CA4: el consentimiento revocado pasa de una vez al historial con el estado que respondió el
+   * BFF, y la lista se vuelve a consultar para mostrar lo que hay en la base.
+   */
   private alRevocar(revocado: Consentimiento): void {
     const carga = this.carga();
     if (carga.tipo === 'lista') {
@@ -142,16 +150,39 @@ export class PaginaMisAutorizaciones {
       );
       this.carga.set({ tipo: 'lista', consentimientos });
     }
-    this.revocacion.set(NINGUNA);
-    this.revocada.set(true);
-    this.enfocar('mis-autorizaciones-aviso');
+    this.avisar('revocada');
   }
 
-  private errorDe(error: HttpErrorResponse): ErrorRevocacion {
+  /** Si ya no estaba vigente (409), la lista estaba desactualizada: se vuelve a consultar. */
+  private alFallar(id: string, error: HttpErrorResponse): void {
     if (error.status === 409) {
-      return 'no-vigente';
+      this.avisar('ya-no-vigente');
+      return;
     }
-    return error.status === 404 ? 'no-encontrado' : 'fallo';
+    const tipo = error.status === 404 ? 'no-encontrado' : 'fallo';
+    this.revocacion.set({ tipo: 'error', id, error: tipo });
+  }
+
+  private avisar(aviso: Aviso): void {
+    this.revocacion.set(NINGUNA);
+    this.aviso.set(aviso);
+    this.enfocar('mis-autorizaciones-aviso');
+    this.actualizar();
+  }
+
+  /**
+   * Vuelve a consultar sin quitar la lista mientras responde. Si la consulta falla se deja la
+   * lista como está: el aviso ya dice lo que pasó.
+   */
+  private actualizar(): void {
+    if (!this.clienteId) {
+      return;
+    }
+    this.consulta?.unsubscribe();
+    this.consulta = this.api.consultar(this.clienteId).subscribe({
+      next: ({ consentimientos }) => this.carga.set({ tipo: 'lista', consentimientos }),
+      error: () => undefined,
+    });
   }
 
   private enfocar(id: string): void {

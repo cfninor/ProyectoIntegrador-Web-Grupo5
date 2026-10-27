@@ -55,25 +55,30 @@ async function responder(route: Route, status: number, json?: unknown): Promise<
 }
 
 /**
- * Simula el BFF web con los consentimientos del cliente y la revocación. Devuelve cuántas
- * consultas recibió y los consentimientos revocados.
+ * Simula el BFF web con los consentimientos del cliente y la revocación, que cambia lo que
+ * responden las consultas siguientes. Devuelve cuántas consultas recibió y los revocados.
  */
 async function simularBff(
   page: Page,
-  consentimientos: object[],
+  inicial: object[],
 ): Promise<{ consultas: number; revocados: string[] }> {
   const contador = { consultas: 0, revocados: [] as string[] };
+  let consentimientos = inicial;
   await page.route('**/v1/consentimientos/*/revocacion', (route) => {
     const id = route.request().url().split('/').at(-2) ?? '';
-    if (route.request().method() === 'POST') {
-      contador.revocados.push(id);
-    }
-    return responder(route, 200, {
+    const revocado = {
       ...VIGENTE,
       consentimientoId: id,
       estado: 'REVOCADO',
       fechaRevoca: '2026-10-27T15:00:00Z',
-    });
+    };
+    if (route.request().method() === 'POST') {
+      contador.revocados.push(id);
+      consentimientos = consentimientos.map((c) =>
+        (c as { consentimientoId: string }).consentimientoId === id ? revocado : c,
+      );
+    }
+    return responder(route, 200, revocado);
   });
   await page.route('**/config.json', (route) =>
     route.fulfill({
@@ -145,11 +150,37 @@ test('CA3: el cliente revoca un vigente después de confirmarlo', async ({ page 
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await confirmacion.getByRole('button', { name: 'Sí, revocar' }).click();
 
-  await expect(page.getByRole('status')).toHaveText('Revocaste la autorización.');
+  await expect(page.getByRole('status')).toContainText('Revocaste la autorización.');
   expect(bff.revocados).toEqual([VIGENTE.consentimientoId]);
   const historial = page.getByRole('region', { name: 'Revocadas y vencidas' });
   await expect(historial.getByText('Revocada', { exact: true })).toBeVisible();
   await expect(historial.getByText('27/10/2026')).toBeVisible();
+});
+
+test('CA4: tras revocar vuelve a consultar y avisa el plazo de 5 minutos', async ({ page }) => {
+  const bff = await simularBff(page, [VIGENTE]);
+  await page.goto('/cliente/autorizaciones');
+  await expect(page.getByRole('button', { name: 'Revocar autorización' })).toBeVisible();
+  expect(bff.consultas).toBe(1);
+
+  await page.getByRole('button', { name: 'Revocar autorización' }).click();
+  await page.getByRole('button', { name: 'Sí, revocar' }).click();
+
+  await expect(page.getByRole('status')).toHaveText(
+    'Revocaste la autorización. Dejamos de consultar tus datos en máximo 5 minutos y tus pólizas vigentes siguen activas.',
+  );
+  await expect.poll(() => bff.consultas).toBe(2);
+  await expect(
+    page.getByText('No tienes autorizaciones vigentes: Solventa no está consultando tus datos.'),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page
+      .getByRole('region', { name: 'Revocadas y vencidas' })
+      .getByText('Revocada', { exact: true }),
+  ).toBeVisible();
+  expect(bff.consultas).toBe(3);
 });
 
 test('CA1 en inglés', async ({ page }) => {

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
 import { APP_CONFIG } from '../../core/config/app-config';
@@ -251,6 +251,11 @@ describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
       expect(historial().getByText('Revocada el').nextElementSibling).toHaveTextContent(
         '27/10/2026',
       );
+      // CA4: después de revocar se vuelve a consultar.
+      http.expectOne(URL_CONSENTIMIENTOS).flush({
+        clienteId: CLIENTE_ID,
+        consentimientos: [REVOCADO_AHORA],
+      });
     });
 
     it('si falla lo dice y deja reintentar', async () => {
@@ -266,21 +271,24 @@ describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
       await usuario.click(confirmacion().getByRole('button', { name: 'Sí, revocar' }));
       http.expectOne(URL_REVOCAR).flush(REVOCADO_AHORA);
       expect(await screen.findByRole('status')).toHaveTextContent('Revocaste la autorización.');
+      http.expectOne(URL_CONSENTIMIENTOS).flush({
+        clienteId: CLIENTE_ID,
+        consentimientos: [REVOCADO_AHORA],
+      });
     });
 
-    it.each([
-      [409, 'Esta autorización ya no estaba vigente.'],
-      [404, 'No encontramos esta autorización.'],
-    ])('con %s lo dice y no deja reintentar', async (estado, mensaje) => {
+    it('con 404 lo dice y no deja reintentar', async () => {
       const { http, usuario } = await cargar([VIGENTE]);
       await usuario.click(screen.getByRole('button', { name: 'Revocar autorización' }));
       await usuario.click(confirmacion().getByRole('button', { name: 'Sí, revocar' }));
 
       http
         .expectOne(URL_REVOCAR)
-        .flush({ codigo: 'X', detalle: 'x' }, { status: estado, statusText: '' });
+        .flush({ codigo: 'X', detalle: 'x' }, { status: 404, statusText: '' });
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(mensaje);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'No encontramos esta autorización.',
+      );
       expect(confirmacion().queryByRole('button', { name: 'Sí, revocar' })).not.toBeInTheDocument();
       expect(confirmacion().getByRole('button', { name: 'Cancelar' })).toBeEnabled();
     });
@@ -295,6 +303,84 @@ describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
 
       expect(screen.getAllByRole('group', { name: PREGUNTA })).toHaveLength(1);
       expect(screen.getAllByRole('button', { name: 'Revocar autorización' })).toHaveLength(1);
+    });
+  });
+
+  describe('CA4: tras revocar, la consulta refleja el nuevo estado', () => {
+    async function revocar(respuesta: { status: number; cuerpo: unknown }) {
+      const contexto = await cargar([VIGENTE]);
+      await contexto.usuario.click(screen.getByRole('button', { name: 'Revocar autorización' }));
+      await contexto.usuario.click(confirmacion().getByRole('button', { name: 'Sí, revocar' }));
+      contexto.http
+        .expectOne(URL_REVOCAR)
+        .flush(respuesta.cuerpo, { status: respuesta.status, statusText: '' });
+      return contexto;
+    }
+
+    it('vuelve a consultar y muestra lo que responde el BFF, con el aviso de los 5 minutos', async () => {
+      const { http } = await revocar({ status: 200, cuerpo: REVOCADO_AHORA });
+
+      const aviso = await screen.findByRole('status');
+      expect(aviso).toHaveTextContent(
+        'Revocaste la autorización. Dejamos de consultar tus datos en máximo 5 minutos y tus pólizas vigentes siguen activas.',
+      );
+      await waitFor(() => expect(aviso).toHaveFocus());
+      const consulta = http.expectOne(URL_CONSENTIMIENTOS);
+      expect(consulta.request.method).toBe('GET');
+      consulta.flush({
+        clienteId: CLIENTE_ID,
+        consentimientos: [{ ...REVOCADO_AHORA, fechaRevoca: '2026-10-27T15:00:05Z' }, REVOCADO],
+      });
+
+      await waitFor(() => expect(screen.getAllByText('Revocada el')).toHaveLength(2));
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+
+    it('si la nueva consulta falla deja la lista con el revocado y el aviso', async () => {
+      const { http } = await revocar({ status: 200, cuerpo: REVOCADO_AHORA });
+      await screen.findByRole('status');
+
+      http.expectOne(URL_CONSENTIMIENTOS).flush(null, { status: 503, statusText: '' });
+
+      expect(screen.getByRole('status')).toHaveTextContent('Revocaste la autorización.');
+      expect(historial().getByText('Revocada el')).toBeInTheDocument();
+      expect(
+        screen.queryByText('No pudimos cargar tus autorizaciones. Intenta de nuevo.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('con 409 (ya no estaba vigente) lo avisa y actualiza la lista con su estado real', async () => {
+      const { http } = await revocar({
+        status: 409,
+        cuerpo: { codigo: 'CONSENTIMIENTO_NO_VIGENTE', detalle: 'x' },
+      });
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Esa autorización ya no estaba vigente. Actualizamos la lista con su estado.',
+      );
+      http.expectOne(URL_CONSENTIMIENTOS).flush({
+        clienteId: CLIENTE_ID,
+        consentimientos: [{ ...VIGENTE, estado: 'VENCIDO' }],
+      });
+
+      expect(await screen.findByText('Venció el')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: PREGUNTA })).not.toBeInTheDocument();
+    });
+
+    it('abrir otra confirmación quita el aviso', async () => {
+      const otro = { ...VIGENTE, consentimientoId: '3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f' };
+      const { http, usuario } = await cargar([VIGENTE, otro]);
+      await usuario.click(screen.getAllByRole('button', { name: 'Revocar autorización' })[0]);
+      await usuario.click(confirmacion().getByRole('button', { name: 'Sí, revocar' }));
+      http.expectOne(URL_REVOCAR).flush(REVOCADO_AHORA);
+      await screen.findByRole('status');
+      http
+        .expectOne(URL_CONSENTIMIENTOS)
+        .flush({ clienteId: CLIENTE_ID, consentimientos: [otro, REVOCADO_AHORA] });
+
+      await usuario.click(await screen.findByRole('button', { name: 'Revocar autorización' }));
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 });

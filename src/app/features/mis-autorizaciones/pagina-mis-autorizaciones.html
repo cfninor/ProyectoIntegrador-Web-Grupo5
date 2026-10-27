@@ -34,15 +34,18 @@
 </div>
 
 @if (carga().tipo === 'lista') {
-  @if (revocada()) {
-    <p
-      id="mis-autorizaciones-aviso"
-      class="tarjeta aviso"
-      role="status"
-      tabindex="-1"
-      i18n="@@misAutorizaciones.revocada"
-    >
-      Revocaste la autorización.
+  @if (aviso(); as aviso) {
+    <p id="mis-autorizaciones-aviso" class="tarjeta aviso" role="status" tabindex="-1">
+      @if (aviso === 'revocada') {
+        <ng-container i18n="@@misAutorizaciones.revocada"
+          >Revocaste la autorización. Dejamos de consultar tus datos en máximo 5 minutos y tus
+          pólizas vigentes siguen activas.</ng-container
+        >
+      } @else {
+        <ng-container i18n="@@misAutorizaciones.yaNoVigente"
+          >Esa autorización ya no estaba vigente. Actualizamos la lista con su estado.</ng-container
+        >
+      }
     </p>
   }
   <section class="grupo" aria-labelledby="mis-autorizaciones-vigentes">
@@ -106,11 +109,6 @@
             @if (revocacion.tipo === 'error') {
               <p class="mensaje-error" role="alert">
                 @switch (revocacion.error) {
-                  @case ('no-vigente') {
-                    <ng-container i18n="@@misAutorizaciones.error.noVigente"
-                      >Esta autorización ya no estaba vigente.</ng-container
-                    >
-                  }
                   @case ('no-encontrado') {
                     <ng-container i18n="@@misAutorizaciones.error.noEncontrado"
                       >No encontramos esta autorización.</ng-container
