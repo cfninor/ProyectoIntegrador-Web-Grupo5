@@ -34,6 +34,17 @@
 </div>
 
 @if (carga().tipo === 'lista') {
+  @if (revocada()) {
+    <p
+      id="mis-autorizaciones-aviso"
+      class="tarjeta aviso"
+      role="status"
+      tabindex="-1"
+      i18n="@@misAutorizaciones.revocada"
+    >
+      Revocaste la autorización.
+    </p>
+  }
   <section class="grupo" aria-labelledby="mis-autorizaciones-vigentes">
     <h2 id="mis-autorizaciones-vigentes" i18n="@@misAutorizaciones.vigentes.titulo">Vigentes</h2>
     @for (consentimiento of vigentes(); track consentimiento.consentimientoId) {
@@ -64,6 +75,84 @@
             }
           </ul>
         </div>
+        @let id = consentimiento.consentimientoId;
+        @let revocacion = revocacionDe(id);
+        @if (revocacion.tipo === 'ninguna') {
+          <div class="acciones">
+            <button
+              [id]="'revocar-' + id"
+              type="button"
+              class="boton-secundario boton-revocar"
+              (click)="pedirConfirmacion(id)"
+              i18n="@@misAutorizaciones.revocar"
+            >
+              Revocar autorización
+            </button>
+          </div>
+        } @else {
+          <div class="confirmacion" role="group" [attr.aria-labelledby]="'confirmar-' + id">
+            <p
+              [id]="'confirmar-' + id"
+              class="pregunta"
+              tabindex="-1"
+              i18n="@@misAutorizaciones.confirmar.pregunta"
+            >
+              ¿Revocar esta autorización?
+            </p>
+            <p class="texto-secundario" i18n="@@misAutorizaciones.confirmar.texto">
+              Solventa dejará de consultar tus datos y tus pólizas vigentes siguen activas. Para
+              volver a autorizar, tu asesor te enviará una nueva solicitud.
+            </p>
+            @if (revocacion.tipo === 'error') {
+              <p class="mensaje-error" role="alert">
+                @switch (revocacion.error) {
+                  @case ('no-vigente') {
+                    <ng-container i18n="@@misAutorizaciones.error.noVigente"
+                      >Esta autorización ya no estaba vigente.</ng-container
+                    >
+                  }
+                  @case ('no-encontrado') {
+                    <ng-container i18n="@@misAutorizaciones.error.noEncontrado"
+                      >No encontramos esta autorización.</ng-container
+                    >
+                  }
+                  @default {
+                    <ng-container i18n="@@misAutorizaciones.error.revocar"
+                      >No pudimos revocar la autorización. Intenta de nuevo.</ng-container
+                    >
+                  }
+                }
+              </p>
+            }
+            <div class="acciones">
+              @if (revocacion.tipo !== 'error' || revocacion.error === 'fallo') {
+                <button
+                  type="button"
+                  class="boton-primario boton-peligro"
+                  [disabled]="revocacion.tipo === 'revocando'"
+                  (click)="revocar(id)"
+                >
+                  @if (revocacion.tipo === 'revocando') {
+                    <ng-container i18n="@@misAutorizaciones.confirmar.revocando"
+                      >Revocando…</ng-container
+                    >
+                  } @else {
+                    <ng-container i18n="@@misAutorizaciones.confirmar.si">Sí, revocar</ng-container>
+                  }
+                </button>
+              }
+              <button
+                type="button"
+                class="boton-secundario"
+                [disabled]="revocacion.tipo === 'revocando'"
+                (click)="cancelar(id)"
+                i18n="@@misAutorizaciones.confirmar.cancelar"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        }
       </article>
     } @empty {
       <p class="tarjeta texto-secundario" i18n="@@misAutorizaciones.vigentes.ninguna">

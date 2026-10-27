@@ -39,4 +39,15 @@ describe('MisAutorizacionesApi', () => {
 
     http.expectOne('http://bff.prueba/v1/clientes/a%2Fb/consentimientos').flush({});
   });
+
+  it('revoca por POST /v1/consentimientos/{consentimientoId}/revocacion', async () => {
+    const respuesta = firstValueFrom(api.revocar('k-1'));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/consentimientos/k-1/revocacion');
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toBeNull();
+    peticion.flush({ consentimientoId: 'k-1', estado: 'REVOCADO' });
+
+    await expect(respuesta).resolves.toEqual({ consentimientoId: 'k-1', estado: 'REVOCADO' });
+  });
 });

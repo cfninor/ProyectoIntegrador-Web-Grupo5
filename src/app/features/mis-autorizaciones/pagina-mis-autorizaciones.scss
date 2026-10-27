@@ -66,3 +66,41 @@ h3 {
     margin-top: 4px;
   }
 }
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.boton-revocar {
+  color: var(--error);
+}
+
+.boton-peligro {
+  border-color: var(--error);
+  background: var(--error);
+
+  &:hover:not(:disabled) {
+    border-color: var(--error);
+    background: var(--error);
+    filter: brightness(0.9);
+  }
+}
+
+.confirmacion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-control);
+}
+
+.pregunta {
+  font-weight: 600;
+}
+
+.aviso {
+  font-size: 14px;
+}

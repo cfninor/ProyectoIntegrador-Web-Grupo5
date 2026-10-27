@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 
 import { APP_CONFIG } from '../../core/config/app-config';
 import { provideSesionSimulada } from '../../core/sesion/sesion-simulada';
@@ -88,5 +89,16 @@ describe('PaginaMisAutorizaciones · en inglés', () => {
     expect(historial.getByText('Revoked on').nextElementSibling).toHaveTextContent('Jun 15, 2026');
     expect(historial.getByText('Expired')).toBeInTheDocument();
     expect(historial.getByText('Expired on').nextElementSibling).toHaveTextContent('Oct 9, 2027');
+  });
+
+  it('CA3: la confirmación en inglés', async () => {
+    await cargar([VIGENTE]);
+    const usuario = userEvent.setup();
+
+    await usuario.click(await screen.findByRole('button', { name: 'Revoke authorization' }));
+
+    const confirmacion = within(screen.getByRole('group', { name: 'Revoke this authorization?' }));
+    expect(confirmacion.getByRole('button', { name: 'Yes, revoke' })).toBeInTheDocument();
+    expect(confirmacion.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 });

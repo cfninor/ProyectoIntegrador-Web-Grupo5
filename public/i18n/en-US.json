@@ -362,6 +362,16 @@
     "misAutorizaciones.dato.destinatarioHistorial": " Who you authorized ",
     "misAutorizaciones.dato.revocado": "Revoked on",
     "misAutorizaciones.dato.vencio": "Expired on",
-    "misAutorizaciones.dato.cubria": "Data it covered"
+    "misAutorizaciones.dato.cubria": "Data it covered",
+    "misAutorizaciones.revocada": " You revoked the authorization. ",
+    "misAutorizaciones.revocar": " Revoke authorization ",
+    "misAutorizaciones.confirmar.pregunta": " Revoke this authorization? ",
+    "misAutorizaciones.confirmar.texto": " Solventa will stop consulting your data and your active policies remain in force. To authorize again, your advisor will send you a new request. ",
+    "misAutorizaciones.error.noVigente": "This authorization was no longer active.",
+    "misAutorizaciones.error.noEncontrado": "We couldn't find this authorization.",
+    "misAutorizaciones.error.revocar": "We couldn't revoke the authorization. Try again.",
+    "misAutorizaciones.confirmar.revocando": "Revoking…",
+    "misAutorizaciones.confirmar.si": "Yes, revoke",
+    "misAutorizaciones.confirmar.cancelar": " Cancel "
   }
 }
