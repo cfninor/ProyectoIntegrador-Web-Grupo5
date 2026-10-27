@@ -338,6 +338,21 @@
     "crearCuenta.error.contrasena.requerido": "Enter a password.",
     "crearCuenta.error.confirmacion.requerido": "Enter the password again.",
     "crearCuenta.error.confirmacion.distinta": "The passwords don't match.",
-    "ingreso.aviso.confirmada": "Your email is confirmed. Sign in with your password."
+    "ingreso.aviso.confirmada": "Your email is confirmed. Sign in with your password.",
+    "misAutorizaciones.tituloPestana": "My authorizations · Solventa",
+    "misAutorizaciones.titulo": "My authorizations",
+    "menu.misAutorizaciones": "My authorizations",
+    "autorizacion.destinatario.solventa": "Solventa",
+    "misAutorizaciones.intro": " These are the authorizations you have given Solventa to consult your data.\n",
+    "misAutorizaciones.cargando": " Loading your authorizations… ",
+    "misAutorizaciones.sinCliente": " Your account does not have a registered client yet. Finish your registration to see your authorizations. ",
+    "misAutorizaciones.error": " We couldn't load your authorizations. Try again. ",
+    "misAutorizaciones.reintentar": " Try again ",
+    "misAutorizaciones.vigentes.titulo": "Active",
+    "misAutorizaciones.estado.vigente": "Active",
+    "misAutorizaciones.dato.destinatario": "Who you authorize",
+    "misAutorizaciones.dato.otorgado": "Granted on",
+    "misAutorizaciones.dato.vence": "Expires on",
+    "misAutorizaciones.dato.cubre": "Data it covers"
   }
 }

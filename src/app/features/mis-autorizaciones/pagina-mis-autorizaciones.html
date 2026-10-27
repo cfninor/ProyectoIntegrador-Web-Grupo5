@@ -1,0 +1,70 @@
+<p class="texto-secundario" i18n="@@misAutorizaciones.intro">
+  Estas son las autorizaciones que has dado para que Solventa consulte tus datos.
+</p>
+
+<div aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <p class="tarjeta estado-carga" i18n="@@misAutorizaciones.cargando">
+        Cargando tus autorizaciones…
+      </p>
+    }
+    @case ('sin-cliente') {
+      <p class="tarjeta estado-carga mensaje-error" i18n="@@misAutorizaciones.sinCliente">
+        Tu cuenta todavía no tiene un cliente registrado. Termina tu registro para ver tus
+        autorizaciones.
+      </p>
+    }
+    @case ('error') {
+      <div class="tarjeta estado-carga">
+        <p class="mensaje-error" i18n="@@misAutorizaciones.error">
+          No pudimos cargar tus autorizaciones. Intenta de nuevo.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="cargar()"
+          i18n="@@misAutorizaciones.reintentar"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+  }
+</div>
+
+@if (carga().tipo === 'lista') {
+  <section class="grupo" aria-labelledby="mis-autorizaciones-vigentes">
+    <h2 id="mis-autorizaciones-vigentes" i18n="@@misAutorizaciones.vigentes.titulo">Vigentes</h2>
+    @for (consentimiento of vigentes(); track consentimiento.consentimientoId) {
+      <article class="tarjeta consentimiento" [attr.aria-label]="consentimiento.finalidad">
+        <div class="encabezado">
+          <h3>{{ consentimiento.finalidad }}</h3>
+          <span class="chip chip-verde" i18n="@@misAutorizaciones.estado.vigente">Vigente</span>
+        </div>
+        <dl class="datos">
+          <div>
+            <dt class="etiqueta" i18n="@@misAutorizaciones.dato.destinatario">A quién autorizas</dt>
+            <dd>{{ consentimiento.destinatario }}</dd>
+          </div>
+          <div>
+            <dt class="etiqueta" i18n="@@misAutorizaciones.dato.otorgado">Otorgada el</dt>
+            <dd>{{ consentimiento.otorgado }}</dd>
+          </div>
+          <div>
+            <dt class="etiqueta" i18n="@@misAutorizaciones.dato.vence">Vence el</dt>
+            <dd>{{ consentimiento.vence }}</dd>
+          </div>
+        </dl>
+        <div>
+          <h4 class="etiqueta" i18n="@@misAutorizaciones.dato.cubre">Datos que cubre</h4>
+          <ul class="cubre">
+            @for (dato of consentimiento.datos; track dato) {
+              <li>{{ dato }}</li>
+            }
+          </ul>
+        </div>
+      </article>
+    }
+  </section>
+}

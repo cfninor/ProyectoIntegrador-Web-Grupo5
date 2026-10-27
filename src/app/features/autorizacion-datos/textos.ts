@@ -59,6 +59,11 @@ export const TEXTOS_DESTINATARIO: Record<Destinatario, string> = {
   SOLVENTA: $localize`:@@autorizacion.condiciones.destinatario.solventa:Solventa usa el resultado para calcular tu prima. Tu asesor ve el estado de la autorización y la prima, no tus datos`,
 };
 
+/** A quién autoriza el consentimiento, en una palabra, para «Mis autorizaciones» (SOLVENTAG5-84). */
+export const TEXTOS_NOMBRE_DESTINATARIO: Record<Destinatario, string> = {
+  SOLVENTA: $localize`:@@autorizacion.destinatario.solventa:Solventa`,
+};
+
 export const TEXTOS_BASE_LEGAL: Record<BaseLegal, string> = {
   LEY_1581_2012: $localize`:@@autorizacion.condiciones.baseLegal.ley15812012:Ley 1581 de 2012`,
   DECRETO_1297_2022: $localize`:@@autorizacion.condiciones.baseLegal.decreto12972022:Decreto 1297 de 2022`,
