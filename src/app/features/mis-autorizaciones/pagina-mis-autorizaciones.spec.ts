@@ -71,6 +71,14 @@ async function cargar(consentimientos: Consentimiento[]) {
 }
 
 const vigentes = () => within(screen.getByRole('region', { name: 'Vigentes' }));
+const historial = () => within(screen.getByRole('region', { name: 'Revocadas y vencidas' }));
+const VENCIDO: Consentimiento = {
+  ...VIGENTE,
+  consentimientoId: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+  estado: 'VENCIDO',
+  fechaOtorga: '2025-01-20T13:00:00Z',
+  fechaVencimiento: '2026-01-20T13:00:00Z',
+};
 
 describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
   it('consulta los consentimientos del cliente de la sesión mientras muestra que carga', async () => {
@@ -106,6 +114,44 @@ describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
 
     expect(vigentes().getAllByRole('article')).toHaveLength(1);
     expect(vigentes().getByText('Otorgada el').nextElementSibling).toHaveTextContent('09/10/2026');
+  });
+
+  it('CA2: los revocados y los vencidos van aparte, cada uno con su estado y su fecha', async () => {
+    await cargar([VIGENTE, REVOCADO, VENCIDO]);
+
+    const [revocado, vencido] = historial().getAllByRole('article');
+    expect(within(revocado).getByText('Revocada')).toHaveClass('chip');
+    expect(within(revocado).getByText('Otorgada el').nextElementSibling).toHaveTextContent(
+      '02/03/2026',
+    );
+    expect(within(revocado).getByText('Revocada el').nextElementSibling).toHaveTextContent(
+      '15/06/2026',
+    );
+    expect(within(revocado).queryByText('Venció el')).not.toBeInTheDocument();
+    expect(within(vencido).getByText('Vencida')).toHaveClass('chip');
+    expect(within(vencido).getByText('Venció el').nextElementSibling).toHaveTextContent(
+      '20/01/2026',
+    );
+    expect(within(vencido).queryByText('Revocada el')).not.toBeInTheDocument();
+    expect(within(vencido).getAllByRole('listitem')).toHaveLength(3);
+    expect(vigentes().queryByText('Revocada')).not.toBeInTheDocument();
+  });
+
+  it('CA2: sin vigentes lo dice y muestra el historial', async () => {
+    await cargar([REVOCADO]);
+
+    expect(
+      vigentes().getByText(
+        'No tienes autorizaciones vigentes: Solventa no está consultando tus datos.',
+      ),
+    ).toBeInTheDocument();
+    expect(historial().getAllByRole('article')).toHaveLength(1);
+  });
+
+  it('CA2: sin revocados ni vencidos no muestra el historial', async () => {
+    await cargar([VIGENTE]);
+
+    expect(screen.queryByRole('region', { name: 'Revocadas y vencidas' })).not.toBeInTheDocument();
   });
 
   it('las fechas van en hora de Bogotá: lo otorgado a las 2 a. m. UTC es del día anterior', async () => {

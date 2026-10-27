@@ -29,6 +29,14 @@ h3 {
   gap: 12px;
 }
 
+.inactivo {
+  h3,
+  dd,
+  .cubre {
+    color: var(--on-surface-variant);
+  }
+}
+
 .encabezado {
   display: flex;
   flex-wrap: wrap;

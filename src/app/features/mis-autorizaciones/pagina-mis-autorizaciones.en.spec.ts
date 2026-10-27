@@ -70,4 +70,23 @@ describe('PaginaMisAutorizaciones · en inglés', () => {
     expect(vigentes.getByText('Granted on').nextElementSibling).toHaveTextContent('Oct 9, 2026');
     expect(vigentes.getByText('Expires on').nextElementSibling).toHaveTextContent('Oct 9, 2027');
   });
+
+  it('CA2: el revocado y el vencido en inglés', async () => {
+    await cargar([
+      VIGENTE,
+      {
+        ...VIGENTE,
+        consentimientoId: 'r-1',
+        estado: 'REVOCADO',
+        fechaRevoca: '2026-06-15T16:30:00Z',
+      },
+      { ...VIGENTE, consentimientoId: 'v-1', estado: 'VENCIDO' },
+    ]);
+
+    const historial = within(await screen.findByRole('region', { name: 'Revoked and expired' }));
+    expect(historial.getByText('Revoked')).toBeInTheDocument();
+    expect(historial.getByText('Revoked on').nextElementSibling).toHaveTextContent('Jun 15, 2026');
+    expect(historial.getByText('Expired')).toBeInTheDocument();
+    expect(historial.getByText('Expired on').nextElementSibling).toHaveTextContent('Oct 9, 2027');
+  });
 });

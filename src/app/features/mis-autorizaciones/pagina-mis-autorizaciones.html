@@ -65,6 +65,69 @@
           </ul>
         </div>
       </article>
+    } @empty {
+      <p class="tarjeta texto-secundario" i18n="@@misAutorizaciones.vigentes.ninguna">
+        No tienes autorizaciones vigentes: Solventa no está consultando tus datos.
+      </p>
     }
   </section>
+
+  @if (historial().length > 0) {
+    <section class="grupo" aria-labelledby="mis-autorizaciones-historial">
+      <h2 id="mis-autorizaciones-historial" i18n="@@misAutorizaciones.historial.titulo">
+        Revocadas y vencidas
+      </h2>
+      <p class="texto-secundario" i18n="@@misAutorizaciones.historial.texto">
+        Ya no permiten consultar tus datos. Las guardamos como registro de lo que autorizaste.
+      </p>
+      @for (consentimiento of historial(); track consentimiento.consentimientoId) {
+        <article
+          class="tarjeta consentimiento inactivo"
+          [attr.aria-label]="consentimiento.finalidad"
+        >
+          <div class="encabezado">
+            <h3>{{ consentimiento.finalidad }}</h3>
+            @if (consentimiento.estado === 'REVOCADO') {
+              <span class="chip chip-gris" i18n="@@misAutorizaciones.estado.revocado"
+                >Revocada</span
+              >
+            } @else {
+              <span class="chip chip-ambar" i18n="@@misAutorizaciones.estado.vencido">Vencida</span>
+            }
+          </div>
+          <dl class="datos">
+            <div>
+              <dt class="etiqueta" i18n="@@misAutorizaciones.dato.destinatarioHistorial">
+                A quién autorizaste
+              </dt>
+              <dd>{{ consentimiento.destinatario }}</dd>
+            </div>
+            <div>
+              <dt class="etiqueta" i18n="@@misAutorizaciones.dato.otorgado">Otorgada el</dt>
+              <dd>{{ consentimiento.otorgado }}</dd>
+            </div>
+            @if (consentimiento.revocado) {
+              <div>
+                <dt class="etiqueta" i18n="@@misAutorizaciones.dato.revocado">Revocada el</dt>
+                <dd>{{ consentimiento.revocado }}</dd>
+              </div>
+            } @else {
+              <div>
+                <dt class="etiqueta" i18n="@@misAutorizaciones.dato.vencio">Venció el</dt>
+                <dd>{{ consentimiento.vence }}</dd>
+              </div>
+            }
+          </dl>
+          <div>
+            <h4 class="etiqueta" i18n="@@misAutorizaciones.dato.cubria">Datos que cubría</h4>
+            <ul class="cubre">
+              @for (dato of consentimiento.datos; track dato) {
+                <li>{{ dato }}</li>
+              }
+            </ul>
+          </div>
+        </article>
+      }
+    </section>
+  }
 }

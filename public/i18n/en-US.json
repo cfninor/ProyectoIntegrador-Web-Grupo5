@@ -353,6 +353,15 @@
     "misAutorizaciones.dato.destinatario": "Who you authorize",
     "misAutorizaciones.dato.otorgado": "Granted on",
     "misAutorizaciones.dato.vence": "Expires on",
-    "misAutorizaciones.dato.cubre": "Data it covers"
+    "misAutorizaciones.dato.cubre": "Data it covers",
+    "misAutorizaciones.vigentes.ninguna": " You have no active authorizations: Solventa is not consulting your data. ",
+    "misAutorizaciones.historial.titulo": " Revoked and expired ",
+    "misAutorizaciones.historial.texto": " They no longer allow consulting your data. We keep them as a record of what you authorized. ",
+    "misAutorizaciones.estado.revocado": "Revoked",
+    "misAutorizaciones.estado.vencido": "Expired",
+    "misAutorizaciones.dato.destinatarioHistorial": " Who you authorized ",
+    "misAutorizaciones.dato.revocado": "Revoked on",
+    "misAutorizaciones.dato.vencio": "Expired on",
+    "misAutorizaciones.dato.cubria": "Data it covered"
   }
 }

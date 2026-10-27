@@ -25,6 +25,21 @@ const VIGENTE = {
   fechaOtorga: '2026-10-09T15:02:11Z',
   fechaVencimiento: '2027-10-09T15:02:11Z',
 };
+const REVOCADO = {
+  ...VIGENTE,
+  consentimientoId: '1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b',
+  estado: 'REVOCADO',
+  fechaOtorga: '2026-03-02T14:00:00Z',
+  fechaVencimiento: '2027-03-02T14:00:00Z',
+  fechaRevoca: '2026-06-15T16:30:00Z',
+};
+const VENCIDO = {
+  ...VIGENTE,
+  consentimientoId: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+  estado: 'VENCIDO',
+  fechaOtorga: '2025-01-20T13:00:00Z',
+  fechaVencimiento: '2026-01-20T13:00:00Z',
+};
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST',
@@ -82,6 +97,21 @@ test('CA1: el cliente abre «Mis autorizaciones» desde el menú y ve sus vigent
     'Estabilidad de ingresos',
   ]);
   expect(bff.consultas).toBe(1);
+});
+
+test('CA2: los revocados y los vencidos se muestran aparte de los vigentes', async ({ page }) => {
+  await simularBff(page, [VIGENTE, REVOCADO, VENCIDO]);
+
+  await page.goto('/cliente/autorizaciones');
+
+  await expect(page.getByRole('region', { name: 'Vigentes' }).getByRole('article')).toHaveCount(1);
+  const historial = page.getByRole('region', { name: 'Revocadas y vencidas' });
+  const tarjetas = historial.getByRole('article');
+  await expect(tarjetas).toHaveCount(2);
+  await expect(tarjetas.nth(0).getByText('Revocada', { exact: true })).toBeVisible();
+  await expect(tarjetas.nth(0).getByText('15/06/2026')).toBeVisible();
+  await expect(tarjetas.nth(1).getByText('Vencida', { exact: true })).toBeVisible();
+  await expect(tarjetas.nth(1).getByText('20/01/2026')).toBeVisible();
 });
 
 test('CA1 en inglés', async ({ page }) => {

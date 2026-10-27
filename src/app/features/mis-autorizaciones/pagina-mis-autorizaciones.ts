@@ -12,7 +12,7 @@ import { Subscription } from 'rxjs';
 import { fechaBogota } from '../../core/idioma/formatos';
 import { idiomaDe } from '../../core/idioma/idioma';
 import { SERVICIO_SESION } from '../../core/sesion/sesion';
-import { Consentimiento } from '../autorizacion-datos/modelos';
+import { Consentimiento, EstadoConsentimiento } from '../autorizacion-datos/modelos';
 import {
   TEXTOS_DATO,
   TEXTOS_FINALIDAD,
@@ -29,11 +29,14 @@ type Carga =
 
 interface ConsentimientoVista {
   consentimientoId: string;
+  estado: EstadoConsentimiento;
   finalidad: string;
   destinatario: string;
   datos: string[];
   otorgado: string;
   vence: string;
+  /** Solo si está revocado. */
+  revocado?: string;
 }
 
 /**
@@ -56,13 +59,9 @@ export class PaginaMisAutorizaciones {
   protected readonly carga = signal<Carga>({ tipo: 'cargando' });
 
   /** CA1: los vigentes, con lo que cubren, a quién autorizan y sus fechas. */
-  protected readonly vigentes = computed(() => {
-    const carga = this.carga();
-    if (carga.tipo !== 'lista') {
-      return [];
-    }
-    return carga.consentimientos.filter((c) => c.estado === 'VIGENTE').map((c) => this.vista(c));
-  });
+  protected readonly vigentes = computed(() => this.lista((c) => c.estado === 'VIGENTE'));
+  /** CA2: los revocados y los vencidos, aparte de los vigentes y en el orden en que llegan. */
+  protected readonly historial = computed(() => this.lista((c) => c.estado !== 'VIGENTE'));
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.consulta?.unsubscribe());
@@ -82,14 +81,24 @@ export class PaginaMisAutorizaciones {
     });
   }
 
+  private lista(incluir: (c: Consentimiento) => boolean): ConsentimientoVista[] {
+    const carga = this.carga();
+    if (carga.tipo !== 'lista') {
+      return [];
+    }
+    return carga.consentimientos.filter(incluir).map((c) => this.vista(c));
+  }
+
   private vista(c: Consentimiento): ConsentimientoVista {
     return {
       consentimientoId: c.consentimientoId,
+      estado: c.estado,
       finalidad: texto(TEXTOS_FINALIDAD, c.finalidad),
       destinatario: texto(TEXTOS_NOMBRE_DESTINATARIO, c.destinatario),
       datos: c.alcance.map((dato) => TEXTOS_DATO[dato]?.nombre ?? dato),
       otorgado: fechaBogota(c.fechaOtorga, this.idioma),
       vence: fechaBogota(c.fechaVencimiento, this.idioma),
+      revocado: c.fechaRevoca ? fechaBogota(c.fechaRevoca, this.idioma) : undefined,
     };
   }
 }
