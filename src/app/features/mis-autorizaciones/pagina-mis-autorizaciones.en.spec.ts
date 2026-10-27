@@ -101,4 +101,13 @@ describe('PaginaMisAutorizaciones · en inglés', () => {
     expect(confirmacion.getByRole('button', { name: 'Yes, revoke' })).toBeInTheDocument();
     expect(confirmacion.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
+
+  it('CA5: el estado vacío en inglés', async () => {
+    await cargar([]);
+
+    const vacio = within(
+      await screen.findByRole('region', { name: "You haven't given any authorization yet" }),
+    );
+    expect(vacio.getByRole('link', { name: 'Get a quote' })).toBeInTheDocument();
+  });
 });

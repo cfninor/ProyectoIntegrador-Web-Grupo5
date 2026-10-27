@@ -383,4 +383,45 @@ describe('PaginaMisAutorizaciones · SOLVENTAG5-84', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
+
+  describe('CA5: sin consentimientos', () => {
+    async function cargarVacia() {
+      const contexto = await renderizar();
+      contexto.http
+        .expectOne(URL_CONSENTIMIENTOS)
+        .flush({ clienteId: CLIENTE_ID, consentimientos: [] });
+      await screen.findByRole('region', { name: 'Todavía no has dado ninguna autorización' });
+      return contexto;
+    }
+
+    it('muestra un estado vacío que explica cómo se autoriza, no un error', async () => {
+      await cargarVacia();
+
+      const vacio = within(
+        screen.getByRole('region', { name: 'Todavía no has dado ninguna autorización' }),
+      );
+      expect(vacio.getByText(/te llegará un enlace por correo/)).toBeInTheDocument();
+      expect(vacio.getByText(/la prima se calcula sin tu perfil de riesgo/)).toBeInTheDocument();
+      expect(vacio.getByRole('link', { name: 'Cotizar un seguro' })).toHaveAttribute(
+        'href',
+        '/cliente/cotizar',
+      );
+      expect(screen.queryByRole('region', { name: 'Vigentes' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('region', { name: 'Revocadas y vencidas' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No pudimos cargar tus autorizaciones. Intenta de nuevo.'),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('con solo revocados o vencidos no es el estado vacío', async () => {
+      await cargar([REVOCADO]);
+
+      expect(
+        screen.queryByRole('region', { name: 'Todavía no has dado ninguna autorización' }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

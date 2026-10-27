@@ -183,6 +183,18 @@ test('CA4: tras revocar vuelve a consultar y avisa el plazo de 5 minutos', async
   expect(bff.consultas).toBe(3);
 });
 
+test('CA5: sin consentimientos muestra el estado vacío y lleva a cotizar', async ({ page }) => {
+  await simularBff(page, []);
+  await page.goto('/cliente/autorizaciones');
+
+  const vacio = page.getByRole('region', { name: 'Todavía no has dado ninguna autorización' });
+  await expect(vacio).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Vigentes' })).toHaveCount(0);
+  await vacio.getByRole('link', { name: 'Cotizar un seguro' }).click();
+
+  await expect(page).toHaveURL('/cliente/cotizar');
+});
+
 test('CA1 en inglés', async ({ page }) => {
   await simularBff(page, [VIGENTE]);
   await preferirIngles(page);

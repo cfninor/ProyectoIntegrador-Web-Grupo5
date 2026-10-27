@@ -10,10 +10,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { fechaBogota } from '../../core/idioma/formatos';
 import { idiomaDe } from '../../core/idioma/idioma';
+import { tableroDe } from '../../core/sesion/roles';
 import { SERVICIO_SESION } from '../../core/sesion/sesion';
 import { Consentimiento, EstadoConsentimiento } from '../autorizacion-datos/modelos';
 import {
@@ -66,6 +68,7 @@ interface ConsentimientoVista {
  */
 @Component({
   selector: 'app-pagina-mis-autorizaciones',
+  imports: [RouterLink],
   templateUrl: './pagina-mis-autorizaciones.html',
   styleUrl: './pagina-mis-autorizaciones.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,6 +91,12 @@ export class PaginaMisAutorizaciones {
   protected readonly vigentes = computed(() => this.lista((c) => c.estado === 'VIGENTE'));
   /** CA2: los revocados y los vencidos, aparte de los vigentes y en el orden en que llegan. */
   protected readonly historial = computed(() => this.lista((c) => c.estado !== 'VIGENTE'));
+  /** CA5: el BFF respondió la lista vacía; es un estado de la pantalla, no un error. */
+  protected readonly sinConsentimientos = computed(() => {
+    const carga = this.carga();
+    return carga.tipo === 'lista' && carga.consentimientos.length === 0;
+  });
+  protected readonly rutaCotizar = `${tableroDe('CLIENTE')}/cotizar`;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {

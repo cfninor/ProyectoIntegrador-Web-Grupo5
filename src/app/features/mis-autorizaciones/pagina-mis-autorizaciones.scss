@@ -104,3 +104,19 @@ h3 {
 .aviso {
   font-size: 14px;
 }
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+
+  h2 {
+    font-size: 18px;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}

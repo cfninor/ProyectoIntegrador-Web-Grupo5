@@ -350,7 +350,7 @@
     "misAutorizaciones.reintentar": " Try again ",
     "misAutorizaciones.vigentes.titulo": "Active",
     "misAutorizaciones.estado.vigente": "Active",
-    "misAutorizaciones.dato.destinatario": "Who you authorize",
+    "misAutorizaciones.dato.destinatario": " Who you authorize ",
     "misAutorizaciones.dato.otorgado": "Granted on",
     "misAutorizaciones.dato.vence": "Expires on",
     "misAutorizaciones.dato.cubre": "Data it covers",
@@ -372,6 +372,10 @@
     "misAutorizaciones.confirmar.revocando": "Revoking…",
     "misAutorizaciones.confirmar.si": "Yes, revoke",
     "misAutorizaciones.confirmar.cancelar": " Cancel ",
-    "misAutorizaciones.yaNoVigente": "That authorization was no longer active. We updated the list with its status."
+    "misAutorizaciones.yaNoVigente": "That authorization was no longer active. We updated the list with its status.",
+    "misAutorizaciones.vacio.titulo": " You haven't given any authorization yet ",
+    "misAutorizaciones.vacio.texto": " When your advisor asks you to authorize consulting your data, you'll receive a link by email. If you authorize, you'll see it here and can revoke it whenever you want. ",
+    "misAutorizaciones.vacio.cotizar": " You can still get a quote without an authorization: the premium is calculated without your risk profile. ",
+    "misAutorizaciones.vacio.boton": "Get a quote"
   }
 }
