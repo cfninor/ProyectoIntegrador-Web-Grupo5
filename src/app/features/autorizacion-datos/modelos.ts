@@ -72,6 +72,12 @@ export interface Consentimiento {
   fechaRevoca?: string;
 }
 
+/** Los consentimientos del cliente, los vigentes primero (SOLVENTAG5-84). */
+export interface ConsentimientosCliente {
+  clienteId: string;
+  consentimientos: Consentimiento[];
+}
+
 export interface ResultadoDecision {
   solicitudId: string;
   estado: EstadoSolicitud;

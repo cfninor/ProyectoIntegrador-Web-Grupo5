@@ -152,6 +152,45 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/clientes/{clienteId}/consentimientos:
+    get:
+      tags: [autorizacion-datos]
+      operationId: consultarConsentimientosCliente
+      summary: Consultar los consentimientos que el cliente ha otorgado
+      description: >
+        Todos los consentimientos del cliente con su estado ahora (SOLVENTAG5-84): VIGENTE,
+        REVOCADO o VENCIDO, con los datos que cubre cada uno, a quién autoriza, para qué y sus
+        fechas. Primero los vigentes y, en cada grupo, del más reciente al más antiguo. Se lee de
+        la base en cada consulta, así que una revocación se ve en la siguiente consulta. Si el
+        cliente no tiene ninguno, la lista va vacía (no es un error). El cliente solo consulta
+        los suyos: con su sesión, un clienteId distinto del de su token responde 403
+        SIN_PERMISO.
+      x-roles: [CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/ClienteId'
+      responses:
+        '200':
+          description: Consentimientos del cliente; lista vacía si no tiene ninguno.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentimientosCliente'
+              examples:
+                conConsentimientos:
+                  $ref: '#/components/examples/ConsentimientosCliente'
+                sinConsentimientos:
+                  summary: El cliente no ha otorgado ninguno
+                  value:
+                    clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+                    consentimientos: []
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
   /v1/clientes/busqueda:
     post:
       tags: [asesor]
@@ -340,8 +379,9 @@ paths:
       summary: Revocar un consentimiento vigente
       description: >
         Solo se revoca un consentimiento VIGENTE y no vencido. Después de confirmar la
-        revocación se avisa a ms-perfilamiento para que deje de usar los datos en caché.
-        Que el consentimiento sea del cliente de la sesión lo valida la SOLVENTAG5-84.
+        revocación se avisa a ms-perfilamiento para que deje de usar los datos en caché. El
+        cliente solo revoca uno suyo: si el consentimiento no es del cliente de la sesión
+        responde 404 CONSENTIMIENTO_NO_ENCONTRADO, como si no existiera, y no se revoca.
       x-roles: [CLIENTE]
       parameters:
         - $ref: '#/components/parameters/ConsentimientoId'
@@ -1282,6 +1322,18 @@ components:
           type: string
           format: date-time
           description: Solo cuando el consentimiento fue revocado.
+    ConsentimientosCliente:
+      type: object
+      required: [clienteId, consentimientos]
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        consentimientos:
+          type: array
+          description: Primero los VIGENTES; vacía si el cliente no ha otorgado ninguno.
+          items:
+            $ref: '#/components/schemas/Consentimiento'
     EstadoAutorizacionCliente:
       type: object
       required: [clienteId, estado]
@@ -2025,3 +2077,34 @@ components:
         cotizacionId: 8f1e2d3c-4b5a-4c6d-9e7f-0a1b2c3d4e5f
         origen: VALOR_POR_DEFECTO
         motivoSinPerfil: PERFIL_NO_DISPONIBLE
+    ConsentimientosCliente:
+      summary: Un consentimiento vigente y uno revocado
+      value:
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        consentimientos:
+          - consentimientoId: 7c6e5d4b-3a2f-4e1d-9c8b-0a1f2e3d4c5b
+            estado: VIGENTE
+            alcance:
+              - COMPORTAMIENTO_PAGO
+              - ESTABILIDAD_INGRESOS
+              - SOCIODEMOGRAFICA_TERRITORIAL
+              - SALUD_ACTUARIAL_AGREGADA
+              - INMUEBLE_UBICACION
+            finalidad: PERFILAMIENTO_VIDA_HIPOTECARIO
+            destinatario: SOLVENTA
+            versionCatalogo: v1
+            versionPolitica: v1
+            fechaOtorga: '2026-10-09T15:02:11Z'
+            fechaVencimiento: '2027-10-09T15:02:11Z'
+          - consentimientoId: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+            estado: REVOCADO
+            alcance:
+              - COMPORTAMIENTO_PAGO
+              - ESTABILIDAD_INGRESOS
+            finalidad: PERFILAMIENTO_VIDA_HIPOTECARIO
+            destinatario: SOLVENTA
+            versionCatalogo: v1
+            versionPolitica: v1
+            fechaOtorga: '2026-03-02T10:00:00Z'
+            fechaVencimiento: '2027-03-02T10:00:00Z'
+            fechaRevoca: '2026-06-15T18:20:00Z'

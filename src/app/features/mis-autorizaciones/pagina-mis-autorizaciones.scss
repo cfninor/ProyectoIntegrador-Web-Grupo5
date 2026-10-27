@@ -1,0 +1,122 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h3 {
+  font-size: 16px;
+}
+
+.estado-carga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.grupo,
+.consentimiento {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inactivo {
+  h3,
+  dd,
+  .cubre {
+    color: var(--on-surface-variant);
+  }
+}
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0;
+
+  dd {
+    margin: 6px 0 0;
+    font-size: 14px;
+  }
+}
+
+.cubre {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.boton-revocar {
+  color: var(--error);
+}
+
+.boton-peligro {
+  border-color: var(--error);
+  background: var(--error);
+
+  &:hover:not(:disabled) {
+    border-color: var(--error);
+    background: var(--error);
+    filter: brightness(0.9);
+  }
+}
+
+.confirmacion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-control);
+}
+
+.pregunta {
+  font-weight: 600;
+}
+
+.aviso {
+  font-size: 14px;
+}
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+
+  h2 {
+    font-size: 18px;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}
