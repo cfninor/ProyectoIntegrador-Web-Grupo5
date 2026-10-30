@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
+import { POR_RESULTADO } from '../../../testing/fixtures-resultado';
 import { APP_CONFIG } from '../../core/config/app-config';
 import { SolicitudSuscripcion } from '../suscripcion/modelos';
 import { Actor } from './formulario-cotizacion';
@@ -30,7 +31,8 @@ const PENDIENTE: SolicitudSuscripcion = {
   aceptadaEn: '2026-10-14T15:05:00Z',
 };
 const EVALUADA: SolicitudSuscripcion = { ...PENDIENTE, estado: 'EVALUADA' };
-const ACEPTADA: SolicitudSuscripcion = { ...PENDIENTE, estado: 'ACEPTADA' };
+const ACEPTADA = POR_RESULTADO.ACEPTADA;
+const EN_REVISION = POR_RESULTADO.EN_REVISION;
 
 let http: HttpTestingController | undefined;
 
@@ -113,28 +115,28 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
 
   describe.each([
     {
-      estado: 'ACEPTADA',
+      estado: 'ACEPTADA' as const,
       chip: 'Aceptada',
       clase: 'chip-verde',
       cliente: ['Aprobamos tu solicitud', /El siguiente paso es el pago/],
       asesor: ['Solicitud aceptada', /continúa a cobro y emisión/],
     },
     {
-      estado: 'AJUSTADA',
+      estado: 'AJUSTADA' as const,
       chip: 'Aceptada con ajuste',
       clase: 'chip-verde-azulado',
       cliente: ['Aprobamos tu solicitud con ajustes', /Revisa el detalle antes de pagar/],
       asesor: ['Solicitud aceptada con ajuste', /condiciones distintas a las cotizadas/],
     },
     {
-      estado: 'RECHAZADA',
+      estado: 'RECHAZADA' as const,
       chip: 'Rechazada',
       clase: 'chip-rojo',
       cliente: ['No pudimos aprobar tu solicitud', /no podemos emitirlo/],
       asesor: ['Solicitud rechazada', /no continúa a emisión/],
     },
     {
-      estado: 'EN_REVISION',
+      estado: 'EN_REVISION' as const,
       chip: 'Pendiente de revisión',
       clase: 'chip-ambar',
       cliente: ['Tu solicitud está en revisión', /Un suscriptor revisará tu solicitud/],
@@ -147,12 +149,12 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
     ] as const)('se la muestra al %s con su chip y deja de consultar', async (actor, textos) => {
       jest.useFakeTimers();
       const { http, detectChanges } = await renderizar(actor);
-      http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado });
+      http.expectOne(URL_SOLICITUD).flush(POR_RESULTADO[estado]);
       detectChanges();
 
       expect(titulo()).toHaveTextContent(textos[0]);
       expect(screen.getByText(textos[1])).toBeInTheDocument();
-      const decision = screen.getByText('Decisión').nextElementSibling;
+      const decision = screen.getByText('Decisión', { selector: 'dt' }).nextElementSibling;
       expect(decision).toHaveTextContent(chip);
       expect(decision?.querySelector('.chip')).toHaveClass(clase);
       jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 3);
@@ -162,7 +164,7 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
 
   it('«Pendiente de revisión» es un estado, no un error', async () => {
     const { http, detectChanges } = await renderizar();
-    http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado: 'EN_REVISION' });
+    http.expectOne(URL_SOLICITUD).flush(EN_REVISION);
     detectChanges();
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -171,6 +173,27 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
       'aria-live',
       'polite',
     );
+  });
+
+  it('en revisión la acción es volver al tablero, no a la oferta', async () => {
+    const { http, detectChanges } = await renderizar('asesor');
+    http.expectOne(URL_SOLICITUD).flush(EN_REVISION);
+    detectChanges();
+
+    expect(screen.getByRole('link', { name: 'Volver al tablero' })).toHaveAttribute(
+      'href',
+      '/asesor',
+    );
+    expect(screen.queryByRole('link', { name: 'Volver a la oferta' })).not.toBeInTheDocument();
+  });
+
+  it('la tarjeta sale de la misma respuesta: una sola llamada con la decisión', async () => {
+    const { http, detectChanges } = await renderizar();
+    http.expectOne(URL_SOLICITUD).flush(ACEPTADA);
+    detectChanges();
+
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    http.expectNone(() => true);
   });
 
   it('si la decisión tarda más de lo normal, también lo dice', async () => {
@@ -186,7 +209,7 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
     expect(titulo()).toHaveTextContent('Evaluamos tu solicitud');
     expect(screen.getByRole('status')).toHaveTextContent('tardando más de lo normal');
     screen.getByRole('button', { name: 'Consultar de nuevo' }).click();
-    http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado: 'EN_REVISION' });
+    http.expectOne(URL_SOLICITUD).flush(EN_REVISION);
     detectChanges();
     expect(titulo()).toHaveTextContent('Tu solicitud está en revisión');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

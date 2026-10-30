@@ -41,4 +41,66 @@ export interface SolicitudSuscripcion {
   motivoSinPerfil?: MotivoSinPerfil;
   canal: 'web' | 'movil' | 'socio';
   aceptadaEn: string;
+  // El resultado (SOLVENTAG5-55): solo los envía la consulta, nunca `aceptarOferta`.
+  /** True cuando existe la decisión automática, también en EN_REVISION. */
+  decidida?: boolean;
+  /** Cuándo cambió el estado por última vez. */
+  actualizadaEn?: string;
+  /** Con evaluación. */
+  reglasEvaluadas?: ReglaEvaluadaSuscripcion[];
+  /** Con evaluación. */
+  versionReglas?: string;
+  /** Con evaluación. False si un registro no se pudo verificar al consultar. */
+  registrosVerificables?: boolean;
+  /** Cuando `decidida` es true y su registro se puede leer. */
+  decision?: DecisionSuscripcion;
+}
+
+export type MotivoDecisionSuscripcion =
+  | 'CUMPLE_REGLAS'
+  | 'REGLA_DE_RECHAZO'
+  | 'REGLA_DE_REVISION'
+  | 'REGLA_DE_AJUSTE'
+  | 'REGLAS_NO_ALCANZAN'
+  | 'EVALUACION_NO_VERIFICABLE';
+
+export type TipoReglaSuscripcion =
+  | 'PERFIL_REQUERIDO'
+  | 'SCORE_MINIMO'
+  | 'NIVEL_PERMITIDO'
+  | 'SENAL_MINIMA'
+  | 'DATO_BIEN_MAXIMO'
+  | 'SIN_REGLAS';
+
+export type EfectoReglaSuscripcion = 'RECHAZAR' | 'AJUSTAR' | 'REVISAR';
+
+export type ResultadoReglaSuscripcion = 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA';
+
+/** `ReglaEvaluadaSuscripcion` del contrato: la regla tal como quedó registrada (SOLVENTAG5-55). */
+export interface ReglaEvaluadaSuscripcion {
+  codigo: string;
+  tipo: TipoReglaSuscripcion;
+  efecto: EfectoReglaSuscripcion;
+  parametros: Record<string, unknown>;
+  /** Un valor es null si la regla no aplica. */
+  senales: Record<string, unknown>;
+  resultado: ResultadoReglaSuscripcion;
+  /** Si determinó la decisión. Solo con decisión. */
+  determinante?: boolean;
+}
+
+/** `DecisionSuscripcion` del contrato: la decisión automática como quedó en su registro. */
+export interface DecisionSuscripcion {
+  resultado: ResultadoSuscripcion;
+  continuaAEmision: boolean;
+  motivo: MotivoDecisionSuscripcion;
+  reglaAplicada: string;
+  versionPolitica: string;
+  primaCotizada: number;
+  /** Solo en ACEPTADA y AJUSTADA. */
+  primaFinal?: number;
+  /** Solo en AJUSTADA. */
+  recargoPorcentaje?: number;
+  tiempoDecisionMs: number;
+  trazaId: string;
 }
