@@ -1,0 +1,314 @@
+@let v = vista();
+
+@if (v.noVerificable) {
+  <p class="aviso" role="status" i18n="@@suscripcion.tarjeta.noVerificable">
+    No pudimos verificar el registro de esta decisión. Los datos pueden estar incompletos.
+  </p>
+}
+
+@switch (v.s.estado) {
+  @case ('PENDIENTE_EVALUACION') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.evaluando.titulo.asesor">
+        Evaluando la solicitud del cliente
+      </h2>
+      <p i18n="@@suscripcion.evaluando.texto.asesor">
+        Se aplican las reglas de suscripción con el perfil de riesgo con que se cotizó. Toma unos
+        segundos.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.evaluando.titulo.cliente">
+        Estamos evaluando tu solicitud
+      </h2>
+      <p i18n="@@suscripcion.evaluando.texto.cliente">
+        Aplicamos las reglas de suscripción con el perfil de riesgo con que cotizaste. Toma unos
+        segundos.
+      </p>
+    }
+  }
+  @case ('EVALUADA') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.evaluada.titulo.asesor">
+        Solicitud evaluada
+      </h2>
+      <p i18n="@@suscripcion.evaluada.texto.asesor">
+        La solicitud se evaluó con las reglas de suscripción y espera la decisión.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.evaluada.titulo.cliente">
+        Evaluamos tu solicitud
+      </h2>
+      <p i18n="@@suscripcion.evaluada.texto.cliente">
+        Revisamos tu solicitud con las reglas de suscripción. Pronto verás aquí la decisión.
+      </p>
+    }
+  }
+  @case ('ACEPTADA') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.aceptada.titulo.asesor">
+        Solicitud aceptada
+      </h2>
+      <p i18n="@@suscripcion.aceptada.texto.asesor">
+        Se aceptó con la prima cotizada y continúa a cobro y emisión.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.aceptada.titulo.cliente">
+        Aprobamos tu solicitud
+      </h2>
+      <p i18n="@@suscripcion.aceptada.texto.cliente">
+        Tu seguro se puede emitir con la prima que cotizaste. El siguiente paso es el pago.
+      </p>
+    }
+  }
+  @case ('AJUSTADA') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.ajustada.titulo.asesor">
+        Solicitud aceptada con ajuste
+      </h2>
+      <p i18n="@@suscripcion.ajustada.texto.asesor">
+        Se aceptó con condiciones distintas a las cotizadas y continúa a cobro y emisión.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.ajustada.titulo.cliente">
+        Aprobamos tu solicitud con ajustes
+      </h2>
+      <p i18n="@@suscripcion.ajustada.texto.cliente">
+        Tu seguro se puede emitir con condiciones distintas a las que cotizaste. Revisa el detalle
+        antes de pagar.
+      </p>
+    }
+  }
+  @case ('RECHAZADA') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.rechazada.titulo.asesor">
+        Solicitud rechazada
+      </h2>
+      <p i18n="@@suscripcion.rechazada.texto.asesor">
+        No cumple las reglas de suscripción del ramo y no continúa a emisión.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.rechazada.titulo.cliente">
+        No pudimos aprobar tu solicitud
+      </h2>
+      <p i18n="@@suscripcion.rechazada.texto.cliente">
+        Tu solicitud no cumple las condiciones de suscripción de este seguro, así que no podemos
+        emitirlo.
+      </p>
+    }
+  }
+  @case ('EN_REVISION') {
+    @if (actor() === 'asesor') {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.enRevision.titulo.asesor">
+        Solicitud pendiente de revisión
+      </h2>
+      <p i18n="@@suscripcion.enRevision.texto.asesor">
+        Las reglas automáticas no alcanzan para decidirla: la revisa un suscriptor. No avanza a
+        cobro mientras no tenga decisión.
+      </p>
+    } @else {
+      <h2 id="suscripcion-titulo" i18n="@@suscripcion.enRevision.titulo.cliente">
+        Tu solicitud está en revisión
+      </h2>
+      <p i18n="@@suscripcion.enRevision.texto.cliente">
+        Un suscriptor revisará tu solicitud. Cuando tenga una decisión la verás aquí.
+      </p>
+    }
+  }
+}
+
+@if (v.sinDecision) {
+  <p i18n="@@suscripcion.tarjeta.ultimoEstado">
+    Este es el último estado conocido, del {{ v.actualizadaEl }}. La decisión todavía no está lista.
+  </p>
+}
+
+<dl class="resumen" i18n-aria-label="@@suscripcion.resumen" aria-label="Resumen de la solicitud">
+  <dt i18n="@@suscripcion.numero">Número de solicitud</dt>
+  <dd>{{ v.s.solicitudId }}</dd>
+  @if (v.tiempo; as tiempo) {
+    <dt i18n="@@suscripcion.tarjeta.tiempoDecision">Tiempo de decisión</dt>
+    <dd>{{ tiempo }}</dd>
+  }
+  @if (v.chip; as chip) {
+    <dt i18n="@@suscripcion.decision">Decisión</dt>
+    <dd>
+      <span class="chip {{ chip.clase }}">{{ chip.texto }}</span>
+    </dd>
+  }
+  @if (v.ilegible) {
+    <dt i18n="@@suscripcion.tarjeta.actualizada">Última actualización</dt>
+    <dd>{{ v.actualizadaEl }}</dd>
+  }
+  @if (!v.d) {
+    <dt i18n="@@suscripcion.prima">Prima mensual</dt>
+    <dd>{{ v.prima }}</dd>
+    <dt i18n="@@suscripcion.aceptadaEl">Aceptada el</dt>
+    <dd>{{ v.aceptadaEl }}</dd>
+  }
+</dl>
+
+@if (v.d; as d) {
+  @if (d.resultado === 'EN_REVISION') {
+    <div class="revision">
+      <p>
+        <strong i18n="@@suscripcion.tarjeta.noEsError"
+          >Esto no es un error: la solicitud sigue su curso.</strong
+        >
+      </p>
+      <div class="bloque">
+        <h3 i18n="@@suscripcion.tarjeta.motivo">Motivo</h3>
+        <p>{{ v.motivo }}</p>
+        @if (v.determinantes.length > 0) {
+          <ul
+            class="determinantes"
+            i18n-aria-label="@@suscripcion.tarjeta.reglasPorResolver"
+            aria-label="Reglas por resolver"
+          >
+            @for (regla of v.determinantes; track regla.codigo) {
+              <li>
+                <strong>{{ regla.nombre }}.</strong>&ngsp;
+                <span i18n="@@suscripcion.tarjeta.reglaResaltada"
+                  >Límite: {{ regla.limite }}. Valor del cliente: {{ regla.valor }}.</span
+                >
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <div class="bloque">
+        <h3 i18n="@@suscripcion.tarjeta.quePasaAhora">Qué pasa ahora</h3>
+        <ol class="linea-tiempo">
+          <li class="hecho" i18n="@@suscripcion.tarjeta.linea.enviada">Enviada a riesgo</li>
+          <li aria-current="step" i18n="@@suscripcion.tarjeta.linea.revision">Revisión</li>
+          <li i18n="@@suscripcion.tarjeta.linea.decision">Decisión</li>
+        </ol>
+        @if (actor() === 'asesor') {
+          <p i18n="@@suscripcion.tarjeta.quePasaAhora.asesor">
+            La decisión se verá en esta misma página. El tiempo objetivo es de hasta 1 día hábil.
+            Mientras tanto, puedes volver al tablero.
+          </p>
+        } @else {
+          <p i18n="@@suscripcion.tarjeta.quePasaAhora.cliente">
+            Verás la decisión en esta misma página. El tiempo objetivo es de hasta 1 día hábil.
+          </p>
+        }
+      </div>
+    </div>
+  } @else {
+    @if (d.resultado === 'RECHAZADA') {
+      <div class="bloque">
+        <h3 i18n="@@suscripcion.tarjeta.motivo">Motivo</h3>
+        <p>{{ v.motivo }}</p>
+      </div>
+    }
+
+    @if (v.continua) {
+      <div class="bloque">
+        <h3 i18n="@@suscripcion.tarjeta.condiciones">Condiciones aprobadas</h3>
+        <dl class="resumen">
+          <dt i18n="@@suscripcion.tarjeta.producto">Producto</dt>
+          <dd>{{ v.producto }}</dd>
+          @if (v.sumaAsegurada; as suma) {
+            <dt i18n="@@cotizacion.panel.sumaAsegurada">Suma asegurada</dt>
+            <dd>{{ suma }}</dd>
+          }
+          @if (v.plazoAnios; as anios) {
+            <dt i18n="@@suscripcion.tarjeta.vigencia">Vigencia</dt>
+            <dd i18n="@@suscripcion.tarjeta.vigencia.anios">{{ anios }} años</dd>
+          }
+          <dt i18n="@@suscripcion.tarjeta.primaCotizada">Prima cotizada</dt>
+          <dd>{{ v.primaCotizada }}</dd>
+          <dt i18n="@@suscripcion.tarjeta.primaFinal">Prima final</dt>
+          <dd>{{ v.primaFinal }}</dd>
+          <dt i18n="@@suscripcion.tarjeta.ajuste">Ajuste</dt>
+          @if (d.recargoPorcentaje; as recargo) {
+            <dd i18n="@@suscripcion.tarjeta.ajuste.recargo">Recargo del {{ recargo }} %</dd>
+          } @else {
+            <dd i18n="@@suscripcion.tarjeta.ajuste.sin">Sin ajuste</dd>
+          }
+        </dl>
+      </div>
+    }
+
+    @if (d.resultado === 'AJUSTADA') {
+      <div class="bloque">
+        <h3 i18n="@@suscripcion.tarjeta.nuevaPrima">Nueva prima: {{ v.primaFinal }}</h3>
+        @if (actor() === 'asesor') {
+          <p i18n="@@suscripcion.tarjeta.nuevaPrima.asesor">
+            El cliente debe aceptar la nueva prima para continuar.
+          </p>
+        } @else {
+          <p i18n="@@suscripcion.tarjeta.nuevaPrima.cliente">
+            Debes aceptar la nueva prima para continuar.
+          </p>
+        }
+      </div>
+    }
+
+    @if (v.reglas.length > 0) {
+      <div class="envoltura-tabla">
+        <table>
+          <caption i18n="@@suscripcion.tarjeta.tabla.caption">
+            Reglas evaluadas, versión
+            {{
+              v.s.versionReglas
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@suscripcion.tarjeta.tabla.regla">Regla</th>
+              <th scope="col" i18n="@@suscripcion.tarjeta.tabla.limite">Límite</th>
+              <th scope="col" i18n="@@suscripcion.tarjeta.tabla.valor">Valor del cliente</th>
+              <th scope="col" i18n="@@suscripcion.tarjeta.tabla.resultado">Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (regla of v.reglas; track regla.codigo) {
+              <tr [class.determinante]="regla.determinante">
+                <th scope="row">
+                  {{ regla.nombre }}
+                  @if (regla.determinante) {
+                    <span class="marca-determinante" i18n="@@suscripcion.tarjeta.determinante"
+                      >Determinante</span
+                    >
+                  }
+                </th>
+                <td>{{ regla.limite }}</td>
+                <td>{{ regla.valor }}</td>
+                <td>
+                  <span class="chip {{ regla.claseResultado }}">{{ regla.resultado }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (v.continua) {
+      <div class="pago">
+        <button
+          type="button"
+          class="boton-primario"
+          disabled
+          aria-describedby="pago-explicacion"
+          i18n="@@suscripcion.tarjeta.continuarPago"
+        >
+          Continuar al pago
+        </button>
+        <p id="pago-explicacion" i18n="@@suscripcion.tarjeta.continuarPago.explicacion">
+          El pago en línea todavía no está disponible.
+        </p>
+      </div>
+    }
+  }
+}
+
+@if (v.s.estado === 'EN_REVISION') {
+  <a
+    class="boton-primario enlace-tablero"
+    [routerLink]="rutaTablero()"
+    i18n="@@suscripcion.tarjeta.volverTablero"
+    >Volver al tablero</a
+  >
+}
