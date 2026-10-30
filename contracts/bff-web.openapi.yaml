@@ -672,7 +672,8 @@ paths:
       summary: Consultar una solicitud de suscripción
       description: >
         Devuelve la solicitud con su estado. Queda en PENDIENTE_EVALUACION hasta que la evalúe
-        la suscripción automática (SOLVENTAG5-50). Con la sesión del cliente, una solicitud que
+        la suscripción automática (SOLVENTAG5-50), que corre después de aceptar la oferta y la
+        pasa a EVALUADA (ADR 0007, decisión 4); el canal consulta aquí. Con la sesión del cliente, una solicitud que
         no es suya (sin clienteId o con otro) responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
         para no revelar que existe.
       x-roles: [ASESOR, CLIENTE]
@@ -1564,9 +1565,10 @@ components:
     EstadoSolicitudSuscripcion:
       type: string
       description: >
-        PENDIENTE_EVALUACION al crearse; la evaluación automática (SOLVENTAG5-50) agrega los
-        estados siguientes.
-      enum: [PENDIENTE_EVALUACION]
+        PENDIENTE_EVALUACION al crearse. EVALUADA cuando la evaluación automática
+        (SOLVENTAG5-50) aplicó las reglas de suscripción del ramo; espera la decisión
+        (SOLVENTAG5-51), que agrega los estados siguientes.
+      enum: [PENDIENTE_EVALUACION, EVALUADA]
     Cobertura:
       type: object
       required: [ramo, datosBien]
