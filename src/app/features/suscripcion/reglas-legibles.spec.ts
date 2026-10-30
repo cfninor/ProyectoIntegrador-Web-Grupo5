@@ -124,6 +124,58 @@ describe('reglaLegible', () => {
     expect(legible({ tipo, parametros, senales }).valor).toBe('No disponible');
   });
 
+  it.each([
+    ['SCORE_MINIMO', { minimo: {} }, { score: {} }, 'Mínimo —', 'No disponible'],
+    [
+      'NIVEL_PERMITIDO',
+      { permitidos: [{}, 'BAJO'] },
+      { nivel: {} },
+      '— · Riesgo bajo',
+      'No disponible',
+    ],
+    [
+      'SENAL_MINIMA',
+      { senal: 'endeudamiento', minimo: {} },
+      { endeudamiento: {} },
+      'Mínimo — de 100',
+      'No disponible',
+    ],
+    [
+      'DATO_BIEN_MAXIMO',
+      { campo: 'montoCredito', maximo: {} },
+      { montoCredito: {} },
+      'Máximo —',
+      'No disponible',
+    ],
+    ['SIN_REGLAS', {}, { ramo: {} }, '—', '—'],
+  ] as const)(
+    '%s con objetos nunca muestra [object Object]',
+    (tipo, parametros, senales, limite, valor) => {
+      const r = legible({ tipo, parametros, senales });
+
+      expect([r.limite, r.valor]).toEqual([limite, valor]);
+    },
+  );
+
+  it.each([
+    ['SENAL_MINIMA', { senal: {}, minimo: 40 }],
+    ['DATO_BIEN_MAXIMO', { campo: {}, maximo: 1 }],
+  ] as const)('%s con un objeto como llave usa «—» y no encuentra el valor', (tipo, parametros) => {
+    const r = legible({ tipo, parametros, senales: { '[object Object]': 72 } });
+
+    expect([r.nombre, r.valor]).toEqual(['—', 'No disponible']);
+  });
+
+  it('un número no finito no es un dato', () => {
+    const r = legible({
+      tipo: 'DATO_BIEN_MAXIMO',
+      parametros: { campo: 'plazoAnios', maximo: Number.POSITIVE_INFINITY },
+      senales: { plazoAnios: Number.NaN },
+    });
+
+    expect([r.limite, r.valor]).toEqual(['Máximo —', 'No disponible']);
+  });
+
   it('SIN_REGLAS y un tipo desconocido no rompen la tabla', () => {
     const sin = legible({ tipo: 'SIN_REGLAS', senales: { ramo: 'VIAJE' } });
     expect([sin.nombre, sin.limite, sin.valor]).toEqual([
@@ -193,6 +245,7 @@ describe('textoMotivo', () => {
 
   it('un motivo desconocido se muestra tal como viene', () => {
     expect(textoMotivo('NUEVO' as never, [])).toBe('NUEVO');
+    expect(textoMotivo({} as never, [])).toBe('—');
   });
 });
 

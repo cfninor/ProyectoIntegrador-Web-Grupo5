@@ -22,17 +22,32 @@ export interface ReglaLegible {
 /** Lo que viene sin dato: la regla no aplica porque no hay perfil de riesgo. */
 const sinDato = (): string => $localize`:@@suscripcion.tarjeta.regla.sinDato:No disponible`;
 
-const NIVELES: readonly string[] = ['BAJO', 'MEDIO', 'ALTO'];
+/** Sin dato en una celda que no es el valor del cliente. */
+const SIN_VALOR = '—';
+
+const NIVELES: ReadonlySet<string> = new Set(['BAJO', 'MEDIO', 'ALTO']);
+
+/**
+ * Un valor de la regla como texto, solo si es un texto o un número finito; si no, `siNo`. Los
+ * parámetros y las señales son JSON abierto: así nunca sale «[object Object]».
+ */
+function textoDe(valor: unknown, siNo: string): string {
+  if (typeof valor === 'string') {
+    return valor;
+  }
+  return typeof valor === 'number' && Number.isFinite(valor) ? String(valor) : siNo;
+}
 
 /** El nivel en palabras; un nivel que esta versión no conoce se muestra tal como viene. */
-function nivel(valor: unknown): string {
-  return NIVELES.includes(String(valor)) ? textoNivel(valor as NivelRiesgo) : String(valor);
+function nivel(valor: unknown, siNo: string): string {
+  const texto = textoDe(valor, siNo);
+  return NIVELES.has(texto) ? textoNivel(texto as NivelRiesgo) : texto;
 }
 
 function nombreDeSenal(senal: unknown): string {
   return ORDEN_SENALES.includes(senal as NombreSenal)
     ? nombreSenal(senal as NombreSenal)
-    : String(senal);
+    : textoDe(senal, SIN_VALOR);
 }
 
 function motivoSinPerfil(motivo: unknown): string | null {
@@ -62,13 +77,17 @@ function valorPerfil(senales: Record<string, unknown>): string {
 }
 
 function deCien(valor: unknown): string {
-  return $localize`:@@suscripcion.tarjeta.regla.deCien:${String(valor)}:valor: de 100`;
+  const sin = sinDato();
+  const texto = textoDe(valor, sin);
+  return texto === sin
+    ? sin
+    : $localize`:@@suscripcion.tarjeta.regla.deCien:${texto}:valor: de 100`;
 }
 
 /** Un dato del bien: montoCredito es dinero; cualquier otro número, con separador de miles. */
-function datoBien(campo: unknown, valor: unknown, idioma: Idioma): string {
-  if (typeof valor !== 'number') {
-    return String(valor);
+function datoBien(campo: unknown, valor: unknown, idioma: Idioma, siNo: string): string {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) {
+    return textoDe(valor, siNo);
   }
   return campo === 'montoCredito' ? montoCop(valor, idioma) : numeroConMiles(valor, idioma);
 }
@@ -76,7 +95,7 @@ function datoBien(campo: unknown, valor: unknown, idioma: Idioma): string {
 function nombreDatoBien(campo: unknown): string {
   return campo === 'montoCredito'
     ? $localize`:@@cotizacion.panel.sumaAsegurada:Suma asegurada`
-    : String(campo);
+    : textoDe(campo, SIN_VALOR);
 }
 
 function textos(
@@ -92,52 +111,48 @@ function textos(
         valor: valorPerfil(r.senales),
       };
     case 'SCORE_MINIMO': {
-      const minimo = String(p['minimo']);
-      const score = r.senales['score'];
+      const minimo = textoDe(p['minimo'], SIN_VALOR);
       return {
         nombre: $localize`:@@suscripcion.tarjeta.regla.score:Puntaje de riesgo`,
         limite: $localize`:@@suscripcion.tarjeta.regla.minimo:Mínimo ${minimo}:minimo:`,
-        valor: score === null || score === undefined ? sinDato() : String(score),
+        valor: textoDe(r.senales['score'], sinDato()),
       };
     }
     case 'NIVEL_PERMITIDO': {
       const permitidos = Array.isArray(p['permitidos']) ? p['permitidos'] : [];
-      const lista = permitidos.map(nivel);
-      const valor = r.senales['nivel'];
+      const lista = permitidos.map((permitido) => nivel(permitido, SIN_VALOR));
       return {
         nombre: $localize`:@@suscripcion.tarjeta.regla.nivel:Nivel de riesgo`,
         limite: lista.join(' · '),
-        valor: valor === null || valor === undefined ? sinDato() : nivel(valor),
+        valor: nivel(r.senales['nivel'], sinDato()),
       };
     }
     case 'SENAL_MINIMA': {
-      const minimo = String(p['minimo']);
-      const valor = r.senales[String(p['senal'])];
+      const minimo = textoDe(p['minimo'], SIN_VALOR);
       return {
         nombre: nombreDeSenal(p['senal']),
         limite: $localize`:@@suscripcion.tarjeta.regla.minimoDeCien:Mínimo ${minimo}:minimo: de 100`,
-        valor: valor === null || valor === undefined ? sinDato() : deCien(valor),
+        valor: deCien(r.senales[textoDe(p['senal'], SIN_VALOR)]),
       };
     }
     case 'DATO_BIEN_MAXIMO': {
-      const maximo = datoBien(p['campo'], p['maximo'], idioma);
-      const valor = r.senales[String(p['campo'])];
+      const maximo = datoBien(p['campo'], p['maximo'], idioma, SIN_VALOR);
+      const valor = r.senales[textoDe(p['campo'], SIN_VALOR)];
       return {
         nombre: nombreDatoBien(p['campo']),
         limite: $localize`:@@suscripcion.tarjeta.regla.maximo:Máximo ${maximo}:maximo:`,
-        valor:
-          valor === null || valor === undefined ? sinDato() : datoBien(p['campo'], valor, idioma),
+        valor: datoBien(p['campo'], valor, idioma, sinDato()),
       };
     }
     case 'SIN_REGLAS':
       return {
         nombre: $localize`:@@suscripcion.tarjeta.regla.sinReglas:Ramo sin reglas configuradas`,
-        limite: '—',
-        valor: String(r.senales['ramo'] ?? '—'),
+        limite: SIN_VALOR,
+        valor: textoDe(r.senales['ramo'], SIN_VALOR),
       };
     default:
       // Un tipo que esta versión del portal no conoce no rompe la tarjeta.
-      return { nombre: r.codigo, limite: '—', valor: '—' };
+      return { nombre: r.codigo, limite: SIN_VALOR, valor: SIN_VALOR };
   }
 }
 
@@ -186,7 +201,7 @@ export function textoMotivo(motivo: MotivoDecisionSuscripcion, reglas: readonly 
     case 'EVALUACION_NO_VERIFICABLE':
       return $localize`:@@suscripcion.tarjeta.motivo.noVerificable:El registro de la evaluación no se pudo verificar al decidir, así que la decide un suscriptor.`;
     default:
-      return String(motivo);
+      return textoDe(motivo, SIN_VALOR);
   }
 }
 

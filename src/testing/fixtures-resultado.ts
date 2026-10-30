@@ -1,5 +1,6 @@
 import {
   ReglaEvaluadaSuscripcion,
+  ResultadoReglaSuscripcion,
   ResultadoSuscripcion,
   SolicitudSuscripcion,
 } from '../app/features/suscripcion/modelos';
@@ -8,6 +9,14 @@ import {
 
 export const SOLICITUD_ID = '7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e';
 const TRAZA = 'a'.repeat(64);
+
+/** El resultado de una regla que necesita el perfil de riesgo. */
+function resultadoConPerfil(sinPerfil: boolean, incumple: boolean): ResultadoReglaSuscripcion {
+  if (sinPerfil) {
+    return 'NO_APLICA';
+  }
+  return incumple ? 'NO_CUMPLE' : 'CUMPLE';
+}
 
 /** Las seis reglas de VIDA_HIPOTECARIO.SUSCRIPCION.v1, con lo que cambia en cada caso. */
 function reglas(
@@ -39,7 +48,7 @@ function reglas(
       efecto: 'RECHAZAR',
       parametros: { minimo: 450 },
       senales: { score },
-      resultado: sinPerfil ? 'NO_APLICA' : score !== null && score < 450 ? 'NO_CUMPLE' : 'CUMPLE',
+      resultado: resultadoConPerfil(sinPerfil, score !== null && score < 450),
     },
     {
       codigo: 'VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1',
@@ -47,7 +56,7 @@ function reglas(
       efecto: 'AJUSTAR',
       parametros: { permitidos: ['BAJO', 'MEDIO'] },
       senales: { nivel },
-      resultado: sinPerfil ? 'NO_APLICA' : nivel === 'ALTO' ? 'NO_CUMPLE' : 'CUMPLE',
+      resultado: resultadoConPerfil(sinPerfil, nivel === 'ALTO'),
     },
     {
       codigo: 'VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1',

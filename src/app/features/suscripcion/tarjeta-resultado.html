@@ -1,9 +1,9 @@
 @let v = vista();
 
 @if (v.noVerificable) {
-  <p class="aviso" role="status" i18n="@@suscripcion.tarjeta.noVerificable">
+  <output class="aviso" i18n="@@suscripcion.tarjeta.noVerificable">
     No pudimos verificar el registro de esta decisión. Los datos pueden estar incompletos.
-  </p>
+  </output>
 }
 
 @switch (v.s.estado) {
