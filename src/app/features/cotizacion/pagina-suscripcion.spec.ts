@@ -11,8 +11,8 @@ import { Actor } from './formulario-cotizacion';
 import { INTERVALO_CONSULTA_MS, MAXIMO_CONSULTAS, PaginaSuscripcion } from './pagina-suscripcion';
 
 // Paso 2 de la contratación (SOLVENTAG5-237): la solicitud que creó «Continuar a la contratación»
-// con su estado. Mientras está en PENDIENTE_EVALUACION se consulta cada pocos segundos (ADR 0007,
-// R8) hasta verla EVALUADA por la suscripción automática (SOLVENTAG5-50).
+// con su estado. Mientras está en PENDIENTE_EVALUACION o EVALUADA se consulta cada pocos segundos
+// (ADR 0007, R8) hasta ver la decisión automática (SOLVENTAG5-51, subtarea SOLVENTAG5-256).
 
 const BFF = 'http://bff.prueba';
 const SOLICITUD_ID = '7e3a9c1f-2b4d-4f6a-8c0e-1d2f3a4b5c6d';
@@ -30,6 +30,7 @@ const PENDIENTE: SolicitudSuscripcion = {
   aceptadaEn: '2026-10-14T15:05:00Z',
 };
 const EVALUADA: SolicitudSuscripcion = { ...PENDIENTE, estado: 'EVALUADA' };
+const ACEPTADA: SolicitudSuscripcion = { ...PENDIENTE, estado: 'ACEPTADA' };
 
 let http: HttpTestingController | undefined;
 
@@ -87,22 +88,108 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
     http.match(URL_SOLICITUD);
   });
 
-  it('vuelve a consultar mientras sigue en evaluación hasta verla evaluada', async () => {
+  it('vuelve a consultar mientras no hay decisión: en evaluación, evaluada y decidida', async () => {
     jest.useFakeTimers();
     const { http, detectChanges } = await renderizar();
     http.expectOne(URL_SOLICITUD).flush(PENDIENTE);
 
     jest.advanceTimersByTime(INTERVALO_CONSULTA_MS);
-    http.expectOne(URL_SOLICITUD).flush(PENDIENTE);
-    jest.advanceTimersByTime(INTERVALO_CONSULTA_MS);
     http.expectOne(URL_SOLICITUD).flush(EVALUADA);
+    detectChanges();
+    expect(titulo()).toHaveTextContent('Evaluamos tu solicitud');
+    expect(screen.getByText(/Pronto verás aquí la decisión/)).toBeInTheDocument();
+    expect(screen.queryByText('Decisión')).not.toBeInTheDocument();
+
+    // Evaluada todavía no es la decisión (BA-12, decisión asíncrona): sigue consultando.
+    jest.advanceTimersByTime(INTERVALO_CONSULTA_MS);
+    http.expectOne(URL_SOLICITUD).flush(ACEPTADA);
+    detectChanges();
+    expect(titulo()).toHaveTextContent('Aprobamos tu solicitud');
+
+    // Con la decisión no se consulta más.
+    jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 3);
+    http.expectNone(URL_SOLICITUD);
+  });
+
+  describe.each([
+    {
+      estado: 'ACEPTADA',
+      chip: 'Aceptada',
+      clase: 'chip-verde',
+      cliente: ['Aprobamos tu solicitud', /El siguiente paso es el pago/],
+      asesor: ['Solicitud aceptada', /continúa a cobro y emisión/],
+    },
+    {
+      estado: 'AJUSTADA',
+      chip: 'Aceptada con ajuste',
+      clase: 'chip-verde-azulado',
+      cliente: ['Aprobamos tu solicitud con ajustes', /Revisa el detalle antes de pagar/],
+      asesor: ['Solicitud aceptada con ajuste', /condiciones distintas a las cotizadas/],
+    },
+    {
+      estado: 'RECHAZADA',
+      chip: 'Rechazada',
+      clase: 'chip-rojo',
+      cliente: ['No pudimos aprobar tu solicitud', /no podemos emitirlo/],
+      asesor: ['Solicitud rechazada', /no continúa a emisión/],
+    },
+    {
+      estado: 'EN_REVISION',
+      chip: 'Pendiente de revisión',
+      clase: 'chip-ambar',
+      cliente: ['Tu solicitud está en revisión', /Un suscriptor revisará tu solicitud/],
+      asesor: ['Solicitud pendiente de revisión', /la revisa un suscriptor/],
+    },
+  ] as const)('decisión $estado', ({ estado, chip, clase, cliente, asesor }) => {
+    it.each([
+      ['cliente', cliente],
+      ['asesor', asesor],
+    ] as const)('se la muestra al %s con su chip y deja de consultar', async (actor, textos) => {
+      jest.useFakeTimers();
+      const { http, detectChanges } = await renderizar(actor);
+      http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado });
+      detectChanges();
+
+      expect(titulo()).toHaveTextContent(textos[0]);
+      expect(screen.getByText(textos[1])).toBeInTheDocument();
+      const decision = screen.getByText('Decisión').nextElementSibling;
+      expect(decision).toHaveTextContent(chip);
+      expect(decision?.querySelector('.chip')).toHaveClass(clase);
+      jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 3);
+      http.expectNone(URL_SOLICITUD);
+    });
+  });
+
+  it('«Pendiente de revisión» es un estado, no un error', async () => {
+    const { http, detectChanges } = await renderizar();
+    http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado: 'EN_REVISION' });
+    detectChanges();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Tu solicitud está en revisión' })).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+  });
+
+  it('si la decisión tarda más de lo normal, también lo dice', async () => {
+    jest.useFakeTimers();
+    const { http, detectChanges } = await renderizar();
+    http.expectOne(URL_SOLICITUD).flush(EVALUADA);
+    for (let i = 1; i < MAXIMO_CONSULTAS; i++) {
+      jest.advanceTimersByTime(INTERVALO_CONSULTA_MS);
+      http.expectOne(URL_SOLICITUD).flush(EVALUADA);
+    }
     detectChanges();
 
     expect(titulo()).toHaveTextContent('Evaluamos tu solicitud');
-    expect(screen.getByText(/Pronto verás aquí la decisión/)).toBeInTheDocument();
-    // Evaluada: no se consulta más.
-    jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 3);
-    http.expectNone(URL_SOLICITUD);
+    expect(screen.getByRole('status')).toHaveTextContent('tardando más de lo normal');
+    screen.getByRole('button', { name: 'Consultar de nuevo' }).click();
+    http.expectOne(URL_SOLICITUD).flush({ ...PENDIENTE, estado: 'EN_REVISION' });
+    detectChanges();
+    expect(titulo()).toHaveTextContent('Tu solicitud está en revisión');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('si la evaluación tarda más de lo normal, lo dice y permite consultar de nuevo', async () => {
