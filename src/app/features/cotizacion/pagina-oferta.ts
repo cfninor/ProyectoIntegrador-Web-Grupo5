@@ -15,9 +15,10 @@ import { Subscription } from 'rxjs';
 
 import { fechaBogota, horaBogota, montoCop } from '../../core/idioma/formatos';
 import { idiomaDe } from '../../core/idioma/idioma';
+import { SuscripcionApi } from '../suscripcion/suscripcion-api';
 import { CotizacionApi } from './cotizacion-api';
 import { Actor } from './formulario-cotizacion';
-import { Cotizacion, DatosBienVidaHipotecario } from './modelos';
+import { Cotizacion, DatosBienVidaHipotecario, ErrorApi } from './modelos';
 import { EstadoNavegacionOferta, estadoNavegacion } from './navegacion-oferta';
 import { PasosContratacion } from './pasos-contratacion';
 import {
@@ -58,8 +59,9 @@ const SCORE_MAXIMO = 850;
  * segunda para el cliente (D8).
  *
  * Desde aquí se decide (CA2): continuar a la contratación, ajustar los datos o descartar la oferta.
- * Una oferta vencida lo dice y solo permite recotizar (CA3). Ninguna de las tres decisiones se
- * guarda en el backend: cada una lleva a la pantalla que sigue.
+ * Una oferta vencida lo dice y solo permite recotizar (CA3). Continuar acepta la oferta en el BFF
+ * (`POST /v1/solicitudes-suscripcion`, SOLVENTAG5-237) y lleva al paso 2 con la solicitud creada;
+ * ajustar y descartar no guardan nada.
  */
 @Component({
   selector: 'app-pagina-oferta',
@@ -75,13 +77,18 @@ export class PaginaOferta implements OnInit {
   readonly actor = input.required<Actor>();
 
   private readonly api = inject(CotizacionApi);
+  private readonly suscripcion = inject(SuscripcionApi);
   private readonly router = inject(Router);
   /** El documento con que el asesor encontró al cliente, si la oferta se abrió desde el cotizador. */
   private readonly busqueda = estadoNavegacion(this.router).busqueda;
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
   private consulta?: Subscription;
+  private aceptacion?: Subscription;
 
   protected readonly carga = signal<Carga>({ tipo: 'cargando' });
+  /** Mientras se acepta la oferta, el botón de continuar queda deshabilitado (sin doble envío). */
+  protected readonly aceptando = signal(false);
+  protected readonly errorAceptacion = signal(false);
   protected readonly circunferencia = CIRCUNFERENCIA;
   protected readonly radioAnillo = RADIO_ANILLO;
 
@@ -110,7 +117,10 @@ export class PaginaOferta implements OnInit {
   });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.consulta?.unsubscribe());
+    inject(DestroyRef).onDestroy(() => {
+      this.consulta?.unsubscribe();
+      this.aceptacion?.unsubscribe();
+    });
   }
 
   ngOnInit(): void {
@@ -128,11 +138,38 @@ export class PaginaOferta implements OnInit {
     });
   }
 
-  /** CA2: el siguiente paso de la contratación, la suscripción. */
+  /**
+   * CA2: acepta la oferta y abre el paso 2, Suscripción, con la solicitud creada (201) o la que ya
+   * existía (200, p. ej. un doble clic). 409 OFERTA_VENCIDA: la oferta se muestra vencida y solo
+   * permite recotizar (CA3). 404: la oferta ya no existe.
+   */
   protected continuar(): void {
-    void this.router.navigateByUrl(
-      `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/suscripcion`,
-    );
+    if (this.aceptando()) {
+      return;
+    }
+    this.aceptando.set(true);
+    this.errorAceptacion.set(false);
+    this.aceptacion = this.suscripcion.aceptarOferta(this.cotizacionId()).subscribe({
+      next: (solicitud) => {
+        this.aceptando.set(false);
+        const id = encodeURIComponent(solicitud.solicitudId);
+        void this.router.navigateByUrl(
+          `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/suscripcion?solicitudId=${id}`,
+        );
+      },
+      error: (error: HttpErrorResponse) => {
+        this.aceptando.set(false);
+        const codigo = (error.error as ErrorApi | null)?.codigo;
+        const carga = this.carga();
+        if (error.status === 409 && codigo === 'OFERTA_VENCIDA' && carga.tipo === 'lista') {
+          this.carga.set({ tipo: 'lista', cotizacion: { ...carga.cotizacion, estado: 'VENCIDA' } });
+        } else if (error.status === 404) {
+          this.carga.set({ tipo: 'no-encontrada' });
+        } else {
+          this.errorAceptacion.set(true);
+        }
+      },
+    });
   }
 
   /** CA2: descartar la oferta lleva al tablero, como en el prototipo. No se guarda nada. */

@@ -2,11 +2,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
 import { APP_CONFIG } from '../../core/config/app-config';
 import { Actor } from './formulario-cotizacion';
+import { SolicitudSuscripcion } from '../suscripcion/modelos';
 import { Cotizacion } from './modelos';
 import { PaginaOferta } from './pagina-oferta';
 
@@ -17,6 +18,7 @@ import { PaginaOferta } from './pagina-oferta';
 const BFF = 'http://bff.prueba';
 const COTIZACION_ID = '5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d';
 const URL_OFERTA = `${BFF}/v1/cotizaciones/${COTIZACION_ID}`;
+const URL_ACEPTAR = `${BFF}/v1/solicitudes-suscripcion`;
 const CON_PERFIL: Cotizacion = {
   cotizacionId: COTIZACION_ID,
   ramo: 'VIDA_HIPOTECARIO',
@@ -52,6 +54,20 @@ const SIN_PERFIL: Cotizacion = {
   calculadaSinPerfil: true,
   motivoSinPerfil: 'SIN_CONSENTIMIENTO',
   perfil: undefined,
+};
+
+const SOLICITUD: SolicitudSuscripcion = {
+  solicitudId: '7e3a9c1f-2b4d-4f6a-8c0e-1d2f3a4b5c6d',
+  cotizacionId: COTIZACION_ID,
+  clienteId: CON_PERFIL.clienteId,
+  estado: 'PENDIENTE_EVALUACION',
+  cobertura: { ramo: 'VIDA_HIPOTECARIO', datosBien: { ...CON_PERFIL.datosBien } },
+  prima: CON_PERFIL.prima,
+  moneda: 'COP',
+  periodicidad: 'MENSUAL',
+  perfilRiesgo: { perfilId: '2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d', version: 3 },
+  canal: 'web',
+  aceptadaEn: '2026-10-14T15:05:00Z',
 };
 
 let http: HttpTestingController | undefined;
@@ -267,16 +283,95 @@ describe('PaginaOferta · decisiones del cliente (CA2, CA3)', () => {
     ]);
   });
 
-  it.each<[Actor, string, string]>([
-    ['cliente', 'Continuar a la contratación', '/cliente'],
-    ['asesor', 'El cliente acepta · enviar a suscripción', '/asesor'],
-  ])('el %s continúa al paso de suscripción de esta oferta', async (actor, boton, portal) => {
-    const { usuario } = await cargar(CON_PERFIL, actor);
+  it.each<[Actor, string, string, number]>([
+    ['cliente', 'Continuar a la contratación', '/cliente', 201],
+    ['asesor', 'El cliente acepta · enviar a suscripción', '/asesor', 201],
+    // Aceptación repetida (p. ej. doble clic en otra pestaña): la misma solicitud.
+    ['cliente', 'Continuar a la contratación', '/cliente', 200],
+  ])(
+    'el %s acepta la oferta y continúa al paso de suscripción con la solicitud (%#)',
+    async (actor, boton, portal, codigo) => {
+      const { http, usuario } = await cargar(CON_PERFIL, actor);
+      const navegar = espiarNavegacion();
+
+      await usuario.click(screen.getByRole('button', { name: boton }));
+
+      const aceptar = http.expectOne(URL_ACEPTAR);
+      expect(aceptar.request.method).toBe('POST');
+      // Solo la cotización: el canal lo pone el BFF.
+      expect(aceptar.request.body).toEqual({ cotizacionId: COTIZACION_ID });
+      aceptar.flush(SOLICITUD, { status: codigo, statusText: 'OK' });
+      expect(navegar).toHaveBeenCalledWith(
+        `${portal}/cotizar/oferta/${COTIZACION_ID}/suscripcion?solicitudId=${SOLICITUD.solicitudId}`,
+      );
+    },
+  );
+
+  it('deshabilita el botón mientras envía la aceptación y no la envía dos veces', async () => {
+    const { http, usuario } = await cargar(CON_PERFIL);
+    espiarNavegacion();
+    const boton = screen.getByRole('button', { name: 'Continuar a la contratación' });
+
+    await usuario.click(boton);
+
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAttribute('aria-busy', 'true');
+    await usuario.click(boton);
+    http.expectOne(URL_ACEPTAR).flush(SOLICITUD, { status: 201, statusText: 'Created' });
+    await waitFor(() => expect(boton).toBeEnabled());
+  });
+
+  it('si la oferta venció al aceptarla, lo dice y solo permite recotizar (409 OFERTA_VENCIDA)', async () => {
+    const { http, usuario } = await cargar(CON_PERFIL);
     const navegar = espiarNavegacion();
 
-    await usuario.click(screen.getByRole('button', { name: boton }));
+    await usuario.click(screen.getByRole('button', { name: 'Continuar a la contratación' }));
+    http
+      .expectOne(URL_ACEPTAR)
+      .flush(
+        { codigo: 'OFERTA_VENCIDA', detalle: 'La oferta venció.' },
+        { status: 409, statusText: 'Conflict' },
+      );
 
-    expect(navegar).toHaveBeenCalledWith(`${portal}/cotizar/oferta/${COTIZACION_ID}/suscripcion`);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Esta oferta venció el/);
+    expect(acciones().map((b) => b.textContent?.trim())).toEqual(['Recotizar', 'Descartar oferta']);
+    expect(navegar).not.toHaveBeenCalled();
+  });
+
+  it('si la cotización ya no existe al aceptarla, muestra la oferta no encontrada (404)', async () => {
+    const { http, usuario } = await cargar(CON_PERFIL);
+
+    await usuario.click(screen.getByRole('button', { name: 'Continuar a la contratación' }));
+    http
+      .expectOne(URL_ACEPTAR)
+      .flush(
+        { codigo: 'COTIZACION_NO_ENCONTRADA', detalle: 'No encontramos la cotización.' },
+        { status: 404, statusText: 'Not Found' },
+      );
+
+    expect(await screen.findByText('No encontramos esta oferta.')).toBeInTheDocument();
+  });
+
+  it('si el BFF falla al aceptar, lo dice y permite intentar de nuevo', async () => {
+    const { http, usuario } = await cargar(CON_PERFIL);
+    espiarNavegacion();
+    const boton = screen.getByRole('button', { name: 'Continuar a la contratación' });
+
+    await usuario.click(boton);
+    http
+      .expectOne(URL_ACEPTAR)
+      .flush(
+        { codigo: 'NUCLEO_NO_DISPONIBLE', detalle: 'No disponible.' },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos enviar la aceptación de la oferta. Intenta de nuevo.',
+    );
+    expect(boton).toBeEnabled();
+    await usuario.click(boton);
+    http.expectOne(URL_ACEPTAR).flush(SOLICITUD, { status: 201, statusText: 'Created' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it.each<[Actor, string]>([
