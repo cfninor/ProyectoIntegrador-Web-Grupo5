@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.1.0
+  version: 1.2.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -51,7 +51,9 @@ tags:
       Solicitudes de suscripción (SOLVENTAG5-133). Cuando el cliente acepta la oferta, se crea
       una solicitud que conserva la cotización, la prima, la cobertura y el perfil con que se
       calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50). El responsable de
-      suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67).
+      suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67). La consulta de la
+      solicitud también da el resultado de la suscripción o, sin decisión, el último estado
+      conocido (SOLVENTAG5-55).
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -624,7 +626,10 @@ paths:
         aceptado, no se crea la solicitud: responde 409 OFERTA_VENCIDA y la pantalla ofrece
         recotizar. El BFF agrega el canal antes de llamar al núcleo. El asesor acepta en nombre
         del cliente; con la sesión del cliente, una cotización que no es suya (sin clienteId o
-        con otro) responde 404 COTIZACION_NO_ENCONTRADA y no se acepta.
+        con otro) responde 404 COTIZACION_NO_ENCONTRADA y no se acepta. Esta operación no envía
+        los campos del resultado de SolicitudSuscripcion (decidida, actualizadaEn,
+        reglasEvaluadas, versionReglas, registrosVerificables y decision): solo los envía
+        obtenerSolicitudSuscripcion.
       x-roles: [ASESOR, CLIENTE]
       requestBody:
         required: true
@@ -672,10 +677,19 @@ paths:
       summary: Consultar una solicitud de suscripción
       description: >
         Devuelve la solicitud con su estado. Queda en PENDIENTE_EVALUACION hasta que la evalúe
-        la suscripción automática (SOLVENTAG5-50). Con la sesión del cliente, una solicitud que
-        no es suya (sin clienteId o con otro) responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
-        para no revelar que existe.
-      x-roles: [ASESOR, CLIENTE]
+        la suscripción automática (SOLVENTAG5-50), que corre después de aceptar la oferta y la
+        pasa a EVALUADA y luego al estado de la decisión automática (SOLVENTAG5-51): ACEPTADA,
+        AJUSTADA, RECHAZADA o EN_REVISION (ADR 0007, decisión 4); el canal consulta aquí. Con la
+        decisión, la respuesta trae el resultado (SOLVENTAG5-55): si continúa a cobro y emisión,
+        el motivo, la regla aplicada, las condiciones y las reglas evaluadas, tal como quedaron
+        en los registros de la evaluación y de la decisión (ADR 0006). Sin decisión responde 200
+        con el último estado conocido: decidida en false y cuándo cambió por última vez.
+        EN_REVISION es un resultado con su motivo, no un error. Con la sesión del cliente, una
+        solicitud que no es suya (sin clienteId o con otro) responde 404
+        SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, para no revelar que existe; igual con la sesión del
+        asesor si la solicitud no está en su cartera. El analista de riesgo consulta cualquier
+        solicitud.
+      x-roles: [ASESOR, CLIENTE, ANALISTA_RIESGO]
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
       responses:
@@ -688,12 +702,27 @@ paths:
               examples:
                 conPerfil:
                   $ref: '#/components/examples/SolicitudSuscripcionCreada'
+                pendiente:
+                  $ref: '#/components/examples/SolicitudSuscripcionPendiente'
+                evaluada:
+                  $ref: '#/components/examples/SolicitudSuscripcionEvaluada'
+                aceptada:
+                  $ref: '#/components/examples/SolicitudSuscripcionAceptada'
+                ajustada:
+                  $ref: '#/components/examples/SolicitudSuscripcionAjustada'
+                rechazada:
+                  $ref: '#/components/examples/SolicitudSuscripcionRechazada'
+                enRevision:
+                  $ref: '#/components/examples/SolicitudSuscripcionEnRevision'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+          description: >
+            La solicitud de suscripción no existe o es ajena: el cliente no es su titular o el
+            asesor no la tiene en su cartera.
         '422':
           $ref: '#/components/responses/Validacion'
         '503':
@@ -1564,9 +1593,14 @@ components:
     EstadoSolicitudSuscripcion:
       type: string
       description: >
-        PENDIENTE_EVALUACION al crearse; la evaluación automática (SOLVENTAG5-50) agrega los
-        estados siguientes.
-      enum: [PENDIENTE_EVALUACION]
+        PENDIENTE_EVALUACION al crearse. EVALUADA cuando la evaluación automática
+        (SOLVENTAG5-50) aplicó las reglas de suscripción del ramo. Luego, la decisión automática
+        (SOLVENTAG5-51): ACEPTADA (con la prima cotizada) o AJUSTADA (con condiciones distintas)
+        continúan a cobro y emisión; RECHAZADA no continúa; EN_REVISION espera a un suscriptor
+        (SOLVENTAG5-52) y es un estado de negocio, no un error. La decisión corre después de
+        aceptar la oferta (ADR 0007, decisión 4): mientras la solicitud esté en
+        PENDIENTE_EVALUACION o EVALUADA, el canal sigue consultando.
+      enum: [PENDIENTE_EVALUACION, EVALUADA, ACEPTADA, AJUSTADA, RECHAZADA, EN_REVISION]
     Cobertura:
       type: object
       required: [ramo, datosBien]
@@ -1633,6 +1667,161 @@ components:
         aceptadaEn:
           type: string
           format: date-time
+        decidida:
+          type: boolean
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, siempre. true cuando existe la decisión
+            automática (SOLVENTAG5-51), también en EN_REVISION; false mientras la solicitud está
+            en PENDIENTE_EVALUACION o EVALUADA. La revisión de un suscriptor (SOLVENTAG5-52 y 53)
+            no es parte de esta versión.
+        actualizadaEn:
+          type: string
+          format: date-time
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, siempre. Cuándo cambió el estado por última
+            vez: al aceptar, al evaluar o al decidir. Con decidida en false, indica la fecha del
+            último estado conocido.
+        reglasEvaluadas:
+          type: array
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, cuando hay evaluación. Cada regla tal como
+            quedó registrada, en el orden del catálogo.
+          items:
+            $ref: '#/components/schemas/ReglaEvaluadaSuscripcion'
+        versionReglas:
+          type: string
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, cuando hay evaluación. Versión del conjunto
+            de reglas con que se evaluó.
+          examples: [VIDA_HIPOTECARIO.SUSCRIPCION.v1]
+        registrosVerificables:
+          type: boolean
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, cuando hay evaluación. false si el registro
+            de la evaluación o el de la decisión no se pudo verificar al consultar; los datos son
+            los guardados, sin corregirlos. Es distinto del motivo EVALUACION_NO_VERIFICABLE, que
+            describe la evaluación en el momento de decidir.
+        decision:
+          $ref: '#/components/schemas/DecisionSuscripcion'
+          description: >
+            Solo lo envía obtenerSolicitudSuscripcion, cuando decidida es true y su registro se
+            puede leer.
+    ResultadoSuscripcion:
+      type: string
+      description: >
+        ACEPTADA y AJUSTADA continúan a cobro y emisión; RECHAZADA no continúa; EN_REVISION espera
+        a un suscriptor y es un estado de negocio, no un error.
+      enum: [ACEPTADA, AJUSTADA, RECHAZADA, EN_REVISION]
+    MotivoDecisionSuscripcion:
+      type: string
+      description: >
+        CUMPLE_REGLAS cumple todas las reglas. REGLA_DE_RECHAZO, REGLA_DE_REVISION y
+        REGLA_DE_AJUSTE incumple una regla con ese efecto. REGLAS_NO_ALCANZAN alguna regla no
+        aplica o el ramo no tiene reglas. EVALUACION_NO_VERIFICABLE el registro de la evaluación
+        no se pudo verificar al decidir.
+      enum:
+        - CUMPLE_REGLAS
+        - REGLA_DE_RECHAZO
+        - REGLA_DE_REVISION
+        - REGLA_DE_AJUSTE
+        - REGLAS_NO_ALCANZAN
+        - EVALUACION_NO_VERIFICABLE
+    TipoReglaSuscripcion:
+      type: string
+      enum:
+        - PERFIL_REQUERIDO
+        - SCORE_MINIMO
+        - NIVEL_PERMITIDO
+        - SENAL_MINIMA
+        - DATO_BIEN_MAXIMO
+        - SIN_REGLAS
+    EfectoReglaSuscripcion:
+      type: string
+      description: Lo que la regla propone a la decisión cuando no se cumple.
+      enum: [RECHAZAR, AJUSTAR, REVISAR]
+    ResultadoReglaSuscripcion:
+      type: string
+      description: NO_APLICA si la regla necesita el perfil de riesgo y se cotizó sin él.
+      enum: [CUMPLE, NO_CUMPLE, NO_APLICA]
+    ReglaEvaluadaSuscripcion:
+      type: object
+      required: [codigo, tipo, efecto, parametros, senales, resultado]
+      properties:
+        codigo:
+          type: string
+          description: Código de la regla con su versión.
+          examples: [VIDA_HIPOTECARIO.SCORE_MINIMO.v1]
+        tipo:
+          $ref: '#/components/schemas/TipoReglaSuscripcion'
+        efecto:
+          $ref: '#/components/schemas/EfectoReglaSuscripcion'
+        parametros:
+          type: object
+          additionalProperties: true
+          description: Parámetros tal como se aplicaron, como el límite; dependen del tipo.
+        senales:
+          type: object
+          additionalProperties: true
+          description: >
+            Valores del cliente que usó la regla; dependen del tipo. Un valor es null si la regla
+            no aplica.
+        resultado:
+          $ref: '#/components/schemas/ResultadoReglaSuscripcion'
+        determinante:
+          type: boolean
+          description: Si la regla determinó la decisión. Solo con decisión.
+    DecisionSuscripcion:
+      type: object
+      description: La decisión automática tal como quedó en su registro (ADR 0006).
+      required:
+        - resultado
+        - continuaAEmision
+        - motivo
+        - reglaAplicada
+        - versionPolitica
+        - primaCotizada
+        - tiempoDecisionMs
+        - trazaId
+      properties:
+        resultado:
+          $ref: '#/components/schemas/ResultadoSuscripcion'
+        continuaAEmision:
+          type: boolean
+          description: Si la solicitud continúa a cobro y emisión.
+        motivo:
+          $ref: '#/components/schemas/MotivoDecisionSuscripcion'
+        reglaAplicada:
+          type: string
+          description: >
+            La regla que determinó el resultado. Sin una regla determinante, como al aceptar, es
+            la versión de la política.
+          examples: [VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1]
+        versionPolitica:
+          type: string
+          examples: [VIDA_HIPOTECARIO.DECISION.v1]
+        primaCotizada:
+          type: integer
+          minimum: 0
+          description: Prima en COP con que se decidió, redondeada al peso.
+        primaFinal:
+          type: integer
+          minimum: 0
+          description: >
+            Prima en COP que se cobra: la cotizada si se aceptó, con el recargo si se ajustó.
+            Solo en ACEPTADA y AJUSTADA.
+        recargoPorcentaje:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Recargo aplicado sobre la prima cotizada. Solo en AJUSTADA.
+        tiempoDecisionMs:
+          type: integer
+          minimum: 0
+          description: Milisegundos desde la aceptación de la oferta hasta la decisión.
+        trazaId:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Huella SHA-256 del registro de la decisión; con ella se audita y se reconstruye.
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -2052,6 +2241,406 @@ components:
           version: 3
         canal: web
         aceptadaEn: '2026-10-14T16:30:00Z'
+    SolicitudSuscripcionPendiente:
+      summary: Sin decisión y todavía sin evaluar, con el último estado conocido
+      value:
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_EVALUACION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: false
+        actualizadaEn: '2026-10-14T16:30:00Z'
+    SolicitudSuscripcionEvaluada:
+      summary: Sin decisión y ya evaluada, con el último estado conocido y las reglas
+      value:
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: EVALUADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: false
+        actualizadaEn: '2026-10-14T16:30:00.620Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 640 }
+            resultado: CUMPLE
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 72 }
+            resultado: CUMPLE
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 41 }
+            resultado: CUMPLE
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+    SolicitudSuscripcionAceptada:
+      summary: Aceptada con la prima cotizada porque cumple todas las reglas
+      value:
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: ACEPTADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 2a4b6c8d-1e3f-4a5b-8c7d-9e0f1a2b3c4d
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-14T16:30:01.240Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 640 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 72 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 41 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: ACEPTADA
+          continuaAEmision: true
+          motivo: CUMPLE_REGLAS
+          reglaAplicada: VIDA_HIPOTECARIO.DECISION.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 70000
+          primaFinal: 70000
+          tiempoDecisionMs: 1240
+          trazaId: 2663d21e3e010504b77315719b3f6ee0c100276cf9c98d9f5ada8bbf1b4b06c4
+    SolicitudSuscripcionAjustada:
+      summary: Ajustada con recargo del 20 % porque el nivel ALTO no está permitido
+      value:
+        solicitudId: 3d5f7a9b-4c6e-4f8a-9b1d-5e7f9a1b3c5d
+        cotizacionId: 4e6a8c0d-5d7f-4a9b-8c2e-6f8a0b2c4d6e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: AJUSTADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 91000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 5b7d9f1a-6e8a-4b0c-9d3f-7a9b1c3d5e7f
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-14T16:30:01.180Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 500 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: ALTO }
+            resultado: NO_CUMPLE
+            determinante: true
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 60 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 45 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: AJUSTADA
+          continuaAEmision: true
+          motivo: REGLA_DE_AJUSTE
+          reglaAplicada: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 91000
+          primaFinal: 109200
+          recargoPorcentaje: 20
+          tiempoDecisionMs: 1180
+          trazaId: 6a5b5cd8dcf69950afce9c9dd305401d735c1f0be18d3d634be2fcb92befd29e
+    SolicitudSuscripcionRechazada:
+      summary: Rechazada porque el score no alcanza el mínimo; no continúa
+      value:
+        solicitudId: 6c8e0a2b-7f9b-4c1d-8e4a-8b0c2d4e6f8a
+        cotizacionId: 7d9f1b3c-8a0c-4d2e-9f5b-9c1d3e5f7a9b
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: RECHAZADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 91000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 8e0a2c4d-9b1d-4e3f-8a6c-0d2e4f6a8b0c
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-14T16:30:01.320Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 400 }
+            resultado: NO_CUMPLE
+            determinante: true
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: ALTO }
+            resultado: NO_CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 55 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 35 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: RECHAZADA
+          continuaAEmision: false
+          motivo: REGLA_DE_RECHAZO
+          reglaAplicada: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 91000
+          tiempoDecisionMs: 1320
+          trazaId: 0edf080801e10552a8f2c642e3427eabe92b4ceac92e78459e9717433626ca9d
+    SolicitudSuscripcionEnRevision:
+      summary: En revisión porque se cotizó sin perfil; es un estado, no un error
+      value:
+        solicitudId: 9f1b3d5e-0c2e-4f4a-9b7d-1e3f5a7b9c1d
+        cotizacionId: 0a2c4e6f-1d3f-4a5b-8c8e-2f4a6b8c0d2e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: EN_REVISION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        motivoSinPerfil: PERFIL_NO_DISPONIBLE
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-14T16:30:01.090Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: VALOR_POR_DEFECTO, motivoSinPerfil: PERFIL_NO_DISPONIBLE, perfilConsistente: true }
+            resultado: NO_CUMPLE
+            determinante: true
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: null }
+            resultado: NO_APLICA
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: null }
+            resultado: NO_APLICA
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: null }
+            resultado: NO_APLICA
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: null }
+            resultado: NO_APLICA
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: EN_REVISION
+          continuaAEmision: false
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 70000
+          tiempoDecisionMs: 1090
+          trazaId: 3e3b227afb28e75f0b3fb02a61f8dc178f6128acbb354ed27310dc4638738677
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:

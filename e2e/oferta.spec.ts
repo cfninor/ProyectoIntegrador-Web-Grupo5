@@ -2,8 +2,8 @@ import { expect, Page, Route, test } from '@playwright/test';
 
 // Oferta personalizada (SOLVENTAG5-49) del asesor y del cliente, con el BFF simulado por
 // page.route: ver la oferta desde la cotización con el precio explicado y la cobertura (CA1),
-// continuar a la suscripción o descartar sin guardar nada (CA2), recotizar la oferta vencida
-// (CA3), en español y en inglés.
+// continuar a la suscripción aceptando la oferta (SOLVENTAG5-237) o descartar sin guardar nada
+// (CA2), recotizar la oferta vencida (CA3), en español y en inglés.
 
 const CLIENTE_ID = '9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e';
 const COTIZACION_ID = '5d2c8b1a-4e3f-4a6b-9c7d-8e1f2a3b4c5d';
@@ -45,6 +45,22 @@ const COTIZACION = {
   perfil: PERFIL,
 };
 const VENCIDA = { ...COTIZACION, estado: 'VENCIDA' };
+const SOLICITUD_ID = '7e3a9c1f-2b4d-4f6a-8c0e-1d2f3a4b5c6d';
+const SOLICITUD = {
+  solicitudId: SOLICITUD_ID,
+  cotizacionId: COTIZACION_ID,
+  clienteId: CLIENTE_ID,
+  estado: 'PENDIENTE_EVALUACION',
+  cobertura: { ramo: 'VIDA_HIPOTECARIO', datosBien: DATOS_BIEN },
+  prima: 148500,
+  moneda: 'COP',
+  periodicidad: 'MENSUAL',
+  perfilRiesgo: { perfilId: '7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d', version: 1 },
+  canal: 'web',
+  aceptadaEn: '2026-10-14T15:05:00Z',
+};
+const RUTA_SUSCRIPCION = (actor: string) =>
+  `${RUTA_OFERTA(actor)}/suscripcion?solicitudId=${SOLICITUD_ID}`;
 const SIN_PERFIL = {
   ...COTIZACION,
   prima: 170000,
@@ -62,6 +78,8 @@ interface Bff {
   /** Cotización que devuelve la consulta de la oferta; null responde 404. */
   oferta: object | null;
   peticiones: { metodo: string; ruta: string; cuerpo?: unknown }[];
+  /** Respuesta de aceptar la oferta: la solicitud creada, o 409 si la oferta venció. */
+  aceptacion: 'creada' | 'vencida';
 }
 
 async function responder(route: Route, status: number, json?: unknown): Promise<void> {
@@ -78,7 +96,7 @@ async function simularBff(
   actor: 'asesor' | 'cliente',
   oferta: object | null = COTIZACION,
 ): Promise<Bff> {
-  const bff: Bff = { oferta, peticiones: [] };
+  const bff: Bff = { oferta, peticiones: [], aceptacion: 'creada' };
   const anotar = (route: Route) => {
     const peticion = route.request();
     if (peticion.method() !== 'OPTIONS') {
@@ -118,6 +136,22 @@ async function simularBff(
     return bff.oferta
       ? responder(route, 200, bff.oferta)
       : responder(route, 404, { codigo: 'COTIZACION_NO_ENCONTRADA', detalle: 'x' });
+  });
+  await page.route('**/v1/solicitudes-suscripcion', (route) => {
+    anotar(route);
+    return bff.aceptacion === 'creada'
+      ? responder(route, 201, SOLICITUD)
+      : responder(route, 409, { codigo: 'OFERTA_VENCIDA', detalle: 'La oferta venció.' });
+  });
+  // La primera consulta la ve en evaluación; la siguiente, ya evaluada por el núcleo.
+  let consultasSolicitud = 0;
+  await page.route('**/v1/solicitudes-suscripcion/*', (route) => {
+    anotar(route);
+    if (route.request().method() === 'GET') {
+      consultasSolicitud += 1;
+    }
+    const estado = consultasSolicitud > 1 ? 'EVALUADA' : 'PENDIENTE_EVALUACION';
+    return responder(route, 200, { ...SOLICITUD, estado });
   });
   return bff;
 }
@@ -179,16 +213,24 @@ test('el cliente cotiza, ve la oferta con el precio explicado y continúa a la s
     'Banco de Ejemplo',
   ]);
 
-  // CA2: continuar lleva al paso 2, Suscripción, sin enviar nada más al BFF.
+  // CA2 y SOLVENTAG5-237: continuar acepta la oferta y lleva al paso 2 con la solicitud creada.
   await cobertura.getByRole('button', { name: 'Continuar a la contratación' }).click();
 
-  await expect(page).toHaveURL(`${RUTA_OFERTA('cliente')}/suscripcion`);
+  await expect(page).toHaveURL(RUTA_SUSCRIPCION('cliente'));
   await expect(page).toHaveTitle('Suscripción · Solventa');
-  await expect(page.getByRole('heading', { name: 'La suscripción llega pronto' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Estamos evaluando tu solicitud' })).toBeVisible();
+  await expect(page.getByText(SOLICITUD_ID)).toBeVisible();
+  // La pantalla vuelve a consultar hasta ver la solicitud evaluada (ADR 0007, R8).
+  await expect(page.getByRole('heading', { name: 'Evaluamos tu solicitud' })).toBeVisible();
   expect(bff.peticiones.map(({ metodo, ruta }) => `${metodo} ${ruta}`)).toEqual([
     'POST /v1/cotizaciones',
     `GET /v1/cotizaciones/${COTIZACION_ID}`,
+    'POST /v1/solicitudes-suscripcion',
+    `GET /v1/solicitudes-suscripcion/${SOLICITUD_ID}`,
+    `GET /v1/solicitudes-suscripcion/${SOLICITUD_ID}`,
   ]);
+  // Solo la cotización: el canal lo pone el BFF.
+  expect(bff.peticiones[2].cuerpo).toEqual({ cotizacionId: COTIZACION_ID });
 
   await page.getByRole('link', { name: 'Volver a la oferta' }).click();
   await expect(page).toHaveURL(RUTA_OFERTA('cliente'));
@@ -212,8 +254,26 @@ test('el asesor ve la oferta del cliente y la envía a suscripción', async ({ p
 
   await page.getByRole('button', { name: 'El cliente acepta · enviar a suscripción' }).click();
 
-  await expect(page).toHaveURL(`${RUTA_OFERTA('asesor')}/suscripcion`);
-  await expect(page.getByText('El cliente aceptó la oferta.')).toBeVisible();
+  await expect(page).toHaveURL(RUTA_SUSCRIPCION('asesor'));
+  await expect(page.getByRole('heading', { name: 'Solicitud evaluada' })).toBeVisible();
+  await expect(page.getByText(/espera la decisión/)).toBeVisible();
+});
+
+test('si la oferta vence antes de aceptarla, lo dice y solo permite recotizar', async ({
+  page,
+}) => {
+  const bff = await simularBff(page, 'cliente');
+  bff.aceptacion = 'vencida';
+
+  await page.goto(RUTA_OFERTA('cliente'));
+  await page.getByRole('button', { name: 'Continuar a la contratación' }).click();
+
+  await expect(page).toHaveURL(RUTA_OFERTA('cliente'));
+  await expect(page.getByRole('alert')).toHaveText(
+    'Esta oferta venció el 21/10/2026. Recotiza para obtener una prima vigente.',
+  );
+  const cobertura = page.getByRole('region', { name: 'Resumen de la cobertura' });
+  await expect(cobertura.getByRole('button')).toHaveText(['Recotizar', 'Descartar oferta']);
 });
 
 test('descartar la oferta vuelve al tablero sin guardar nada (CA2)', async ({ page }) => {
@@ -346,7 +406,10 @@ test.describe('en inglés', () => {
     await page.getByRole('button', { name: 'Continue with the purchase' }).click();
 
     await expect(page).toHaveTitle('Underwriting · Solventa');
-    await expect(page.getByRole('heading', { name: 'Underwriting is coming soon' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'We evaluated your application' }),
+    ).toBeVisible();
+    await expect(page.getByText('Application number')).toBeVisible();
   });
 
   test('la oferta vencida, en inglés', async ({ page }) => {

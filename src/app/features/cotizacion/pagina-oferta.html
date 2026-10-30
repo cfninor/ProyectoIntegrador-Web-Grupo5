@@ -204,6 +204,11 @@
         <dd>{{ datos.beneficiario }}</dd>
       </div>
     </dl>
+    @if (errorAceptacion()) {
+      <p class="mensaje-error" role="alert" i18n="@@oferta.aceptar.error">
+        No pudimos enviar la aceptación de la oferta. Intenta de nuevo.
+      </p>
+    }
     <div class="acciones">
       @if (datos.vencida) {
         <button
@@ -219,6 +224,8 @@
           <button
             type="button"
             class="boton-primario"
+            [disabled]="aceptando()"
+            [attr.aria-busy]="aceptando()"
             (click)="continuar()"
             i18n="@@oferta.continuar.asesor"
           >
@@ -228,6 +235,8 @@
           <button
             type="button"
             class="boton-primario"
+            [disabled]="aceptando()"
+            [attr.aria-busy]="aceptando()"
             (click)="continuar()"
             i18n="@@oferta.continuar.cliente"
           >
