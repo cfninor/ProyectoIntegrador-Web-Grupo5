@@ -314,3 +314,69 @@ describe('PaginaSuscripcion · SOLVENTAG5-237', () => {
     http.expectNone(URL_SOLICITUD);
   });
 });
+
+// SOLVENTAG5-56: con AJUSTADA, el cliente acepta la nueva prima desde la tarjeta (D2).
+describe('PaginaSuscripcion · aceptar la nueva prima', () => {
+  // La solicitud de la URL: la aceptación usa el id de la solicitud mostrada.
+  const AJUSTADA = { ...POR_RESULTADO.AJUSTADA, solicitudId: SOLICITUD_ID };
+  const URL_ACEPTACION = `${BFF}/v1/solicitudes-suscripcion/${SOLICITUD_ID}/aceptacion-prima`;
+
+  it('el cliente la acepta: POST sin cuerpo y la tarjeta muestra la respuesta', async () => {
+    const { http, detectChanges } = await renderizar('cliente');
+    http.expectOne(URL_SOLICITUD).flush(AJUSTADA);
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Aceptar nueva prima' }));
+    const aceptacion = http.expectOne(URL_ACEPTACION);
+    expect(aceptacion.request.method).toBe('POST');
+    expect(aceptacion.request.body).toBeNull();
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeDisabled();
+
+    aceptacion.flush({ ...AJUSTADA, primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' });
+    detectChanges();
+
+    expect(screen.getByText(/Aceptaste la nueva prima el 14\/10\/2026 a las 11:31/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+  });
+
+  it.each([
+    [409, { codigo: 'AJUSTE_NO_APLICA', detalle: 'x' }],
+    [503, null],
+  ])('si la aceptación responde %s, lo dice y conserva la solicitud', async (status, cuerpo) => {
+    const { http, detectChanges } = await renderizar('cliente');
+    http.expectOne(URL_SOLICITUD).flush(AJUSTADA);
+    detectChanges();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Aceptar nueva prima' }));
+    http.expectOne(URL_ACEPTACION).flush(cuerpo, { status, statusText: 'Error' });
+    detectChanges();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos registrar tu aceptación');
+    expect(titulo()).toHaveTextContent('Aprobamos tu solicitud con ajustes');
+    expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeEnabled();
+  });
+
+  it('el asesor no tiene el botón: ve que el cliente debe aceptarla', async () => {
+    const { http, detectChanges } = await renderizar('asesor');
+    http.expectOne(URL_SOLICITUD).flush(AJUSTADA);
+    detectChanges();
+
+    expect(screen.getByText(/El cliente debe aceptar la nueva prima/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
+  });
+
+  it('al salir de la pantalla se cancela una aceptación en curso', async () => {
+    const { http, detectChanges, fixture } = await renderizar('cliente');
+    http.expectOne(URL_SOLICITUD).flush(AJUSTADA);
+    detectChanges();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Aceptar nueva prima' }));
+    const aceptacion = http.expectOne(URL_ACEPTACION);
+
+    fixture.destroy();
+
+    expect(aceptacion.cancelled).toBe(true);
+  });
+});

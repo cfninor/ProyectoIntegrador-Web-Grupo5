@@ -1,4 +1,4 @@
-import { fechaBogota, horaBogota, montoCop, numeroConMiles } from './formatos';
+import { fechaBogota, fechaCalendario, horaBogota, montoCop, numeroConMiles } from './formatos';
 
 // Fechas en UTC y lo que se ve en Bogotá (UTC−05:00).
 describe('fechaBogota y horaBogota', () => {
@@ -33,5 +33,16 @@ describe('montos en COP (D8)', () => {
     expect(numeroConMiles(valor, 'en-US')).toBe(milesEn);
     expect(montoCop(valor, 'es-CO')).toBe(montoEs);
     expect(montoCop(valor, 'en-US')).toBe(montoEn);
+  });
+});
+
+// Fechas de calendario sin hora, como la vigencia de la póliza (SOLVENTAG5-56).
+describe('fechaCalendario', () => {
+  it.each([
+    ['2026-10-14', '14/10/2026', 'Oct 14, 2026'],
+    ['2046-02-28', '28/02/2046', 'Feb 28, 2046'],
+  ])('%s no cambia de día', (fecha, espanol, ingles) => {
+    expect(fechaCalendario(fecha, 'es-CO')).toBe(espanol);
+    expect(fechaCalendario(fecha, 'en-US')).toBe(ingles);
   });
 });

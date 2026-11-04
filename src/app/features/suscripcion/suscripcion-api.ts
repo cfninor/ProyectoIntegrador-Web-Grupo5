@@ -29,6 +29,19 @@ export class SuscripcionApi {
     );
   }
 
+  /**
+   * El cliente titular acepta la nueva prima de su solicitud AJUSTADA (`aceptarPrimaAjustada`,
+   * SOLVENTAG5-56): 200 con la solicitud y `primaAjustadaAceptadaEn`, también si ya la había
+   * aceptado. Sin cuerpo: el canal lo pone el BFF. 404 y 409 AJUSTE_NO_APLICA llegan como error.
+   */
+  aceptarPrimaAjustada(solicitudId: string): Observable<SolicitudSuscripcion> {
+    const id = encodeURIComponent(solicitudId);
+    return this.http.post<SolicitudSuscripcion>(
+      `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/${id}/aceptacion-prima`,
+      null,
+    );
+  }
+
   obtenerPerfilRiesgo(solicitudId: string): Observable<PerfilRiesgoSolicitud> {
     const id = encodeURIComponent(solicitudId);
     return this.http.get<PerfilRiesgoSolicitud>(

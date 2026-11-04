@@ -14,7 +14,7 @@ import { Subscription } from 'rxjs';
 
 import { SIN_DECISION, SolicitudSuscripcion } from '../suscripcion/modelos';
 import { SuscripcionApi } from '../suscripcion/suscripcion-api';
-import { TarjetaResultado } from '../suscripcion/tarjeta-resultado';
+import { EstadoAceptacion, TarjetaResultado } from '../suscripcion/tarjeta-resultado';
 import { Actor } from './formulario-cotizacion';
 import { PasosContratacion } from './pasos-contratacion';
 
@@ -39,6 +39,9 @@ export const MAXIMO_CONSULTAS = 15;
  * `GET /v1/solicitudes-suscripcion/{solicitudId}`, sin dejar una petición abierta (R8), y al
  * llegar muestra la decisión. «Pendiente de revisión» es un estado, no un error. La misma respuesta
  * alimenta la tarjeta del resultado (SOLV-WEB-07 y 08, SOLVENTAG5-55), sin otra llamada al BFF.
+ *
+ * Con AJUSTADA, el cliente acepta aquí la nueva prima (SOLVENTAG5-56, D2): la tarjeta lo pide y la
+ * página llama a `aceptarPrimaAjustada`, cuya respuesta reemplaza a la solicitud mostrada.
  */
 @Component({
   selector: 'app-pagina-suscripcion',
@@ -115,7 +118,12 @@ export const MAXIMO_CONSULTAS = 15;
         }
       }
       @if (solicitudLista(); as solicitud) {
-        <app-tarjeta-resultado [solicitud]="solicitud" [actor]="actor()" />
+        <app-tarjeta-resultado
+          [solicitud]="solicitud"
+          [actor]="actor()"
+          [aceptacion]="aceptacion()"
+          (aceptarPrima)="aceptarPrima(solicitud.solicitudId)"
+        />
         @if (demorada()) {
           <p role="status" i18n="@@suscripcion.demorada">
             La evaluación está tardando más de lo normal. Consulta de nuevo en unos minutos.
@@ -152,11 +160,13 @@ export class PaginaSuscripcion implements OnInit {
 
   private readonly api = inject(SuscripcionApi);
   private consulta?: Subscription;
+  private aceptacionEnCurso?: Subscription;
   private espera?: ReturnType<typeof setTimeout>;
   private consultas = 0;
 
   protected readonly carga = signal<Carga>({ tipo: 'cargando' });
   protected readonly demorada = signal(false);
+  protected readonly aceptacion = signal<EstadoAceptacion>('inactiva');
 
   protected readonly rutaOferta = computed(
     () => `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}`,
@@ -168,7 +178,10 @@ export class PaginaSuscripcion implements OnInit {
   });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.detener());
+    inject(DestroyRef).onDestroy(() => {
+      this.detener();
+      this.aceptacionEnCurso?.unsubscribe();
+    });
   }
 
   ngOnInit(): void {
@@ -206,6 +219,22 @@ export class PaginaSuscripcion implements OnInit {
       },
       error: (error: HttpErrorResponse) =>
         this.carga.set({ tipo: error.status === 404 ? 'no-encontrada' : 'error' }),
+    });
+  }
+
+  /**
+   * El cliente acepta la nueva prima (SOLVENTAG5-56). La respuesta trae la solicitud con
+   * `primaAjustadaAceptadaEn`; si falla, la tarjeta lo dice y conserva la solicitud.
+   */
+  protected aceptarPrima(solicitudId: string): void {
+    this.aceptacion.set('aceptando');
+    this.aceptacionEnCurso?.unsubscribe();
+    this.aceptacionEnCurso = this.api.aceptarPrimaAjustada(solicitudId).subscribe({
+      next: (solicitud) => {
+        this.aceptacion.set('inactiva');
+        this.carga.set({ tipo: 'lista', solicitud });
+      },
+      error: () => this.aceptacion.set('error'),
     });
   }
 

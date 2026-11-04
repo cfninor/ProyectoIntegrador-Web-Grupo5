@@ -73,6 +73,24 @@ describe('TarjetaResultado en inglés', () => {
     expect(screen.getByText('Decisive')).toBeInTheDocument();
   });
 
+  it('ajustada para el cliente: aceptar la nueva prima (SOLVENTAG5-56)', async () => {
+    await renderizar(AJUSTADA);
+
+    expect(screen.getByText(/You must accept the new premium/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Accept new premium' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Continue to payment' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['cliente', 'You accepted the new premium on Oct 14, 2026 at 11:31 AM.'],
+    ['asesor', 'The client accepted the new premium on Oct 14, 2026 at 11:31 AM.'],
+  ] as const)('ajustada con la prima aceptada, para el %s', async (actor, texto) => {
+    await renderizar({ ...AJUSTADA, primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' }, actor);
+
+    expect(screen.getByText(new RegExp(texto.replaceAll('.', '\\.')))).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
+  });
+
   it('rechazada', async () => {
     await renderizar(RECHAZADA);
 

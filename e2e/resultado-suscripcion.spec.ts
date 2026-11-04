@@ -32,14 +32,19 @@ const CORS = {
   'access-control-allow-headers': 'Content-Type',
 };
 
-/** Cada consulta recibe la siguiente respuesta de la lista, y la última se repite. */
+/**
+ * Cada consulta recibe la siguiente respuesta de la lista, y la última se repite. Con `aceptacion`,
+ * el POST de la nueva prima (SOLVENTAG5-56) responde eso y queda anotado.
+ */
 async function simularBff(
   page: Page,
   actor: 'asesor' | 'cliente',
   respuestas: readonly { status?: number; json: unknown }[],
-): Promise<{ consultas: () => number; otras: string[] }> {
+  aceptacion?: { status?: number; json: unknown },
+): Promise<{ consultas: () => number; otras: string[]; aceptaciones: (string | null)[] }> {
   let consultas = 0;
   const otras: string[] = [];
+  const aceptaciones: (string | null)[] = [];
   await page.route('**/config.json', (route) =>
     route.fulfill({
       json: { apiBaseUrl: 'http://localhost:8010', sesionSimulada: SESIONES[actor] },
@@ -50,7 +55,20 @@ async function simularBff(
     if (peticion.method() === 'OPTIONS') {
       return route.fulfill({ status: 204, headers: CORS });
     }
-    if (new URL(peticion.url()).pathname !== `/v1/solicitudes-suscripcion/${SOLICITUD_ID}`) {
+    const ruta = new URL(peticion.url()).pathname;
+    if (
+      aceptacion &&
+      peticion.method() === 'POST' &&
+      ruta === `/v1/solicitudes-suscripcion/${SOLICITUD_ID}/aceptacion-prima`
+    ) {
+      aceptaciones.push(peticion.postData());
+      return route.fulfill({
+        status: aceptacion.status ?? 200,
+        headers: CORS,
+        json: aceptacion.json,
+      });
+    }
+    if (ruta !== `/v1/solicitudes-suscripcion/${SOLICITUD_ID}`) {
       otras.push(peticion.url());
       return route.fulfill({ status: 404, headers: CORS, json: {} });
     }
@@ -62,7 +80,7 @@ async function simularBff(
       json: respuesta.json,
     });
   });
-  return { consultas: () => consultas, otras };
+  return { consultas: () => consultas, otras, aceptaciones };
 }
 
 test.describe('en español', () => {
@@ -103,6 +121,48 @@ test.describe('en español', () => {
     await expect(
       page.getByRole('rowheader', { name: /Nivel de riesgo.*Determinante/ }),
     ).toBeVisible();
+    // SOLVENTAG5-56: el asesor no la acepta por el cliente, y sin aceptarla no hay pago.
+    await expect(page.getByRole('button', { name: 'Aceptar nueva prima' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+  });
+
+  test('ajustada: el cliente acepta la nueva prima y continúa a pago (SOLVENTAG5-56)', async ({
+    page,
+  }) => {
+    const bff = await simularBff(page, 'cliente', [{ json: AJUSTADA }], {
+      json: { ...AJUSTADA, primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' },
+    });
+
+    await page.goto(RUTA('cliente'));
+    await expect(page.getByText(/Debes aceptar la nueva prima/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+
+    await page.getByRole('button', { name: 'Aceptar nueva prima' }).click();
+
+    await expect(
+      page.getByText(
+        'Aceptaste la nueva prima el 14/10/2026 a las 11:31. Tu solicitud continúa a pago y emisión.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Aceptar nueva prima' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    expect(bff.aceptaciones).toEqual([null]);
+    expect(bff.otras).toEqual([]);
+  });
+
+  test('ajustada: si la aceptación falla, el cliente puede intentarlo de nuevo', async ({
+    page,
+  }) => {
+    await simularBff(page, 'cliente', [{ json: AJUSTADA }], {
+      status: 503,
+      json: { codigo: 'NUCLEO_NO_DISPONIBLE', detalle: 'x' },
+    });
+
+    await page.goto(RUTA('cliente'));
+    await page.getByRole('button', { name: 'Aceptar nueva prima' }).click();
+
+    await expect(page.getByRole('alert')).toContainText('No pudimos registrar tu aceptación');
+    await expect(page.getByRole('button', { name: 'Aceptar nueva prima' })).toBeEnabled();
   });
 
   test('rechazada: el motivo, sin condiciones ni pago', async ({ page }) => {
@@ -183,6 +243,20 @@ test.describe('en inglés', () => {
 
     await expect(page.getByRole('heading', { name: 'Approved conditions' })).toBeVisible();
     await expect(page.getByRole('rowheader', { name: 'Risk score' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
+  });
+
+  test('ajustada: el cliente acepta la nueva prima', async ({ page }) => {
+    await simularBff(page, 'cliente', [{ json: AJUSTADA }], {
+      json: { ...AJUSTADA, primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' },
+    });
+
+    await page.goto(RUTA('cliente'));
+    await page.getByRole('button', { name: 'Accept new premium' }).click();
+
+    await expect(
+      page.getByText(/You accepted the new premium on Oct 14, 2026 at 11:31 AM/),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
   });
 

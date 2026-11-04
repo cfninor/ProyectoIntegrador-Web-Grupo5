@@ -1,0 +1,270 @@
+import { DOCUMENT } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  LOCALE_ID,
+  OnInit,
+  computed,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
+
+import { fechaBogota, fechaCalendario, horaBogota, montoCop } from '../../core/idioma/formatos';
+import { idiomaDe } from '../../core/idioma/idioma';
+import { Actor } from '../cotizacion/formulario-cotizacion';
+import { PasosContratacion } from '../cotizacion/pasos-contratacion';
+import { ErrorPoliza, MotivoNoEmitible, Poliza } from './modelos';
+import { PolizaApi } from './poliza-api';
+
+/** Por qué no hay póliza: los motivos de SOLICITUD_NO_EMITIBLE y SOLICITUD_SIN_CLIENTE. */
+export type MotivoSinPoliza = MotivoNoEmitible | 'SIN_CLIENTE';
+
+type Carga =
+  | { tipo: 'sin-solicitud' }
+  | { tipo: 'cargando' }
+  | { tipo: 'no-encontrada' }
+  | { tipo: 'error' }
+  | { tipo: 'no-emitible'; motivo: MotivoSinPoliza }
+  | { tipo: 'lista'; poliza: Poliza };
+
+type Descarga = 'inactiva' | 'descargando' | 'error';
+
+/** Cada cuánto se vuelve a consultar una póliza con el documento en GENERANDO (D4). */
+export const INTERVALO_CONSULTA_MS = 1000;
+/** Consultas antes de decir que el documento sigue generándose (≈ 30 s). */
+export const MAXIMO_CONSULTAS = 30;
+
+/** El chip de cada motivo: rojo si no continúa (rechazada), ámbar si espera algo (sección 4). */
+const CHIPS_MOTIVO: Record<MotivoSinPoliza, () => { clase: string; texto: string }> = {
+  PRIMA_AJUSTADA_SIN_ACEPTAR: () => ({
+    clase: 'chip-ambar',
+    texto: $localize`:@@firma.chip.primaSinAceptar:Nueva prima sin aceptar`,
+  }),
+  EN_REVISION: () => ({
+    clase: 'chip-ambar',
+    texto: $localize`:@@suscripcion.chip.enRevision:Pendiente de revisión`,
+  }),
+  SIN_DECISION: () => ({
+    clase: 'chip-ambar',
+    texto: $localize`:@@firma.chip.sinDecision:Sin decisión`,
+  }),
+  SIN_CLIENTE: () => ({
+    clase: 'chip-ambar',
+    texto: $localize`:@@firma.chip.sinCliente:Sin cliente`,
+  }),
+  RECHAZADA: () => ({
+    clase: 'chip-rojo',
+    texto: $localize`:@@suscripcion.chip.rechazada:Rechazada`,
+  }),
+};
+
+/** El motivo del 409 de `generarPolizaParaFirma` (R2, D15), o null si no es uno de ellos. */
+function motivoDe(error: HttpErrorResponse): MotivoSinPoliza | null {
+  if (error.status !== 409) {
+    return null;
+  }
+  const cuerpo = error.error as Partial<ErrorPoliza> | null;
+  if (cuerpo?.codigo === 'SOLICITUD_SIN_CLIENTE') {
+    return 'SIN_CLIENTE';
+  }
+  return cuerpo?.codigo === 'SOLICITUD_NO_EMITIBLE' && cuerpo.motivo ? cuerpo.motivo : null;
+}
+
+/**
+ * SOLV-WEB-10, la póliza para firma (SOLVENTAG5-56), paso 4 de la contratación, para el asesor y
+ * el cliente. Se abre por su ruta con el `solicitudId` de la URL (D17): «Continuar a la firma» del
+ * pago (SOLVENTAG5-74) lleva aquí.
+ *
+ * Al abrir pide la póliza (`generarPolizaParaFirma`, que devuelve la misma si ya existe) y, mientras
+ * el documento está en GENERANDO, la consulta cada segundo con `obtenerPoliza`, sin dejar una
+ * petición abierta (D4). Después de 30 consultas dice que el documento sigue generándose, como
+ * estado. Si una consulta falla se conserva lo último que se vio. Un 409 de R2 se muestra con su
+ * motivo, como estado y no como error genérico.
+ */
+@Component({
+  selector: 'app-pagina-firma',
+  imports: [PasosContratacion, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './pagina-firma.scss',
+  templateUrl: './pagina-firma.html',
+})
+export class PaginaFirma implements OnInit {
+  readonly cotizacionId = input.required<string>();
+  readonly actor = input.required<Actor>();
+  /** El `solicitudId` de la URL (`?solicitudId=`). */
+  readonly solicitudId = input<string>();
+
+  private readonly api = inject(PolizaApi);
+  private readonly documento = inject(DOCUMENT);
+  private readonly idioma = idiomaDe(inject(LOCALE_ID));
+  private peticion?: Subscription;
+  private descargaEnCurso?: Subscription;
+  private espera?: ReturnType<typeof setTimeout>;
+  private consultas = 0;
+  /** El `solicitudId` de la URL, tomado al abrir la página. */
+  private idSolicitud = '';
+
+  protected readonly carga = signal<Carga>({ tipo: 'cargando' });
+  protected readonly demorada = signal(false);
+  protected readonly descarga = signal<Descarga>('inactiva');
+
+  protected readonly rutaSuscripcion = computed(
+    () => `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/suscripcion`,
+  );
+  protected readonly rutaTablero = computed(() => `/${this.actor()}`);
+
+  protected readonly motivo = computed(() => {
+    const carga = this.carga();
+    if (carga.tipo !== 'no-emitible') {
+      return null;
+    }
+    return { motivo: carga.motivo, chip: CHIPS_MOTIVO[carga.motivo]() };
+  });
+
+  /** La vista previa: los datos de la respuesta, formateados (D14, CA4). */
+  protected readonly vista = computed(() => {
+    const carga = this.carga();
+    if (carga.tipo !== 'lista') {
+      return null;
+    }
+    const p = carga.poliza;
+    const generado = p.documento.estado === 'GENERADO';
+    const desde = fechaCalendario(p.vigenciaDesde, this.idioma);
+    const hasta = fechaCalendario(p.vigenciaHasta, this.idioma);
+    return {
+      p,
+      generado,
+      chip: generado
+        ? $localize`:@@firma.chip.generado:Generado`
+        : $localize`:@@firma.chip.generando:Generando`,
+      tomador: `${p.tomador.nombres} ${p.tomador.apellidos}`,
+      producto:
+        p.ramo === 'VIDA_HIPOTECARIO'
+          ? $localize`:@@oferta.vidaHipotecario:Vida hipotecario`
+          : p.ramo,
+      sumaAsegurada: montoCop(p.sumaAsegurada, this.idioma),
+      prima: montoCop(p.prima, this.idioma),
+      mensual: p.periodicidad === 'MENSUAL',
+      vigencia: $localize`:@@firma.vigencia.rango:Del ${desde}:desde: al ${hasta}:hasta:`,
+      generadoEl: p.documento.generadoEn ? this.fechaHora(p.documento.generadoEn) : null,
+    };
+  });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.detener();
+      this.descargaEnCurso?.unsubscribe();
+    });
+  }
+
+  ngOnInit(): void {
+    const solicitudId = this.solicitudId();
+    if (!solicitudId) {
+      this.carga.set({ tipo: 'sin-solicitud' });
+      return;
+    }
+    this.idSolicitud = solicitudId;
+    this.generar();
+  }
+
+  /** Pide la póliza; si el documento se está generando, empieza a consultarla. */
+  protected generar(): void {
+    this.detener();
+    this.carga.set({ tipo: 'cargando' });
+    this.peticion = this.api.generar(this.idSolicitud).subscribe({
+      next: (poliza) => this.mostrar(poliza, true),
+      error: (error: HttpErrorResponse) => {
+        const motivo = motivoDe(error);
+        if (motivo) {
+          this.carga.set({ tipo: 'no-emitible', motivo });
+        } else {
+          this.carga.set({ tipo: error.status === 404 ? 'no-encontrada' : 'error' });
+        }
+      },
+    });
+  }
+
+  /** «Volver a consultar» después de las 30 consultas: otra tanda, empezando ya. */
+  protected volverAConsultar(polizaId: string): void {
+    this.detener();
+    this.consultar(polizaId, true);
+  }
+
+  /** Descarga el PDF con el token de la sesión y libera el blob después (CA4). */
+  protected descargar(): void {
+    const vista = this.vista();
+    if (!vista?.generado) {
+      return;
+    }
+    const polizaId = vista.p.polizaId;
+    this.descarga.set('descargando');
+    this.descargaEnCurso?.unsubscribe();
+    this.descargaEnCurso = this.api.descargarDocumento(polizaId).subscribe({
+      next: (pdf) => {
+        const url = URL.createObjectURL(pdf);
+        const enlace = this.documento.createElement('a');
+        enlace.href = url;
+        enlace.download = `poliza-${polizaId}.pdf`;
+        enlace.click();
+        // El navegador ya tomó el blob: se libera en el siguiente ciclo.
+        setTimeout(() => URL.revokeObjectURL(url));
+        this.descarga.set('inactiva');
+      },
+      error: () => this.descarga.set('error'),
+    });
+  }
+
+  private mostrar(poliza: Poliza, nuevaTanda: boolean): void {
+    this.carga.set({ tipo: 'lista', poliza });
+    if (poliza.documento.estado === 'GENERANDO') {
+      this.programar(poliza.polizaId, nuevaTanda);
+    }
+  }
+
+  private programar(polizaId: string, nuevaTanda = false): void {
+    if (nuevaTanda) {
+      this.nuevaTanda();
+    }
+    if (this.consultas >= MAXIMO_CONSULTAS) {
+      this.demorada.set(true);
+      return;
+    }
+    this.espera = setTimeout(() => this.consultar(polizaId), INTERVALO_CONSULTA_MS);
+  }
+
+  private consultar(polizaId: string, nuevaTanda = false): void {
+    if (nuevaTanda) {
+      this.nuevaTanda();
+    }
+    this.consultas += 1;
+    this.peticion = this.api.obtener(polizaId).subscribe({
+      next: (poliza) => this.mostrar(poliza, false),
+      // Degradación elegante: se conserva el último estado conocido y se sigue consultando.
+      error: () => this.programar(polizaId),
+    });
+  }
+
+  private nuevaTanda(): void {
+    this.consultas = 0;
+    this.demorada.set(false);
+  }
+
+  private detener(): void {
+    this.peticion?.unsubscribe();
+    if (this.espera !== undefined) {
+      clearTimeout(this.espera);
+      this.espera = undefined;
+    }
+  }
+
+  private fechaHora(iso: string): string {
+    const fecha = fechaBogota(iso, this.idioma);
+    const hora = horaBogota(iso, this.idioma);
+    return $localize`:@@suscripcion.fechaHora:${fecha}:fecha: a las ${hora}:hora:`;
+  }
+}

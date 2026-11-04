@@ -77,6 +77,25 @@ function suscripcion(actor: Actor): Route {
   };
 }
 
+/**
+ * SOLV-WEB-10, paso 4: la póliza para firma (SOLVENTAG5-56). Se abre por su ruta con
+ * `?solicitudId=`, sin enlace provisional: a la firma se llega desde el pago (D17).
+ */
+function firma(actor: Actor): Route {
+  return {
+    path: 'cotizar/oferta/:cotizacionId/firma',
+    title: $localize`:@@firma.tituloPestana:Firma · Solventa`,
+    data: {
+      ...datosPagina(
+        $localize`:@@firma.miga:Cotizar / Firma`,
+        $localize`:@@firma.tituloPagina:Firma`,
+      ),
+      actor,
+    },
+    loadComponent: () => import('./features/poliza/pagina-firma').then((m) => m.PaginaFirma),
+  };
+}
+
 const DATOS_PERFIL_RIESGO = datosPagina(
   $localize`:@@perfilRiesgo.miga:Suscripción / Perfil de riesgo`,
   $localize`:@@perfilRiesgo.titulo:Perfil de riesgo de la solicitud`,
@@ -118,12 +137,19 @@ function portal(rol: Rol, pantallas: Routes): Route {
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: redirigirAlPortal },
-  portal('ASESOR', [tablero, cotizarAsesor, oferta('asesor'), suscripcion('asesor')]),
+  portal('ASESOR', [
+    tablero,
+    cotizarAsesor,
+    oferta('asesor'),
+    suscripcion('asesor'),
+    firma('asesor'),
+  ]),
   portal('CLIENTE', [
     tablero,
     cotizarCliente,
     oferta('cliente'),
     suscripcion('cliente'),
+    firma('cliente'),
     misAutorizaciones,
   ]),
   portal('ANALISTA_RIESGO', [

@@ -60,6 +60,22 @@ describe('SuscripcionApi', () => {
     await expect(respuesta).resolves.toEqual({ solicitudId: 's-1', origen: 'VALOR_POR_DEFECTO' });
   });
 
+  it('acepta la nueva prima por POST .../aceptacion-prima sin cuerpo (SOLVENTAG5-56)', async () => {
+    const respuesta = firstValueFrom(api.aceptarPrimaAjustada('a/b'));
+
+    const peticion = http.expectOne(
+      'http://bff.prueba/v1/solicitudes-suscripcion/a%2Fb/aceptacion-prima',
+    );
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toBeNull();
+    peticion.flush({ solicitudId: 'a/b', primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' });
+
+    await expect(respuesta).resolves.toEqual({
+      solicitudId: 'a/b',
+      primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z',
+    });
+  });
+
   it('codifica el id de la solicitud en la ruta', () => {
     void firstValueFrom(api.obtenerPerfilRiesgo('a/b'));
 

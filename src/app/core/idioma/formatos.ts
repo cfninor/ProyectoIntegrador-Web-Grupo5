@@ -28,6 +28,14 @@ export function fechaBogota(iso: string, idioma: Idioma): string {
   return formatDate(iso, FORMATOS[idioma].fecha, DATOS_IDIOMA, ZONA_BOGOTA);
 }
 
+/**
+ * Una fecha de calendario sin hora (`2026-10-14`, como la vigencia de una póliza), con el formato
+ * del idioma. Se lee en UTC: en hora de Bogotá la medianoche UTC caería el día anterior.
+ */
+export function fechaCalendario(fecha: string, idioma: Idioma): string {
+  return formatDate(fecha, FORMATOS[idioma].fecha, DATOS_IDIOMA, '+0000');
+}
+
 /** La hora de `iso` en hora de Bogotá, con el formato del idioma. */
 export function horaBogota(iso: string, idioma: Idioma): string {
   return formatDate(iso, FORMATOS[idioma].hora, DATOS_IDIOMA, ZONA_BOGOTA);

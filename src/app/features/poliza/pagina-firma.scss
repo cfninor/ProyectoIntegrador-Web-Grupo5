@@ -1,0 +1,109 @@
+// SOLV-WEB-10: la póliza para firma (SOLVENTAG5-56). Medidas y colores de la tarjeta de resultado.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 860px;
+}
+
+h2,
+h3,
+h4,
+p,
+ol,
+ul,
+dl,
+dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h3,
+h4 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
+// «El documento sigue generándose»: un <output>, que es en línea, con el aspecto de un párrafo.
+.aviso {
+  display: block;
+}
+
+.vista-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-control);
+}
+
+.condiciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 24px;
+
+  ul {
+    padding-left: 20px;
+  }
+}
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.descarga,
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  a {
+    text-decoration: none;
+  }
+}
+
+.linea-tiempo {
+  padding-left: 20px;
+
+  .hecho {
+    color: var(--chip-verde-texto);
+  }
+
+  [aria-current='step'] {
+    font-weight: 600;
+  }
+}
+
+.huella {
+  font-family: monospace;
+  font-size: 12px;
+}
