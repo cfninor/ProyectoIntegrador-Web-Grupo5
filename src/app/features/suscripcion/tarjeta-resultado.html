@@ -233,7 +233,17 @@
     @if (d.resultado === 'AJUSTADA') {
       <div class="bloque">
         <h3 i18n="@@suscripcion.tarjeta.nuevaPrima">Nueva prima: {{ v.primaFinal }}</h3>
-        @if (actor() === 'asesor') {
+        @if (v.primaAceptadaEl; as aceptadaEl) {
+          @if (actor() === 'asesor') {
+            <p i18n="@@suscripcion.tarjeta.nuevaPrima.aceptada.asesor">
+              El cliente aceptó la nueva prima el {{ aceptadaEl }}.
+            </p>
+          } @else {
+            <p i18n="@@suscripcion.tarjeta.nuevaPrima.aceptada.cliente">
+              Aceptaste la nueva prima el {{ aceptadaEl }}. Tu solicitud continúa a pago y emisión.
+            </p>
+          }
+        } @else if (actor() === 'asesor') {
           <p i18n="@@suscripcion.tarjeta.nuevaPrima.asesor">
             El cliente debe aceptar la nueva prima para continuar.
           </p>
@@ -241,6 +251,23 @@
           <p i18n="@@suscripcion.tarjeta.nuevaPrima.cliente">
             Debes aceptar la nueva prima para continuar.
           </p>
+          <div class="aceptar-prima">
+            <button
+              type="button"
+              class="boton-primario"
+              [disabled]="aceptacion() === 'aceptando'"
+              [attr.aria-busy]="aceptacion() === 'aceptando'"
+              (click)="aceptarPrima.emit()"
+              i18n="@@suscripcion.tarjeta.aceptarNuevaPrima"
+            >
+              Aceptar nueva prima
+            </button>
+            @if (aceptacion() === 'error') {
+              <p role="alert" i18n="@@suscripcion.tarjeta.aceptarNuevaPrima.error">
+                No pudimos registrar tu aceptación. Intenta de nuevo.
+              </p>
+            }
+          </div>
         }
       </div>
     }
@@ -285,7 +312,7 @@
       </div>
     }
 
-    @if (v.continua) {
+    @if (v.puedePagar) {
       <div class="pago">
         <button
           type="button"

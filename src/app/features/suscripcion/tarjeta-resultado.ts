@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   input,
+  output,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
@@ -15,6 +16,9 @@ import { ReglaLegible, duracion, reglaLegible, textoMotivo } from './reglas-legi
 
 /** Quién mira la tarjeta: los textos le hablan al asesor del cliente, y al cliente de lo suyo. */
 export type ActorResultado = 'asesor' | 'cliente';
+
+/** La aceptación de la nueva prima que pide la página (SOLVENTAG5-56): en curso o fallida. */
+export type EstadoAceptacion = 'inactiva' | 'aceptando' | 'error';
 
 /** El chip de cada decisión: verde continúa, rojo no, ámbar espera a un suscriptor. */
 const CHIPS: Record<ResultadoSuscripcion, () => { clase: string; texto: string }> = {
@@ -40,6 +44,11 @@ const CHIPS: Record<ResultadoSuscripcion, () => { clase: string; texto: string }
  * El resultado de la suscripción (SOLVENTAG5-55, R5), para el asesor y para el cliente: SOLV-WEB-07
  * con la decisión, SOLV-WEB-08 en revisión y el último estado conocido sin decisión (CA4). No llama
  * al BFF: muestra la respuesta que la página de suscripción ya consulta.
+ *
+ * Con AJUSTADA (SOLVENTAG5-56, D2), el cliente acepta la nueva prima con «Aceptar nueva prima»: la
+ * tarjeta avisa a la página (`aceptarPrima`), que llama al BFF y le pasa la solicitud nueva. El
+ * asesor no la acepta por él: ve si ya la aceptó. «Continuar al pago» solo aparece con ACEPTADA, o
+ * con AJUSTADA y la nueva prima aceptada.
  */
 @Component({
   selector: 'app-tarjeta-resultado',
@@ -51,6 +60,10 @@ const CHIPS: Record<ResultadoSuscripcion, () => { clase: string; texto: string }
 export class TarjetaResultado {
   readonly solicitud = input.required<SolicitudSuscripcion>();
   readonly actor = input.required<ActorResultado>();
+  /** La aceptación de la nueva prima que la página tiene en curso. */
+  readonly aceptacion = input<EstadoAceptacion>('inactiva');
+  /** El cliente pide aceptar la nueva prima de su solicitud AJUSTADA. */
+  readonly aceptarPrima = output<void>();
 
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
 
@@ -94,6 +107,11 @@ export class TarjetaResultado {
       primaCotizada: d ? montoCop(d.primaCotizada, this.idioma) : null,
       primaFinal: d?.primaFinal === undefined ? null : montoCop(d.primaFinal, this.idioma),
       continua: d?.resultado === 'ACEPTADA' || d?.resultado === 'AJUSTADA',
+      primaAceptadaEl: s.primaAjustadaAceptadaEn ? this.fechaHora(s.primaAjustadaAceptadaEn) : null,
+      // Con AJUSTADA, solo después de aceptar la nueva prima (SOLVENTAG5-56).
+      puedePagar:
+        d?.resultado === 'ACEPTADA' ||
+        (d?.resultado === 'AJUSTADA' && s.primaAjustadaAceptadaEn !== undefined),
     };
   });
 

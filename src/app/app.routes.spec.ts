@@ -192,6 +192,20 @@ describe('routes', () => {
     );
   });
 
+  it.each<[Rol, string]>([
+    ['ASESOR', '/asesor'],
+    ['CLIENTE', '/cliente'],
+  ])('con el rol %s, la firma se abre por su ruta (SOLVENTAG5-56, D17)', async (rol, portal) => {
+    const { url, vista } = await navegar(`${portal}/cotizar/oferta/c-1/firma`, sesionDe(rol));
+
+    expect(url).toBe(`${portal}/cotizar/oferta/c-1/firma`);
+    expect(document.title).toBe('Firma · Solventa');
+    expect(vista.getByRole('heading', { level: 1, name: 'Firma' })).toBeInTheDocument();
+    expect(
+      vista.getByRole('heading', { level: 2, name: 'No hay una solicitud para firmar' }),
+    ).toBeInTheDocument();
+  });
+
   it('el analista de riesgo abre la consulta del perfil de riesgo (SOLVENTAG5-67)', async () => {
     const { url, vista } = await navegar('/riesgo/perfil-riesgo', sesionDe('ANALISTA_RIESGO'));
 

@@ -54,6 +54,11 @@ export interface SolicitudSuscripcion {
   registrosVerificables?: boolean;
   /** Cuando `decidida` es true y su registro se puede leer. */
   decision?: DecisionSuscripcion;
+  /**
+   * Solo en AJUSTADA, cuando el cliente titular ya aceptó la nueva prima (SOLVENTAG5-56): cuándo la
+   * aceptó. No cambia si la acepta otra vez.
+   */
+  primaAjustadaAceptadaEn?: string;
 }
 
 export type MotivoDecisionSuscripcion =

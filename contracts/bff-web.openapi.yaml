@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.2.0
+  version: 1.3.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -53,7 +53,16 @@ tags:
       calculó, y queda pendiente de la evaluación automática (SOLVENTAG5-50). El responsable de
       suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67). La consulta de la
       solicitud también da el resultado de la suscripción o, sin decisión, el último estado
-      conocido (SOLVENTAG5-55).
+      conocido (SOLVENTAG5-55). Con una solicitud AJUSTADA, el cliente titular acepta la nueva
+      prima antes de continuar a cobro y emisión (SOLVENTAG5-56).
+  - name: polizas
+    description: >
+      Póliza preparada para firma electrónica (SOLVENTAG5-56). Se genera desde una solicitud de
+      suscripción ACEPTADA, o AJUSTADA con la nueva prima aceptada, con los datos guardados de la
+      solicitud y sin recalcular nada. El documento se genera en segundo plano (ADR 0007): la
+      petición responde de inmediato con el documento en GENERANDO y el canal consulta la póliza
+      hasta ver GENERADO. Solo el asesor de la cartera y el cliente titular ven la póliza y su
+      documento.
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -629,7 +638,7 @@ paths:
         con otro) responde 404 COTIZACION_NO_ENCONTRADA y no se acepta. Esta operación no envía
         los campos del resultado de SolicitudSuscripcion (decidida, actualizadaEn,
         reglasEvaluadas, versionReglas, registrosVerificables y decision): solo los envía
-        obtenerSolicitudSuscripcion.
+        obtenerSolicitudSuscripcion. Tampoco envía primaAjustadaAceptadaEn.
       x-roles: [ASESOR, CLIENTE]
       requestBody:
         required: true
@@ -688,7 +697,8 @@ paths:
         solicitud que no es suya (sin clienteId o con otro) responde 404
         SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, para no revelar que existe; igual con la sesión del
         asesor si la solicitud no está en su cartera. El analista de riesgo consulta cualquier
-        solicitud.
+        solicitud. Con una solicitud AJUSTADA, primaAjustadaAceptadaEn dice cuándo aceptó el
+        cliente la nueva prima (SOLVENTAG5-56).
       x-roles: [ASESOR, CLIENTE, ANALISTA_RIESGO]
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
@@ -710,6 +720,8 @@ paths:
                   $ref: '#/components/examples/SolicitudSuscripcionAceptada'
                 ajustada:
                   $ref: '#/components/examples/SolicitudSuscripcionAjustada'
+                ajustadaAceptada:
+                  $ref: '#/components/examples/SolicitudSuscripcionAjustadaAceptada'
                 rechazada:
                   $ref: '#/components/examples/SolicitudSuscripcionRechazada'
                 enRevision:
@@ -767,6 +779,190 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}/aceptacion-prima:
+    post:
+      tags: [suscripcion]
+      operationId: aceptarPrimaAjustada
+      summary: Aceptar la nueva prima de una solicitud ajustada
+      description: >
+        El cliente titular acepta la nueva prima (primaFinal de la decisión) de una solicitud
+        AJUSTADA, para que pueda generarse su póliza (SOLVENTAG5-56). La aceptación se registra
+        una sola vez, con la hora, el canal y el usuario de la sesión; el registro de la decisión
+        no cambia (ADR 0006). Aceptarla otra vez responde 200 con la misma hora. Responde la
+        solicitud como obtenerSolicitudSuscripcion, con primaAjustadaAceptadaEn. El asesor no la
+        acepta por el cliente: ve en la solicitud si ya la aceptó. Una solicitud que no es del
+        cliente (sin clienteId o con otro) responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, y una
+        que no está AJUSTADA, 409 AJUSTE_NO_APLICA. No lleva cuerpo.
+      x-roles: [CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      responses:
+        '200':
+          description: >
+            La nueva prima quedó aceptada, ahora o en una petición anterior; es la solicitud con
+            primaAjustadaAceptadaEn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudSuscripcion'
+              examples:
+                ajustadaAceptada:
+                  $ref: '#/components/examples/SolicitudSuscripcionAjustadaAceptada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+          description: La solicitud de suscripción no existe o el cliente no es su titular.
+        '409':
+          $ref: '#/components/responses/AjusteNoAplica'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}/poliza:
+    post:
+      tags: [polizas]
+      operationId: generarPolizaParaFirma
+      summary: Generar la póliza para firma de una solicitud
+      description: >
+        Crea la póliza de la solicitud en PENDIENTE_FIRMA, con el tomador, la cobertura, la suma
+        asegurada, la prima y la vigencia tomados de la solicitud y su decisión, sin recalcular
+        nada (SOLVENTAG5-56). Solo se genera para una solicitud ACEPTADA o AJUSTADA con la nueva
+        prima aceptada, la haya decidido la regla automática o un analista; con AJUSTADA la prima
+        es la final. Una solicitud tiene una sola póliza: pedirla otra vez responde 200 con la
+        misma. No espera el documento: responde con el documento en GENERANDO, que se genera en
+        segundo plano, y el canal consulta obtenerPoliza hasta ver GENERADO. Una solicitud que
+        no se puede emitir responde 409 SOLICITUD_NO_EMITIBLE con su motivo, y una sin cliente,
+        409 SOLICITUD_SIN_CLIENTE. Con la sesión del cliente, una solicitud que no es suya
+        responde 404 SOLICITUD_SUSCRIPCION_NO_ENCONTRADA; igual con la del asesor si la solicitud
+        no está en su cartera. No lleva cuerpo.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      responses:
+        '200':
+          description: La solicitud ya tenía su póliza; es la existente, con su documento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poliza'
+              examples:
+                generada:
+                  $ref: '#/components/examples/PolizaGenerada'
+                generando:
+                  $ref: '#/components/examples/PolizaGenerando'
+        '201':
+          description: Póliza creada, con el documento en GENERANDO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poliza'
+              examples:
+                aceptada:
+                  $ref: '#/components/examples/PolizaGenerando'
+                ajustadaAceptada:
+                  $ref: '#/components/examples/PolizaAjustadaGenerando'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+          description: >
+            La solicitud de suscripción no existe o es ajena: el cliente no es su titular o el
+            asesor no la tiene en su cartera.
+        '409':
+          $ref: '#/components/responses/SolicitudNoEmitible'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/polizas/{polizaId}:
+    get:
+      tags: [polizas]
+      operationId: obtenerPoliza
+      summary: Consultar una póliza y el estado de su documento
+      description: >
+        Devuelve la póliza con el estado de su documento (SOLVENTAG5-56). El canal la consulta
+        hasta que documento.estado es GENERADO; entonces trae la hora de generación y la huella
+        que certifica la firma (SOLVENTAG5-57). El documento del tomador va enmascarado: el
+        completo solo va en el PDF. Con la sesión del cliente, una póliza que no es suya responde
+        404 POLIZA_NO_ENCONTRADA; igual con la del asesor si la solicitud de la póliza no está en
+        su cartera.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: Póliza para firma.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poliza'
+              examples:
+                generando:
+                  $ref: '#/components/examples/PolizaGenerando'
+                generada:
+                  $ref: '#/components/examples/PolizaGenerada'
+                ajustadaGenerada:
+                  $ref: '#/components/examples/PolizaAjustadaGenerada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/polizas/{polizaId}/documento:
+    get:
+      tags: [polizas]
+      operationId: descargarDocumentoPoliza
+      summary: Descargar el PDF de la póliza
+      description: >
+        Devuelve el PDF del documento de la póliza (SOLVENTAG5-56), en español, con el tomador,
+        las coberturas, las exclusiones, la suma asegurada, la prima y la vigencia. Es el mismo
+        contenido cuya huella trae obtenerPoliza. Mientras el documento esté en GENERANDO
+        responde 409 DOCUMENTO_EN_GENERACION. El acceso es el de obtenerPoliza.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: PDF de la póliza.
+          headers:
+            Content-Disposition:
+              description: Descarga con el nombre poliza-<polizaId>.pdf.
+              schema:
+                type: string
+                pattern: '^attachment; filename="poliza-[0-9a-f-]{36}\.pdf"$'
+              example: attachment; filename="poliza-2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f.pdf"
+            Cache-Control:
+              description: El PDF tiene datos personales; no se guarda en cachés.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/pdf:
+              schema:
+                type: string
+                contentMediaType: application/pdf
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/DocumentoEnGeneracion'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
 components:
   securitySchemes:
     tokenCognito:
@@ -813,6 +1009,14 @@ components:
       in: path
       required: true
       description: Id (UUID v4) de la solicitud de suscripción.
+      schema:
+        type: string
+        format: uuid
+    PolizaId:
+      name: polizaId
+      in: path
+      required: true
+      description: Id (UUID v4) de la póliza.
       schema:
         type: string
         format: uuid
@@ -1117,6 +1321,107 @@ components:
           example:
             codigo: PERFIL_NO_COINCIDE
             detalle: El perfil de riesgo de la cotización no coincide con el de la solicitud.
+    AjusteNoAplica:
+      description: >
+        La solicitud no está AJUSTADA: no tiene una nueva prima que aceptar.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: AJUSTE_NO_APLICA
+          example:
+            codigo: AJUSTE_NO_APLICA
+            detalle: La solicitud no tiene una nueva prima que aceptar.
+    SolicitudNoEmitible:
+      description: >
+        La solicitud no puede generar su póliza. SOLICITUD_NO_EMITIBLE, con el motivo en motivo
+        y en detalle: PRIMA_AJUSTADA_SIN_ACEPTAR (AJUSTADA y el cliente no ha aceptado la nueva prima),
+        RECHAZADA, EN_REVISION o SIN_DECISION (PENDIENTE_EVALUACION o EVALUADA).
+        SOLICITUD_SIN_CLIENTE, la solicitud no tiene un cliente que sea el tomador. No se crea la
+        póliza.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - required: [motivo]
+                    properties:
+                      codigo:
+                        const: SOLICITUD_NO_EMITIBLE
+                      motivo:
+                        $ref: '#/components/schemas/MotivoNoEmitible'
+                        description: >
+                          Por qué no se genera, para mostrarlo traducido; detalle lo explica en
+                          español.
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - properties:
+                      codigo:
+                        const: SOLICITUD_SIN_CLIENTE
+          examples:
+            ajusteNoAceptado:
+              summary: Ajustada sin aceptar la nueva prima
+              value:
+                codigo: SOLICITUD_NO_EMITIBLE
+                motivo: PRIMA_AJUSTADA_SIN_ACEPTAR
+                detalle: El cliente debe aceptar la nueva prima antes de generar la póliza.
+            rechazada:
+              summary: Rechazada
+              value:
+                codigo: SOLICITUD_NO_EMITIBLE
+                motivo: RECHAZADA
+                detalle: La solicitud fue rechazada y no continúa a emisión.
+            enRevision:
+              summary: En revisión de un suscriptor
+              value:
+                codigo: SOLICITUD_NO_EMITIBLE
+                motivo: EN_REVISION
+                detalle: La solicitud está en revisión y todavía no continúa a emisión.
+            sinDecision:
+              summary: Todavía sin decisión
+              value:
+                codigo: SOLICITUD_NO_EMITIBLE
+                motivo: SIN_DECISION
+                detalle: La solicitud todavía no tiene una decisión de suscripción.
+            sinCliente:
+              summary: Sin cliente
+              value:
+                codigo: SOLICITUD_SIN_CLIENTE
+                detalle: La solicitud no tiene un cliente para la póliza.
+    PolizaNoEncontrada:
+      description: >
+        La póliza no existe o es ajena: el cliente no es su titular o el asesor no tiene la
+        solicitud de la póliza en su cartera.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: POLIZA_NO_ENCONTRADA
+          example:
+            codigo: POLIZA_NO_ENCONTRADA
+            detalle: No encontramos la póliza.
+    DocumentoEnGeneracion:
+      description: >
+        El documento de la póliza todavía está en GENERANDO. El canal sigue consultando
+        obtenerPoliza hasta ver GENERADO.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: DOCUMENTO_EN_GENERACION
+          example:
+            codigo: DOCUMENTO_EN_GENERACION
+            detalle: El documento de la póliza todavía se está generando.
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -1706,6 +2011,13 @@ components:
           description: >
             Solo lo envía obtenerSolicitudSuscripcion, cuando decidida es true y su registro se
             puede leer.
+        primaAjustadaAceptadaEn:
+          type: string
+          format: date-time
+          description: >
+            Solo lo envían obtenerSolicitudSuscripcion y aceptarPrimaAjustada, cuando la solicitud
+            está AJUSTADA y el cliente titular ya aceptó la nueva prima (SOLVENTAG5-56). Cuándo la
+            aceptó; no cambia si la acepta otra vez.
     ResultadoSuscripcion:
       type: string
       description: >
@@ -1822,6 +2134,148 @@ components:
           type: string
           pattern: '^[0-9a-f]{64}$'
           description: Huella SHA-256 del registro de la decisión; con ella se audita y se reconstruye.
+    MotivoNoEmitible:
+      type: string
+      description: >
+        Por qué una solicitud no genera su póliza. PRIMA_AJUSTADA_SIN_ACEPTAR está AJUSTADA y el cliente
+        no ha aceptado la nueva prima; RECHAZADA y EN_REVISION son esos resultados; SIN_DECISION
+        la solicitud está en PENDIENTE_EVALUACION o EVALUADA.
+      enum: [PRIMA_AJUSTADA_SIN_ACEPTAR, RECHAZADA, EN_REVISION, SIN_DECISION]
+    EstadoPoliza:
+      type: string
+      description: >
+        PENDIENTE_FIRMA al generarse (SOLVENTAG5-56). La firma (SOLVENTAG5-57) y la emisión
+        (SOLVENTAG5-58) suman sus estados en versiones posteriores.
+      enum: [PENDIENTE_FIRMA]
+    EstadoDocumentoPoliza:
+      type: string
+      description: >
+        GENERANDO desde que se crea la póliza hasta que el PDF queda guardado; GENERADO después.
+      enum: [GENERANDO, GENERADO]
+    TomadorPoliza:
+      type: object
+      description: >
+        El cliente titular de la solicitud. El documento va enmascarado; el completo solo va en el
+        PDF.
+      required: [nombres, apellidos, documentoEnmascarado]
+      properties:
+        nombres:
+          type: string
+        apellidos:
+          type: string
+        documentoEnmascarado:
+          type: string
+          description: El tipo de documento y los cuatro últimos caracteres del número.
+          pattern: '^(CC|CE|PA|PPT) ••••[A-Za-z0-9]{4}$'
+          examples: [CC ••••5678]
+    CondicionesPoliza:
+      type: object
+      description: >
+        Condiciones del producto del ramo, del catálogo versionado de pólizas. Son las mismas del
+        documento.
+      required: [version, coberturas, exclusiones]
+      properties:
+        version:
+          type: string
+          description: Versión de las condiciones del ramo.
+          examples: [VH-2026.1]
+        coberturas:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        exclusiones:
+          type: array
+          items:
+            type: string
+    DocumentoPoliza:
+      type: object
+      description: >
+        El documento de la póliza para firma. generadoEn y huella solo vienen en GENERADO.
+      required: [estado]
+      properties:
+        estado:
+          $ref: '#/components/schemas/EstadoDocumentoPoliza'
+        generadoEn:
+          type: string
+          format: date-time
+          description: Cuándo quedó generado. Es la hora del hito «Documento generado».
+        huella:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: >
+            Huella SHA-256 del contenido canónico del documento; certifica la firma
+            (SOLVENTAG5-57).
+    Poliza:
+      type: object
+      description: >
+        Póliza para firma (SOLVENTAG5-56). Los datos salen de la solicitud y su decisión, sin
+        recalcular.
+      required:
+        - polizaId
+        - solicitudId
+        - cotizacionId
+        - clienteId
+        - estado
+        - ramo
+        - sumaAsegurada
+        - prima
+        - moneda
+        - periodicidad
+        - vigenciaDesde
+        - vigenciaHasta
+        - tomador
+        - condiciones
+        - documento
+      properties:
+        polizaId:
+          type: string
+          format: uuid
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+          description: El cliente titular; es el tomador.
+        estado:
+          $ref: '#/components/schemas/EstadoPoliza'
+        ramo:
+          $ref: '#/components/schemas/Ramo'
+        sumaAsegurada:
+          type: integer
+          minimum: 0
+          description: Suma asegurada en COP; para VIDA_HIPOTECARIO, el montoCredito cotizado.
+        prima:
+          type: integer
+          minimum: 0
+          description: >
+            Prima en COP que se cobra, redondeada al peso: la primaFinal de la decisión (con el
+            recargo si se ajustó).
+        moneda:
+          type: string
+          enum: [COP]
+        periodicidad:
+          type: string
+          enum: [MENSUAL]
+        vigenciaDesde:
+          type: string
+          format: date
+          description: >
+            Provisional: la fecha de generación. La emisión (SOLVENTAG5-58) la fija.
+        vigenciaHasta:
+          type: string
+          format: date
+          description: vigenciaDesde más el plazoAnios cotizado.
+        tomador:
+          $ref: '#/components/schemas/TomadorPoliza'
+        condiciones:
+          $ref: '#/components/schemas/CondicionesPoliza'
+        documento:
+          $ref: '#/components/schemas/DocumentoPoliza'
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -2054,7 +2508,9 @@ components:
             CLIENTE_NO_ENCONTRADO, DATOS_BIEN_INVALIDOS, RAMO_NO_SOPORTADO,
             COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA, SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
             PERFIL_NO_COINCIDE, CUENTA_NO_ENLAZABLE, DECISION_NO_ENCONTRADA,
-            NUCLEO_NO_DISPONIBLE e IDENTIDAD_NO_DISPONIBLE.
+            NUCLEO_NO_DISPONIBLE, IDENTIDAD_NO_DISPONIBLE, AJUSTE_NO_APLICA,
+            SOLICITUD_NO_EMITIBLE, SOLICITUD_SIN_CLIENTE, POLIZA_NO_ENCONTRADA y
+            DOCUMENTO_EN_GENERACION.
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -2487,6 +2943,87 @@ components:
           recargoPorcentaje: 20
           tiempoDecisionMs: 1180
           trazaId: 6a5b5cd8dcf69950afce9c9dd305401d735c1f0be18d3d634be2fcb92befd29e
+    SolicitudSuscripcionAjustadaAceptada:
+      summary: Ajustada con recargo del 20 % y la nueva prima ya aceptada por el cliente
+      value:
+        solicitudId: 3d5f7a9b-4c6e-4f8a-9b1d-5e7f9a1b3c5d
+        cotizacionId: 4e6a8c0d-5d7f-4a9b-8c2e-6f8a0b2c4d6e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: AJUSTADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 91000
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 5b7d9f1a-6e8a-4b0c-9d3f-7a9b1c3d5e7f
+          version: 3
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-14T16:30:01.180Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 500 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: ALTO }
+            resultado: NO_CUMPLE
+            determinante: true
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 60 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 45 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: AJUSTADA
+          continuaAEmision: true
+          motivo: REGLA_DE_AJUSTE
+          reglaAplicada: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 91000
+          primaFinal: 109200
+          recargoPorcentaje: 20
+          tiempoDecisionMs: 1180
+          trazaId: 6a5b5cd8dcf69950afce9c9dd305401d735c1f0be18d3d634be2fcb92befd29e
+        primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z'
     SolicitudSuscripcionRechazada:
       summary: Rechazada porque el score no alcanza el mínimo; no continúa
       value:
@@ -2641,6 +3178,134 @@ components:
           primaCotizada: 70000
           tiempoDecisionMs: 1090
           trazaId: 3e3b227afb28e75f0b3fb02a61f8dc178f6128acbb354ed27310dc4638738677
+    PolizaGenerando:
+      summary: Solicitud aceptada, con el documento todavía generándose
+      value:
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_FIRMA
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+        documento:
+          estado: GENERANDO
+    PolizaGenerada:
+      summary: Solicitud aceptada, con el documento generado y su huella
+      value:
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_FIRMA
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+        documento:
+          estado: GENERADO
+          generadoEn: '2026-10-14T16:32:10.850Z'
+          huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+    PolizaAjustadaGenerando:
+      summary: Solicitud ajustada con la nueva prima aceptada, con el documento generándose
+      value:
+        polizaId: 5e7a9c1b-6d8f-4b0a-8c2e-7f9a1b3c5d7e
+        solicitudId: 3d5f7a9b-4c6e-4f8a-9b1d-5e7f9a1b3c5d
+        cotizacionId: 4e6a8c0d-5d7f-4a9b-8c2e-6f8a0b2c4d6e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_FIRMA
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 109200
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+        documento:
+          estado: GENERANDO
+    PolizaAjustadaGenerada:
+      summary: Solicitud ajustada con la nueva prima aceptada, con el documento generado
+      value:
+        polizaId: 5e7a9c1b-6d8f-4b0a-8c2e-7f9a1b3c5d7e
+        solicitudId: 3d5f7a9b-4c6e-4f8a-9b1d-5e7f9a1b3c5d
+        cotizacionId: 4e6a8c0d-5d7f-4a9b-8c2e-6f8a0b2c4d6e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: PENDIENTE_FIRMA
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 109200
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+        documento:
+          estado: GENERADO
+          generadoEn: '2026-10-14T16:32:41.120Z'
+          huella: 4e1a06d53e8edc65c35282b61b00695414dd19c435a2cba0c9f4cb3131879049
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:

@@ -100,14 +100,18 @@ describe('TarjetaResultado · SOLV-WEB-07', () => {
     expect(determinante.closest('tr')).toHaveClass('determinante');
     expect(screen.getAllByText('Determinante')).toHaveLength(1);
     expect(fila(/Nivel de riesgo/).getByText('No cumple')).toHaveClass('chip-rojo');
-    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    // SOLVENTAG5-56: sin aceptar la nueva prima no hay pago; el cliente la acepta aquí.
+    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeEnabled();
   });
 
-  it('ajustada para el asesor: el cliente debe aceptarla', async () => {
+  it('ajustada para el asesor: el cliente debe aceptarla, y el asesor no la acepta', async () => {
     await renderizar(AJUSTADA, 'asesor');
 
     expect(titulo()).toHaveTextContent('Solicitud aceptada con ajuste');
     expect(screen.getByText(/El cliente debe aceptar la nueva prima/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
   });
 
   it('rechazada: el motivo y las reglas, sin condiciones ni pago', async () => {
@@ -261,5 +265,73 @@ describe('TarjetaResultado · registros', () => {
     expect(screen.getByRole('status')).toHaveTextContent(AVISO);
     expect(screen.getByRole('heading', { name: 'Condiciones aprobadas' })).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+});
+
+// SOLVENTAG5-56: la nueva prima de una solicitud ajustada la acepta el cliente titular (D2).
+describe('TarjetaResultado · aceptar la nueva prima', () => {
+  // 16:31 UTC = 11:31 en Bogotá.
+  const ACEPTADA_LA_PRIMA: SolicitudSuscripcion = {
+    ...AJUSTADA,
+    primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z',
+  };
+
+  it('el botón avisa a la página', async () => {
+    const aceptar = jest.fn();
+    await render(TarjetaResultado, {
+      inputs: { solicitud: AJUSTADA, actor: 'cliente' },
+      on: { aceptarPrima: aceptar },
+      providers: [provideRouter([])],
+    });
+
+    screen.getByRole('button', { name: 'Aceptar nueva prima' }).click();
+
+    expect(aceptar).toHaveBeenCalledTimes(1);
+  });
+
+  it('mientras se acepta, el botón queda ocupado y deshabilitado', async () => {
+    await render(TarjetaResultado, {
+      inputs: { solicitud: AJUSTADA, actor: 'cliente', aceptacion: 'aceptando' },
+      providers: [provideRouter([])],
+    });
+
+    const boton = screen.getByRole('button', { name: 'Aceptar nueva prima' });
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('si la aceptación falla, lo dice y deja intentarlo de nuevo', async () => {
+    await render(TarjetaResultado, {
+      inputs: { solicitud: AJUSTADA, actor: 'cliente', aceptacion: 'error' },
+      providers: [provideRouter([])],
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'No pudimos registrar tu aceptación. Intenta de nuevo.',
+    );
+    expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeEnabled();
+  });
+
+  it('aceptada, el cliente ve cuándo y que continúa a pago y emisión', async () => {
+    await renderizar(ACEPTADA_LA_PRIMA);
+
+    expect(
+      screen.getByText(
+        'Aceptaste la nueva prima el 14/10/2026 a las 11:31. Tu solicitud continúa a pago y emisión.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Debes aceptar la nueva prima/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+  });
+
+  it('aceptada, el asesor ve la fecha y la hora de la aceptación', async () => {
+    await renderizar(ACEPTADA_LA_PRIMA, 'asesor');
+
+    expect(
+      screen.getByText('El cliente aceptó la nueva prima el 14/10/2026 a las 11:31.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/El cliente debe aceptar la nueva prima/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
   });
 });
