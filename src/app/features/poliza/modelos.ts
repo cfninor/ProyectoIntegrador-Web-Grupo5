@@ -36,7 +36,8 @@ export interface Poliza {
 
 /** El cuerpo `Error` del 409 de `generarPolizaParaFirma`. */
 export interface ErrorPoliza {
-  codigo: 'SOLICITUD_NO_EMITIBLE' | 'SOLICITUD_SIN_CLIENTE' | string;
+  /** En el 409: SOLICITUD_NO_EMITIBLE (con `motivo`) o SOLICITUD_SIN_CLIENTE. */
+  codigo: string;
   detalle: string;
   /** Siempre en SOLICITUD_NO_EMITIBLE. */
   motivo?: MotivoNoEmitible;

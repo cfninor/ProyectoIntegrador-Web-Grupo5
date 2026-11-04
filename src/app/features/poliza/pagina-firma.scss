@@ -49,6 +49,11 @@ h4 {
   }
 }
 
+// «El documento sigue generándose»: un <output>, que es en línea, con el aspecto de un párrafo.
+.aviso {
+  display: block;
+}
+
 .vista-previa {
   display: flex;
   flex-direction: column;

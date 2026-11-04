@@ -204,7 +204,7 @@ describe('PaginaFirma · SOLV-WEB-10', () => {
     http.expectOne(URL_GENERAR).flush(POLIZA_GENERADA);
 
     jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 5);
-    http.expectNone(URL_POLIZA);
+    expect(http.match(URL_POLIZA)).toHaveLength(0);
   });
 
   it.each([
@@ -229,7 +229,7 @@ describe('PaginaFirma · SOLV-WEB-10', () => {
     fixture.destroy();
     jest.advanceTimersByTime(INTERVALO_CONSULTA_MS * 3);
 
-    http.expectNone(URL_POLIZA);
+    expect(http.match(URL_POLIZA)).toHaveLength(0);
   });
 });
 
