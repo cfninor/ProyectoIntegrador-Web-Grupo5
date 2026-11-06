@@ -10,12 +10,13 @@ Con esta copia el portal puede:
 - generar el cliente TypeScript de la API, y
 - trabajar contra un mock del contrato mientras el backend se construye.
 
-Versión de la copia: 1.3.0, tomada del commit `83b5e3f` del repositorio principal, rama
-`feature/SOLVENTAG5-56-poliza-para-firma`, que agrega la aceptación de la nueva prima de una
-solicitud ajustada y la póliza para firma (SOLVENTAG5-56). Incluye: autorización de datos
+Versión de la copia: 1.4.0, tomada de la rama `feature/SOLVENTAG5-52-identificar-solicitudes-revision`
+del repositorio principal (commit de la SOLVENTAG5-307), que agrega la bandeja de las solicitudes en
+revisión para el analista de riesgo (SOLVENTAG5-52). Incluye: autorización de datos
 (SOLVENTAG5-65), cotización (SOLVENTAG5-47), búsqueda de cliente (SOLVENTAG5-132), solicitudes de
 suscripción (SOLVENTAG5-133) con su resultado (SOLVENTAG5-55), consulta del perfil de riesgo de una
 solicitud (SOLVENTAG5-67), el inicio de sesión con el ID token de Cognito, sus roles por operación,
 crear cuenta del cliente y la consulta de trazabilidad (SOLVENTAG5-207), la consulta de los
-consentimientos del cliente (SOLVENTAG5-84), y la aceptación de la nueva prima, la generación y
-consulta de la póliza y la descarga de su PDF (SOLVENTAG5-56). 18 operaciones.
+consentimientos del cliente (SOLVENTAG5-84), la aceptación de la nueva prima, la generación y
+consulta de la póliza y la descarga de su PDF (SOLVENTAG5-56), y la bandeja de suscripción asistida
+(SOLVENTAG5-52). 19 operaciones.

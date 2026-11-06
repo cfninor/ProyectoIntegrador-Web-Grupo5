@@ -76,6 +76,19 @@ describe('SuscripcionApi', () => {
     });
   });
 
+  it('pide una página de la bandeja por GET .../en-revision con pagina y tamano (SOLVENTAG5-52)', async () => {
+    const bandeja = { solicitudes: [], total: 0, pagina: 2, tamano: 20 };
+    const respuesta = firstValueFrom(api.listarEnRevision(2, 20));
+
+    const peticion = http.expectOne(
+      'http://bff.prueba/v1/solicitudes-suscripcion/en-revision?pagina=2&tamano=20',
+    );
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush(bandeja);
+
+    await expect(respuesta).resolves.toEqual(bandeja);
+  });
+
   it('codifica el id de la solicitud en la ruta', () => {
     void firstValueFrom(api.obtenerPerfilRiesgo('a/b'));
 

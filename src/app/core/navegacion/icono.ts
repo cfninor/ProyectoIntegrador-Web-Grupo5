@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /** Íconos del portal, como los del componente `Sidebar` del Figma. */
-export type NombreIcono = 'cuadricula' | 'documento' | 'escudo' | 'mas' | 'menu';
+export type NombreIcono = 'bandeja' | 'cuadricula' | 'documento' | 'escudo' | 'mas' | 'menu';
 
 /**
  * Ícono SVG en línea, de trazo y con el color del texto (`currentColor`). Es decorativo: el texto
@@ -31,6 +31,10 @@ export type NombreIcono = 'cuadricula' | 'documento' | 'escudo' | 'mas' | 'menu'
       focusable="false"
     >
       @switch (nombre()) {
+        @case ('bandeja') {
+          <path d="M3 13h5l1.5 3h5l1.5-3h5" />
+          <path d="M5.5 4.5h13L21 13v5.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V13z" />
+        }
         @case ('cuadricula') {
           <rect x="2" y="2" width="8.5" height="8.5" rx="1.5" />
           <rect x="13.5" y="2" width="8.5" height="8.5" rx="1.5" />

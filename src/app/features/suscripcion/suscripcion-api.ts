@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { APP_CONFIG } from '../../core/config/app-config';
-import { PerfilRiesgoSolicitud, SolicitudSuscripcion } from './modelos';
+import { BandejaRevision, PerfilRiesgoSolicitud, SolicitudSuscripcion } from './modelos';
 
 @Injectable({ providedIn: 'root' })
 export class SuscripcionApi {
@@ -46,6 +46,18 @@ export class SuscripcionApi {
     const id = encodeURIComponent(solicitudId);
     return this.http.get<PerfilRiesgoSolicitud>(
       `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/${id}/perfil-riesgo`,
+    );
+  }
+
+  /**
+   * Una página de la bandeja de suscripción asistida (`listarSolicitudesEnRevision`,
+   * SOLVENTAG5-52): las solicitudes en EN_REVISION, de la que lleva más tiempo esperando a la más
+   * reciente, con el total. Solo para el analista de riesgo.
+   */
+  listarEnRevision(pagina: number, tamano: number): Observable<BandejaRevision> {
+    return this.http.get<BandejaRevision>(
+      `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/en-revision`,
+      { params: new HttpParams().set('pagina', pagina).set('tamano', tamano) },
     );
   }
 }

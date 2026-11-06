@@ -30,6 +30,16 @@ function cotizar(rol: Rol): OpcionMenu {
   };
 }
 
+/** La bandeja de suscripción asistida (SOLVENTAG5-52). */
+function bandeja(): OpcionMenu {
+  return {
+    ruta: `${tableroDe('ANALISTA_RIESGO')}/bandeja`,
+    icono: 'bandeja',
+    texto: $localize`:@@menu.bandeja:Bandeja de suscripción`,
+    exacta: false,
+  };
+}
+
 function perfilRiesgo(): OpcionMenu {
   return {
     ruta: `${tableroDe('ANALISTA_RIESGO')}/perfil-riesgo`,
@@ -56,7 +66,7 @@ function misAutorizaciones(): OpcionMenu {
 export const MENU: Record<Rol, readonly OpcionMenu[]> = {
   ASESOR: [tablero('ASESOR'), cotizar('ASESOR')],
   CLIENTE: [tablero('CLIENTE'), cotizar('CLIENTE'), misAutorizaciones()],
-  ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO'), perfilRiesgo()],
+  ANALISTA_RIESGO: [tablero('ANALISTA_RIESGO'), bandeja(), perfilRiesgo()],
   OPERACIONES: [tablero('OPERACIONES')],
   SOCIO: [tablero('SOCIO')],
 };

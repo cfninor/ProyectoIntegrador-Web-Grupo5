@@ -111,6 +111,17 @@ function perfilRiesgo(path: string): Route {
   };
 }
 
+/** SOLVENTAG5-52: la bandeja de suscripción asistida del analista de riesgo. */
+const bandeja: Route = {
+  path: 'bandeja',
+  title: $localize`:@@bandeja.tituloPestana:Bandeja de suscripción · Solventa`,
+  data: datosPagina(
+    $localize`:@@bandeja.miga:Suscripción / Bandeja`,
+    $localize`:@@bandeja.titulo:Bandeja de suscripción asistida`,
+  ),
+  loadComponent: () => import('./features/suscripcion/pagina-bandeja').then((m) => m.PaginaBandeja),
+};
+
 /** SOLVENTAG5-84: los consentimientos que el cliente ha otorgado. */
 const misAutorizaciones: Route = {
   path: 'autorizaciones',
@@ -154,6 +165,7 @@ export const routes: Routes = [
   ]),
   portal('ANALISTA_RIESGO', [
     tablero,
+    bandeja,
     perfilRiesgo('perfil-riesgo'),
     perfilRiesgo('perfil-riesgo/:solicitudId'),
   ]),

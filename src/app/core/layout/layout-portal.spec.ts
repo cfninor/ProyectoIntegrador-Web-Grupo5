@@ -37,7 +37,12 @@ describe('LayoutPortal', () => {
   it.each<[Rol, string, string, string[]]>([
     ['ASESOR', '/asesor', 'Asesor comercial', ['Tablero', 'Cotizar']],
     ['CLIENTE', '/cliente', 'Cliente', ['Tablero', 'Cotizar', 'Mis autorizaciones']],
-    ['ANALISTA_RIESGO', '/riesgo', 'Analista de riesgo', ['Tablero', 'Perfil de riesgo']],
+    [
+      'ANALISTA_RIESGO',
+      '/riesgo',
+      'Analista de riesgo',
+      ['Tablero', 'Bandeja de suscripción', 'Perfil de riesgo'],
+    ],
     ['OPERACIONES', '/operaciones', 'Operaciones', ['Tablero']],
     ['SOCIO', '/socio', 'Socio', ['Tablero']],
   ])(
