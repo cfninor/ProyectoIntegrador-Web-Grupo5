@@ -206,6 +206,37 @@ describe('routes', () => {
     ).toBeInTheDocument();
   });
 
+  it('el analista de riesgo abre la bandeja de suscripción asistida (SOLVENTAG5-52)', async () => {
+    const { url, vista } = await navegar('/riesgo/bandeja', sesionDe('ANALISTA_RIESGO'));
+
+    expect(url).toBe('/riesgo/bandeja');
+    expect(document.title).toBe('Bandeja de suscripción · Solventa');
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Bandeja de suscripción asistida' }),
+    ).toBeInTheDocument();
+    expect(vista.getByRole('link', { name: 'Bandeja de suscripción' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    TestBed.inject(HttpTestingController).expectOne(
+      'http://bff.prueba/v1/solicitudes-suscripcion/en-revision?pagina=1&tamano=20',
+    );
+  });
+
+  it('la página de la bandeja va en la ruta', async () => {
+    await navegar('/riesgo/bandeja?pagina=3', sesionDe('ANALISTA_RIESGO'));
+
+    TestBed.inject(HttpTestingController).expectOne(
+      'http://bff.prueba/v1/solicitudes-suscripcion/en-revision?pagina=3&tamano=20',
+    );
+  });
+
+  it('la bandeja no se abre con otro rol', async () => {
+    const { url } = await navegar('/riesgo/bandeja', sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor');
+  });
+
   it('el analista de riesgo abre la consulta del perfil de riesgo (SOLVENTAG5-67)', async () => {
     const { url, vista } = await navegar('/riesgo/perfil-riesgo', sesionDe('ANALISTA_RIESGO'));
 
