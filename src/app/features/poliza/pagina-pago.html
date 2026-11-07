@@ -1,0 +1,210 @@
+<app-pasos-contratacion [actual]="3" />
+
+<section class="tarjeta" aria-labelledby="pago-titulo" aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <h2 id="pago-titulo" i18n="@@pago.cargando">Preparando el pago…</h2>
+    }
+    @case ('sin-solicitud') {
+      <h2 id="pago-titulo" i18n="@@pago.sinSolicitud.titulo">No hay una solicitud para pagar</h2>
+      <p i18n="@@pago.sinSolicitud.texto">
+        El pago se abre desde la suscripción de una solicitud aceptada.
+      </p>
+    }
+    @case ('no-encontrada') {
+      <h2 id="pago-titulo" i18n="@@pago.noEncontrada">
+        No encontramos esta solicitud de suscripción
+      </h2>
+    }
+    @case ('error') {
+      <h2 id="pago-titulo" i18n="@@pago.error">No pudimos preparar el pago</h2>
+      <button type="button" class="boton-secundario" (click)="generar()" i18n="@@pago.reintentar">
+        Reintentar
+      </button>
+    }
+    @case ('no-emitible') {
+      <h2 id="pago-titulo" i18n="@@pago.noEmitible.titulo">Todavía no puedes pagar esta póliza</h2>
+      @switch (motivoSinPoliza()) {
+        @case ('PRIMA_AJUSTADA_SIN_ACEPTAR') {
+          <p i18n="@@pago.noEmitible.primaSinAceptar">
+            Acepta la nueva prima en la suscripción antes de continuar al pago.
+          </p>
+        }
+        @case ('EN_REVISION') {
+          <p i18n="@@pago.noEmitible.enRevision">
+            La solicitud está en revisión. Podrás pagar cuando un suscriptor la apruebe.
+          </p>
+        }
+        @case ('SIN_DECISION') {
+          <p i18n="@@pago.noEmitible.sinDecision">
+            La solicitud todavía no tiene una decisión de suscripción.
+          </p>
+        }
+        @case ('RECHAZADA') {
+          <p i18n="@@pago.noEmitible.rechazada">La solicitud fue rechazada y no continúa a pago.</p>
+        }
+        @case ('SIN_CLIENTE') {
+          <p i18n="@@pago.noEmitible.sinCliente">
+            La solicitud no tiene un cliente registrado como tomador.
+          </p>
+        }
+      }
+      <div class="acciones">
+        <a
+          class="boton-primario"
+          [routerLink]="rutaSuscripcion()"
+          [queryParams]="{ solicitudId: solicitudId() }"
+          i18n="@@pago.volverSuscripcion"
+          >Volver a la suscripción</a
+        >
+        <a class="boton-secundario" [routerLink]="rutaTablero()" i18n="@@pago.irTablero"
+          >Ir al tablero</a
+        >
+      </div>
+    }
+  }
+
+  @if (poliza(); as p) {
+    @if (actor() === 'asesor') {
+      <h2 id="pago-titulo" i18n="@@pago.titulo.asesor">Pago de la prima del cliente</h2>
+    } @else {
+      <h2 id="pago-titulo" i18n="@@pago.titulo.cliente">Pago de tu primera prima</h2>
+    }
+
+    <dl class="resumen">
+      <dt i18n="@@pago.numeroPoliza">Número de póliza</dt>
+      <dd>{{ p.polizaId }}</dd>
+      <dt i18n="@@pago.prima">Valor a pagar</dt>
+      <dd>{{ prima() }}</dd>
+    </dl>
+
+    @if (resultadoPago(); as pago) {
+      @switch (pago.estado) {
+        @case ('APROBADO') {
+          <p role="status" i18n="@@pago.aprobado">Tu pago quedó aprobado.</p>
+          <dl class="resumen">
+            <dt i18n="@@pago.marca">Tarjeta</dt>
+            <dd>{{ pago.marca }} •••• {{ pago.ultimos4 }}</dd>
+          </dl>
+          <div class="acciones">
+            <a
+              class="boton-primario"
+              [routerLink]="rutaFirma()"
+              [queryParams]="{ solicitudId: solicitudId() }"
+              i18n="@@pago.continuarFirma"
+              >Continuar a la firma</a
+            >
+          </div>
+        }
+        @case ('RECHAZADO') {
+          <p role="alert" i18n="@@pago.rechazado">
+            La pasarela rechazó el pago. Intenta de nuevo con otra tarjeta.
+          </p>
+          <button
+            type="button"
+            class="boton-primario"
+            (click)="intentarConOtroMedio()"
+            i18n="@@pago.intentarOtroMedio"
+          >
+            Intentar con otro medio
+          </button>
+        }
+        @case ('PROCESANDO') {
+          <p role="status" i18n="@@pago.procesando">
+            Tu pago se está procesando. Puedes volver a consultar en unos segundos.
+          </p>
+          <button
+            type="button"
+            class="boton-secundario"
+            (click)="volverAIntentar()"
+            i18n="@@pago.volverAConsultar"
+          >
+            Volver a consultar
+          </button>
+        }
+      }
+    } @else if (estadoCobro().tipo === 'en-curso') {
+      <p role="status" i18n="@@pago.enCurso">
+        Ya hay un cobro en curso para este pago. Vuelve a consultar en unos segundos.
+      </p>
+      <button
+        type="button"
+        class="boton-secundario"
+        (click)="volverAIntentar()"
+        i18n="@@pago.volverAConsultar"
+      >
+        Volver a consultar
+      </button>
+    } @else if (estadoCobro().tipo === 'error-cobro') {
+      <p role="alert" i18n="@@pago.errorCobro">
+        No pudimos conectarnos para procesar el pago. Tu intento se conserva: puedes reintentar.
+      </p>
+      <button
+        type="button"
+        class="boton-secundario"
+        (click)="volverAIntentar()"
+        i18n="@@pago.reintentar"
+      >
+        Reintentar
+      </button>
+    } @else {
+      <form class="formulario-tarjeta" [formGroup]="formulario" (ngSubmit)="pagar()">
+        @if (estadoCobro().tipo === 'error-tokenizacion') {
+          <p role="alert" i18n="@@pago.errorTokenizacion">
+            No pudimos procesar la tarjeta. Revisa los datos e intenta de nuevo.
+          </p>
+        }
+        <div>
+          <label class="etiqueta-campo" for="pago-numero" i18n="@@pago.campo.numero">
+            Número de tarjeta
+          </label>
+          <input
+            id="pago-numero"
+            class="campo"
+            type="text"
+            inputmode="numeric"
+            autocomplete="cc-number"
+            formControlName="numero"
+            [attr.aria-invalid]="errorCampo('numero') !== null"
+            aria-describedby="pago-numero-error"
+          />
+          <div id="pago-numero-error">
+            @if (errorCampo('numero'); as mensaje) {
+              <p class="error-campo">{{ mensaje }}</p>
+            }
+          </div>
+        </div>
+        <div>
+          <label class="etiqueta-campo" for="pago-vencimiento" i18n="@@pago.campo.vencimiento">
+            Vencimiento (MM/AA)
+          </label>
+          <input
+            id="pago-vencimiento"
+            class="campo"
+            type="text"
+            inputmode="numeric"
+            autocomplete="cc-exp"
+            placeholder="MM/AA"
+            formControlName="vencimiento"
+            [attr.aria-invalid]="errorCampo('vencimiento') !== null"
+            aria-describedby="pago-vencimiento-error"
+          />
+          <div id="pago-vencimiento-error">
+            @if (errorCampo('vencimiento'); as mensaje) {
+              <p class="error-campo">{{ mensaje }}</p>
+            }
+          </div>
+        </div>
+        <button
+          type="submit"
+          class="boton-primario"
+          [disabled]="formulario.invalid || estadoCobro().tipo === 'procesando'"
+          [attr.aria-busy]="estadoCobro().tipo === 'procesando'"
+          i18n="@@pago.pagar"
+        >
+          Pagar {{ prima() }}
+        </button>
+      </form>
+    }
+  }
+</section>

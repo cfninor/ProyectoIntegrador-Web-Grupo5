@@ -12,6 +12,7 @@ import {
   NO_VERIFICABLE,
   PENDIENTE,
   RECHAZADA,
+  SOLICITUD_ID,
 } from '../../../testing/fixtures-resultado';
 import { SolicitudSuscripcion } from './modelos';
 import { ActorResultado, TarjetaResultado } from './tarjeta-resultado';
@@ -49,8 +50,9 @@ describe('TarjetaResultado en inglés', () => {
     expect(within(score).getByText('Met')).toBeInTheDocument();
     expect(within(tabla).getByText('Minimum 40 out of 100')).toBeInTheDocument();
     expect(within(tabla).getByText('72 out of 100')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue to payment' })).toHaveAccessibleDescription(
-      'Online payment is not available yet.',
+    expect(screen.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${ACEPTADA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
     );
   });
 
@@ -78,7 +80,7 @@ describe('TarjetaResultado en inglés', () => {
 
     expect(screen.getByText(/You must accept the new premium/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Accept new premium' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Continue to payment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continue to payment' })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -88,7 +90,10 @@ describe('TarjetaResultado en inglés', () => {
     await renderizar({ ...AJUSTADA, primaAjustadaAceptadaEn: '2026-10-14T16:31:05Z' }, actor);
 
     expect(screen.getByText(new RegExp(texto.replaceAll('.', '\\.')))).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute(
+      'href',
+      `/${actor}/cotizar/oferta/${AJUSTADA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   it('rechazada', async () => {
