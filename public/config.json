@@ -1,5 +1,6 @@
 {
   "apiBaseUrl": "http://localhost:8010",
+  "pasarelaUrl": "http://localhost:8005",
   "sesionSimulada": {
     "usuario": { "id": "asesor-local", "nombre": "Asesor de prueba" },
     "rol": "ASESOR"

@@ -102,7 +102,10 @@ test.describe('en español', () => {
       page.getByRole('table', { name: /Reglas evaluadas, versión VIDA_HIPOTECARIO/ }),
     ).toBeVisible();
     await expect(page.getByRole('rowheader', { name: 'Puntaje de riesgo' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${COTIZACION_ID}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
     expect(bff.consultas()).toBe(2);
     expect(bff.otras).toEqual([]);
   });
@@ -123,7 +126,7 @@ test.describe('en español', () => {
     ).toBeVisible();
     // SOLVENTAG5-56: el asesor no la acepta por el cliente, y sin aceptarla no hay pago.
     await expect(page.getByRole('button', { name: 'Aceptar nueva prima' })).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toBeHidden();
   });
 
   test('ajustada: el cliente acepta la nueva prima y continúa a pago (SOLVENTAG5-56)', async ({
@@ -135,7 +138,7 @@ test.describe('en español', () => {
 
     await page.goto(RUTA('cliente'));
     await expect(page.getByText(/Debes aceptar la nueva prima/)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toBeHidden();
 
     await page.getByRole('button', { name: 'Aceptar nueva prima' }).click();
 
@@ -145,7 +148,10 @@ test.describe('en español', () => {
       ),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Aceptar nueva prima' })).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${COTIZACION_ID}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
     expect(bff.aceptaciones).toEqual([null]);
     expect(bff.otras).toEqual([]);
   });
@@ -174,7 +180,7 @@ test.describe('en español', () => {
       page.getByText('No cumple una regla de rechazo: Puntaje de riesgo.'),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Condiciones aprobadas' })).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toBeHidden();
   });
 
   test('en revisión no es un error, y el asesor vuelve al tablero', async ({ page }) => {
@@ -203,7 +209,7 @@ test.describe('en español', () => {
 
     await expect(page.getByText(/No pudimos verificar el registro/)).toBeVisible();
     await expect(page.getByRole('table')).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Continuar al pago' })).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Continuar al pago' })).toBeHidden();
   });
 
   test('registros no verificables: el aviso, con los datos', async ({ page }) => {
@@ -243,7 +249,10 @@ test.describe('en inglés', () => {
 
     await expect(page.getByRole('heading', { name: 'Approved conditions' })).toBeVisible();
     await expect(page.getByRole('rowheader', { name: 'Risk score' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${COTIZACION_ID}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   test('ajustada: el cliente acepta la nueva prima', async ({ page }) => {
@@ -257,7 +266,10 @@ test.describe('en inglés', () => {
     await expect(
       page.getByText(/You accepted the new premium on Oct 14, 2026 at 11:31 AM/),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue to payment' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${COTIZACION_ID}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   test('en revisión', async ({ page }) => {

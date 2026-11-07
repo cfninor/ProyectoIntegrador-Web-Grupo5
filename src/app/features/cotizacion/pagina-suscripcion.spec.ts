@@ -325,7 +325,7 @@ describe('PaginaSuscripcion · aceptar la nueva prima', () => {
     const { http, detectChanges } = await renderizar('cliente');
     http.expectOne(URL_SOLICITUD).flush(AJUSTADA);
     detectChanges();
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Aceptar nueva prima' }));
     const aceptacion = http.expectOne(URL_ACEPTACION);
@@ -339,7 +339,10 @@ describe('PaginaSuscripcion · aceptar la nueva prima', () => {
 
     expect(screen.getByText(/Aceptaste la nueva prima el 14\/10\/2026 a las 11:31/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${AJUSTADA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   it.each([
