@@ -78,8 +78,25 @@ function suscripcion(actor: Actor): Route {
 }
 
 /**
+ * SOLV-WEB-09, paso 3: el pago de la primera prima (SOLVENTAG5-74). Se llega aquí desde
+ * «Continuar al pago» de la tarjeta de resultado de la suscripción, con `?solicitudId=` en la
+ * URL; un pago APROBADO continúa a la firma (D17).
+ */
+function pago(actor: Actor): Route {
+  return {
+    path: 'cotizar/oferta/:cotizacionId/pago',
+    title: $localize`:@@pago.tituloPestana:Pago · Solventa`,
+    data: {
+      ...datosPagina($localize`:@@pago.miga:Cotizar / Pago`, $localize`:@@pago.tituloPagina:Pago`),
+      actor,
+    },
+    loadComponent: () => import('./features/poliza/pagina-pago').then((m) => m.PaginaPago),
+  };
+}
+
+/**
  * SOLV-WEB-10, paso 4: la póliza para firma (SOLVENTAG5-56). Se abre por su ruta con
- * `?solicitudId=`, sin enlace provisional: a la firma se llega desde el pago (D17).
+ * `?solicitudId=`: a la firma se llega desde un pago aprobado (D17).
  */
 function firma(actor: Actor): Route {
   return {
@@ -153,6 +170,7 @@ export const routes: Routes = [
     cotizarAsesor,
     oferta('asesor'),
     suscripcion('asesor'),
+    pago('asesor'),
     firma('asesor'),
   ]),
   portal('CLIENTE', [
@@ -160,6 +178,7 @@ export const routes: Routes = [
     cotizarCliente,
     oferta('cliente'),
     suscripcion('cliente'),
+    pago('cliente'),
     firma('cliente'),
     misAutorizaciones,
   ]),

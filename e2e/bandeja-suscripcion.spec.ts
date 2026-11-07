@@ -167,6 +167,8 @@ test('la bandeja pasa de página con «Siguiente» y «Anterior»', async ({ pag
   await page.getByRole('button', { name: 'Anterior' }).click();
 
   await expect(page).toHaveURL('/riesgo/bandeja');
+  // La URL cambia antes que la consulta de la página 1: esperar la tabla evita la carrera.
+  await expect(page.getByText('Mostrando 1–2 de 21 solicitudes')).toBeVisible();
   expect(consultas).toEqual(['?pagina=1&tamano=20', '?pagina=2&tamano=20', '?pagina=1&tamano=20']);
 });
 

@@ -42,3 +42,49 @@ export interface ErrorPoliza {
   /** Siempre en SOLICITUD_NO_EMITIBLE. */
   motivo?: MotivoNoEmitible;
 }
+
+// --- Cobro de la primera prima (SOLVENTAG5-74) -----------------------------------------------
+
+/** Único medio soportado por ahora (D2 de la SOLVENTAG5-74). */
+export type MedioPago = 'TARJETA';
+
+/** `EstadoPago` del contrato: PROCESANDO mientras la pasarela no responde a tiempo (R3). */
+export type EstadoPago = 'PROCESANDO' | 'APROBADO' | 'RECHAZADO';
+
+/** El token que entrega `POST /tokenizaciones` del simulador de la pasarela (nunca el PAN). */
+export interface TokenTarjeta {
+  token: string;
+  marca: string;
+  ultimos4: string;
+  vencimiento: string;
+}
+
+/** Cuerpo de `POST /v1/polizas/{polizaId}/cobro`. */
+export interface CobroPrima {
+  medioPago: MedioPago;
+  token: string;
+}
+
+/** `Pago` del contrato: el resultado del intento de cobro. */
+export interface Pago {
+  pagoId: string;
+  polizaId: string;
+  estado: EstadoPago;
+  monto: number;
+  moneda: string;
+  medio: MedioPago;
+  creadoEn: string;
+  actualizadoEn?: string;
+  /** Solo cuando la pasarela ya respondió (APROBADO o RECHAZADO); en PROCESANDO, ausente. */
+  referenciaPasarela?: string;
+  marca?: string;
+  ultimos4?: string;
+  vencimiento?: string;
+}
+
+/** El cuerpo `Error` de los 409/422 del cobro (SOLVENTAG5-121: clave de idempotencia). */
+export interface ErrorPago {
+  codigo:
+    'POLIZA_NO_PAGABLE' | 'CLAVE_IDEMPOTENCIA_EN_CURSO' | 'CLAVE_IDEMPOTENCIA_REUTILIZADA' | string;
+  detalle: string;
+}

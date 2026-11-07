@@ -48,7 +48,7 @@ const CHIPS: Record<ResultadoSuscripcion, () => { clase: string; texto: string }
  * Con AJUSTADA (SOLVENTAG5-56, D2), el cliente acepta la nueva prima con «Aceptar nueva prima»: la
  * tarjeta avisa a la página (`aceptarPrima`), que llama al BFF y le pasa la solicitud nueva. El
  * asesor no la acepta por él: ve si ya la aceptó. «Continuar al pago» solo aparece con ACEPTADA, o
- * con AJUSTADA y la nueva prima aceptada.
+ * con AJUSTADA y la nueva prima aceptada, y lleva a SOLV-WEB-09 (SOLVENTAG5-74).
  */
 @Component({
   selector: 'app-tarjeta-resultado',
@@ -68,6 +68,10 @@ export class TarjetaResultado {
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
 
   protected readonly rutaTablero = computed(() => `/${this.actor()}`);
+  /** SOLV-WEB-09 (SOLVENTAG5-74): «Continuar al pago» lleva aquí, con el `solicitudId` en la URL. */
+  protected readonly rutaPago = computed(
+    () => `/${this.actor()}/cotizar/oferta/${this.solicitud().cotizacionId}/pago`,
+  );
 
   protected readonly vista = computed(() => {
     const s = this.solicitud();
