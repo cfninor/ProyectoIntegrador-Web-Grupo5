@@ -314,18 +314,13 @@
 
     @if (v.puedePagar) {
       <div class="pago">
-        <button
-          type="button"
+        <a
           class="boton-primario"
-          disabled
-          aria-describedby="pago-explicacion"
+          [routerLink]="rutaPago()"
+          [queryParams]="{ solicitudId: v.s.solicitudId }"
           i18n="@@suscripcion.tarjeta.continuarPago"
+          >Continuar al pago</a
         >
-          Continuar al pago
-        </button>
-        <p id="pago-explicacion" i18n="@@suscripcion.tarjeta.continuarPago.explicacion">
-          El pago en línea todavía no está disponible.
-        </p>
       </div>
     }
   }

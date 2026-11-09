@@ -25,6 +25,12 @@ export interface AppConfig {
   /** URL base del BFF web (conector C1). */
   apiBaseUrl: string;
   /**
+   * URL base de la pasarela de pagos simulada (SOLVENTAG5-74, ADR 0004 D8). El portal la
+   * tokeniza directo desde el navegador, nunca a través del BFF: el PAN no debe tocar
+   * Solventa (SAQ A). Sin ella, la pantalla de pago no puede tokenizar la tarjeta.
+   */
+  pasarelaUrl?: string;
+  /**
    * Inicio de sesión con Cognito (SOLVENTAG5-207). Lo agrega «Publicar portal» en DEV, QA y PROD
    * con los ids del ambiente. Si está, el portal usa Cognito y no la sesión simulada.
    */

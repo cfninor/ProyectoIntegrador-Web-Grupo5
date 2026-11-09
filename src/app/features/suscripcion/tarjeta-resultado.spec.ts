@@ -54,9 +54,10 @@ describe('TarjetaResultado · SOLV-WEB-07', () => {
     expect(screen.queryByText('Determinante')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Volver al tablero' })).not.toBeInTheDocument();
 
-    const pago = screen.getByRole('button', { name: 'Continuar al pago' });
-    expect(pago).toBeDisabled();
-    expect(pago).toHaveAccessibleDescription('El pago en línea todavía no está disponible.');
+    expect(screen.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${ACEPTADA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   it('la tabla tiene caption con la versión, encabezados y una fila por regla', async () => {
@@ -101,7 +102,7 @@ describe('TarjetaResultado · SOLV-WEB-07', () => {
     expect(screen.getAllByText('Determinante')).toHaveLength(1);
     expect(fila(/Nivel de riesgo/).getByText('No cumple')).toHaveClass('chip-rojo');
     // SOLVENTAG5-56: sin aceptar la nueva prima no hay pago; el cliente la acepta aquí.
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeEnabled();
   });
 
@@ -111,7 +112,7 @@ describe('TarjetaResultado · SOLV-WEB-07', () => {
     expect(titulo()).toHaveTextContent('Solicitud aceptada con ajuste');
     expect(screen.getByText(/El cliente debe aceptar la nueva prima/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
   });
 
   it('rechazada: el motivo y las reglas, sin condiciones ni pago', async () => {
@@ -122,7 +123,7 @@ describe('TarjetaResultado · SOLV-WEB-07', () => {
     expect(screen.getByText('No cumple una regla de rechazo: Puntaje de riesgo.')).toBeVisible();
     expect(fila(/Puntaje de riesgo/).getByText('400')).toBeInTheDocument();
     expect(screen.queryByText('Condiciones aprobadas')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
   });
 
   it('un ramo sin suma asegurada numérica muestra su código y omite la suma', async () => {
@@ -173,7 +174,7 @@ describe('TarjetaResultado · SOLV-WEB-08', () => {
       'href',
       '/cliente',
     );
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
@@ -215,7 +216,7 @@ describe('TarjetaResultado · sin decisión', () => {
     expect(dato('Aceptada el')).toHaveTextContent('14/10/2026 a las 11:30');
     expect(screen.queryByText('Decisión')).not.toBeInTheDocument();
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
   });
 
   it('evaluada: el estado y la fecha de la evaluación, sin mostrar reglas todavía', async () => {
@@ -248,7 +249,7 @@ describe('TarjetaResultado · registros', () => {
     expect(screen.queryByText('Tiempo de decisión')).not.toBeInTheDocument();
     expect(screen.queryByText('Condiciones aprobadas')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
   });
 
   it('en revisión con registro ilegible: el aviso y volver al tablero', async () => {
@@ -322,7 +323,10 @@ describe('TarjetaResultado · aceptar la nueva prima', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aceptar nueva prima' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Debes aceptar la nueva prima/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/${ACEPTADA_LA_PRIMA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 
   it('aceptada, el asesor ve la fecha y la hora de la aceptación', async () => {
@@ -332,6 +336,9 @@ describe('TarjetaResultado · aceptar la nueva prima', () => {
       screen.getByText('El cliente aceptó la nueva prima el 14/10/2026 a las 11:31.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/El cliente debe aceptar la nueva prima/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Continuar al pago' })).toHaveAttribute(
+      'href',
+      `/asesor/cotizar/oferta/${ACEPTADA_LA_PRIMA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
+    );
   });
 });

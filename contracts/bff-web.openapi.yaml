@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.3.0
+  version: 1.4.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -54,7 +54,8 @@ tags:
       suscripción consulta ese mismo perfil para evaluarla (SOLVENTAG5-67). La consulta de la
       solicitud también da el resultado de la suscripción o, sin decisión, el último estado
       conocido (SOLVENTAG5-55). Con una solicitud AJUSTADA, el cliente titular acepta la nueva
-      prima antes de continuar a cobro y emisión (SOLVENTAG5-56).
+      prima antes de continuar a cobro y emisión (SOLVENTAG5-56). El analista de riesgo ve en su
+      bandeja las solicitudes que la decisión automática dejó EN_REVISION (SOLVENTAG5-52).
   - name: polizas
     description: >
       Póliza preparada para firma electrónica (SOLVENTAG5-56). Se genera desde una solicitud de
@@ -677,6 +678,71 @@ paths:
           $ref: '#/components/responses/OfertaVencida'
         '422':
           $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/en-revision:
+    get:
+      tags: [suscripcion]
+      operationId: listarSolicitudesEnRevision
+      summary: Listar las solicitudes que esperan la revisión de un analista
+      description: >
+        Bandeja de suscripción asistida (SOLVENTAG5-52). Devuelve las solicitudes en EN_REVISION,
+        las que la decisión automática (SOLVENTAG5-51) no pudo resolver, de la que lleva más
+        tiempo esperando a la más reciente (enRevisionDesde), por páginas y con el total de
+        pendientes. El motivo de cada una (motivo, reglaAplicada y reglasSinResolver, con sus
+        parámetros y señales) sale solo de los registros de la evaluación y de la decisión
+        (ADR 0006), sin volver a evaluar. Si un registro no se puede leer o verificar, la
+        solicitud igual aparece, con registrosVerificables en false y sin lo que no se pudo
+        leer. Una solicitud de la bandeja no avanza a cobro ni a emisión mientras no tenga
+        decisión. Solo para el analista de riesgo.
+      x-roles: [ANALISTA_RIESGO]
+      parameters:
+        - name: pagina
+          in: query
+          required: false
+          description: Número de la página, desde 1.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: tamano
+          in: query
+          required: false
+          description: Solicitudes por página.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: >
+            Una página de la bandeja. Sin solicitudes en revisión, o pasada la última página,
+            solicitudes llega vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BandejaRevision'
+              examples:
+                conSolicitudes:
+                  $ref: '#/components/examples/BandejaRevisionConSolicitudes'
+                vacia:
+                  $ref: '#/components/examples/BandejaRevisionVacia'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          description: Un parámetro de la página no cumple el contrato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+              example:
+                detail:
+                  - loc: [query, tamano]
+                    msg: Input should be less than or equal to 50
+                    type: less_than_equal
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
   /v1/solicitudes-suscripcion/{solicitudId}:
@@ -2134,6 +2200,98 @@ components:
           type: string
           pattern: '^[0-9a-f]{64}$'
           description: Huella SHA-256 del registro de la decisión; con ella se audita y se reconstruye.
+    BandejaRevision:
+      type: object
+      description: Una página de la bandeja de suscripción asistida (SOLVENTAG5-52).
+      required: [solicitudes, total, pagina, tamano]
+      properties:
+        solicitudes:
+          type: array
+          description: De la que lleva más tiempo en revisión a la más reciente.
+          items:
+            $ref: '#/components/schemas/SolicitudEnRevision'
+        total:
+          type: integer
+          minimum: 0
+          description: Cuántas solicitudes hay en EN_REVISION, contando todas las páginas.
+        pagina:
+          type: integer
+          minimum: 1
+        tamano:
+          type: integer
+          minimum: 1
+          maximum: 50
+    SolicitudEnRevision:
+      type: object
+      description: >
+        Una solicitud en EN_REVISION con el motivo que la mandó a revisión, tal como quedó en el
+        registro de la decisión automática (ADR 0006).
+      required:
+        - solicitudId
+        - cotizacionId
+        - cobertura
+        - prima
+        - moneda
+        - periodicidad
+        - canal
+        - aceptadaEn
+        - enRevisionDesde
+        - registrosVerificables
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        cliente:
+          $ref: '#/components/schemas/ClienteEncontrado'
+          description: Ausente si la solicitud no tiene cliente o identidad no lo encuentra.
+        cobertura:
+          $ref: '#/components/schemas/Cobertura'
+        prima:
+          type: integer
+          minimum: 0
+          description: Prima en COP de la oferta aceptada, redondeada al peso.
+        moneda:
+          type: string
+        periodicidad:
+          type: string
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        aceptadaEn:
+          type: string
+          format: date-time
+        enRevisionDesde:
+          type: string
+          format: date-time
+          description: Cuándo la decisión automática la dejó en EN_REVISION.
+        motivo:
+          $ref: '#/components/schemas/MotivoDecisionSuscripcion'
+          description: Ausente si el registro de la decisión no se puede leer.
+        reglaAplicada:
+          type: string
+          description: >
+            La regla que la mandó a revisión o, sin una regla determinante (como con
+            EVALUACION_NO_VERIFICABLE), la versión de la política. Ausente si el registro de la
+            decisión no se puede leer.
+          examples: [VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1]
+        reglasSinResolver:
+          type: array
+          description: >
+            Las reglas que la mandaron a revisión (determinantes), con sus parámetros, como el
+            límite, y las señales del cliente. Vacía con EVALUACION_NO_VERIFICABLE. Ausente si
+            el registro de la decisión no se puede leer.
+          items:
+            $ref: '#/components/schemas/ReglaEvaluadaSuscripcion'
+        registrosVerificables:
+          type: boolean
+          description: >
+            false si el registro de la evaluación o el de la decisión no se pudo leer o verificar
+            al consultar; los datos son los guardados, sin corregirlos.
     MotivoNoEmitible:
       type: string
       description: >
@@ -3178,6 +3336,84 @@ components:
           primaCotizada: 70000
           tiempoDecisionMs: 1090
           trazaId: 3e3b227afb28e75f0b3fb02a61f8dc178f6128acbb354ed27310dc4638738677
+    BandejaRevisionConSolicitudes:
+      summary: Dos solicitudes en revisión, de la más antigua a la más reciente
+      value:
+        solicitudes:
+          - solicitudId: 9f1b3d5e-0c2e-4f4a-9b7d-1e3f5a7b9c1d
+            cotizacionId: 0a2c4e6f-1d3f-4a5b-8c8e-2f4a6b8c0d2e
+            clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+            cliente:
+              clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+              nombres: María Fernanda
+              apellidos: López Rojas
+              documentoEnmascarado: CC ••••5678
+            cobertura:
+              ramo: VIDA_HIPOTECARIO
+              datosBien:
+                montoCredito: 200000000
+                plazoAnios: 20
+                ciudadInmueble: Bogotá
+                entidadAcreedora: Banco de Ejemplo
+            prima: 70000
+            moneda: COP
+            periodicidad: MENSUAL
+            canal: web
+            aceptadaEn: '2026-10-14T16:30:00Z'
+            enRevisionDesde: '2026-10-14T16:30:01.090Z'
+            motivo: REGLA_DE_REVISION
+            reglaAplicada: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            reglasSinResolver:
+              - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+                tipo: PERFIL_REQUERIDO
+                efecto: REVISAR
+                parametros: {}
+                senales: { origen: VALOR_POR_DEFECTO, motivoSinPerfil: PERFIL_NO_DISPONIBLE, perfilConsistente: true }
+                resultado: NO_CUMPLE
+                determinante: true
+            registrosVerificables: true
+          - solicitudId: 4c6e8a0b-2d4f-4e6a-9c8e-3f5a7b9c1d3e
+            cotizacionId: 7e9a1c3e-5b7d-4f9b-8d1f-6a8c0e2a4b6c
+            clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+            cliente:
+              clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+              nombres: Carlos Andrés
+              apellidos: Peña Ruiz
+              documentoEnmascarado: CC ••••5120
+            cobertura:
+              ramo: VIDA_HIPOTECARIO
+              datosBien:
+                montoCredito: 950000000
+                plazoAnios: 20
+                ciudadInmueble: Medellín
+                entidadAcreedora: Banco de Ejemplo
+            prima: 231900
+            moneda: COP
+            periodicidad: MENSUAL
+            canal: web
+            aceptadaEn: '2026-10-15T14:05:00Z'
+            enRevisionDesde: '2026-10-15T14:05:01.240Z'
+            motivo: REGLA_DE_REVISION
+            reglaAplicada: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            reglasSinResolver:
+              - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+                tipo: DATO_BIEN_MAXIMO
+                efecto: REVISAR
+                parametros: { campo: montoCredito, maximo: 800000000 }
+                senales: { montoCredito: 950000000 }
+                resultado: NO_CUMPLE
+                determinante: true
+            registrosVerificables: true
+        total: 2
+        pagina: 1
+        tamano: 20
+    BandejaRevisionVacia:
+      summary: Ninguna solicitud espera la revisión de un analista
+      value:
+        solicitudes: []
+        total: 0
+        pagina: 1
+        tamano: 20
     PolizaGenerando:
       summary: Solicitud aceptada, con el documento todavía generándose
       value:

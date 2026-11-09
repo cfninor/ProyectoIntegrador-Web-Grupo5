@@ -1,0 +1,173 @@
+<section class="indicadores" i18n-aria-label="@@bandeja.indicadores" aria-label="Indicadores">
+  <div class="tarjeta indicador">
+    <p class="etiqueta" i18n="@@bandeja.pendientes">Pendientes de revisión</p>
+    <p class="valor">
+      @if (vista(); as v) {
+        {{ v.totalTexto }}
+      } @else {
+        —
+      }
+    </p>
+    <p class="texto-secundario" i18n="@@bandeja.pendientes.nota">
+      Sin decisión, no avanzan a cobro ni a emisión
+    </p>
+  </div>
+</section>
+
+<section class="tarjeta bandeja" aria-labelledby="bandeja-titulo">
+  <div class="encabezado">
+    <h2 id="bandeja-titulo" i18n="@@bandeja.tabla.titulo">
+      Solicitudes que las reglas no pudieron decidir
+    </h2>
+  </div>
+
+  <div aria-live="polite">
+    @switch (carga().tipo) {
+      @case ('cargando') {
+        <p class="estado" i18n="@@bandeja.cargando">Cargando la bandeja…</p>
+      }
+      @case ('error') {
+        <div class="estado">
+          <p class="mensaje-error" i18n="@@bandeja.error">
+            No pudimos cargar la bandeja. Intenta de nuevo.
+          </p>
+          <button
+            type="button"
+            class="boton-secundario"
+            (click)="reintentar()"
+            i18n="@@bandeja.reintentar"
+          >
+            Reintentar
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (vista(); as v) {
+    @if (v.filas.length === 0) {
+      @if (v.total === 0) {
+        <p class="estado" i18n="@@bandeja.vacia">
+          No hay solicitudes esperando la revisión de un analista.
+        </p>
+      } @else {
+        <div class="estado">
+          <p i18n="@@bandeja.paginaVacia">Esta página no tiene solicitudes.</p>
+          <button
+            type="button"
+            class="boton-secundario"
+            (click)="irA(1)"
+            i18n="@@bandeja.primeraPagina"
+          >
+            Ir a la primera página
+          </button>
+        </div>
+      }
+    } @else {
+      <div class="envoltura-tabla">
+        <table>
+          <caption class="visualmente-oculto" i18n="@@bandeja.tabla.caption">
+            Solicitudes en revisión, de la que lleva más tiempo esperando a la más reciente
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@bandeja.tabla.solicitud">Solicitud</th>
+              <th scope="col" i18n="@@bandeja.tabla.cliente">Cliente</th>
+              <th scope="col" i18n="@@bandeja.tabla.producto">Producto</th>
+              <th scope="col" i18n="@@bandeja.tabla.motivo">Motivo (regla sin resolver)</th>
+              <th scope="col" i18n="@@bandeja.tabla.recibida">En revisión desde</th>
+              <th scope="col">
+                <span class="visualmente-oculto" i18n="@@bandeja.tabla.acciones">Acciones</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of v.filas; track f.solicitudId) {
+              <tr>
+                <th scope="row">
+                  <span class="codigo" [attr.title]="f.solicitudId">{{ f.codigo }}</span>
+                  @if (f.sinVerificar) {
+                    <span class="chip chip-rojo" i18n="@@bandeja.sinVerificar"
+                      >Registro sin verificar</span
+                    >
+                  }
+                </th>
+                <td>
+                  @if (f.cliente) {
+                    <span class="nombre">{{ f.cliente }}</span>
+                    <span class="texto-secundario">{{ f.documento }}</span>
+                  } @else {
+                    <span class="texto-secundario" i18n="@@bandeja.sinCliente"
+                      >Sin cliente identificado</span
+                    >
+                  }
+                </td>
+                <td>
+                  <span>{{ f.producto }}</span>
+                  @if (f.sumaAsegurada) {
+                    <span class="texto-secundario">{{ f.sumaAsegurada }}</span>
+                  }
+                </td>
+                <td>
+                  @if (f.reglas.length > 0) {
+                    <ul class="reglas">
+                      @for (regla of f.reglas; track $index) {
+                        <li>{{ regla }}</li>
+                      }
+                    </ul>
+                  }
+                  @if (f.motivo) {
+                    <span>{{ f.motivo }}</span>
+                  }
+                </td>
+                <td>
+                  <span>{{ f.recibidaFecha }}</span>
+                  <span class="texto-secundario">{{ f.recibidaHora }}</span>
+                </td>
+                <td>
+                  <a
+                    class="boton-secundario"
+                    [routerLink]="f.rutaPerfil"
+                    [attr.aria-label]="f.etiquetaPerfil"
+                    i18n="@@bandeja.verPerfil"
+                    >Ver perfil</a
+                  >
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="paginacion" i18n-aria-label="@@bandeja.paginacion" aria-label="Paginación">
+        <p class="texto-secundario" i18n="@@bandeja.mostrando">
+          Mostrando {{ v.desde }}–{{ v.hasta }} de {{ v.totalTexto }} solicitudes
+        </p>
+        <div class="botones">
+          <button
+            type="button"
+            class="boton-secundario"
+            [disabled]="!v.hayAnterior"
+            (click)="irA(v.pagina - 1)"
+            i18n="@@bandeja.anterior"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            class="boton-secundario"
+            [disabled]="!v.haySiguiente"
+            (click)="irA(v.pagina + 1)"
+            i18n="@@bandeja.siguiente"
+          >
+            Siguiente
+          </button>
+        </div>
+      </nav>
+    }
+  }
+
+  <p class="aviso" i18n="@@bandeja.aviso">
+    Una solicitud de esta bandeja no avanza a cobro ni a emisión hasta que se registre una decisión.
+  </p>
+</section>

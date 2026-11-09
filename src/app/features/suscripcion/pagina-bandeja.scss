@@ -1,0 +1,131 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+.indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.indicador {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .valor {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+}
+
+.bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.envoltura-tabla {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--outline-variant);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody th {
+  font-weight: 400;
+}
+
+td > span,
+th > span {
+  display: block;
+}
+
+th .chip {
+  display: inline-flex;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+.codigo {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-weight: 600;
+}
+
+.nombre {
+  font-weight: 600;
+}
+
+.reglas {
+  margin: 0;
+  padding-left: 18px;
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
+td a.boton-secundario {
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.paginacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  .botones {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+.aviso {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-size: 13px;
+}

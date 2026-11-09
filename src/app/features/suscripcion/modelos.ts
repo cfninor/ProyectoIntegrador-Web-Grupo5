@@ -1,4 +1,4 @@
-import { MotivoSinPerfil, PerfilUsado } from '../cotizacion/modelos';
+import { ClienteEncontrado, MotivoSinPerfil, PerfilUsado } from '../cotizacion/modelos';
 
 export type OrigenPerfil = 'PERFIL' | 'VALOR_POR_DEFECTO';
 
@@ -108,4 +108,40 @@ export interface DecisionSuscripcion {
   recargoPorcentaje?: number;
   tiempoDecisionMs: number;
   trazaId: string;
+}
+
+/**
+ * `SolicitudEnRevision` del contrato: una solicitud de la bandeja de suscripción asistida
+ * (SOLVENTAG5-52), con el motivo que la mandó a revisión tal como quedó en su registro.
+ */
+export interface SolicitudEnRevision {
+  solicitudId: string;
+  cotizacionId: string;
+  clienteId?: string;
+  /** Ausente si la solicitud no tiene cliente o identidad no lo encuentra. */
+  cliente?: ClienteEncontrado;
+  cobertura: { ramo: string; datosBien: Record<string, unknown> };
+  prima: number;
+  moneda: string;
+  periodicidad: string;
+  canal: 'web' | 'movil' | 'socio';
+  aceptadaEn: string;
+  /** Cuándo la decisión automática la dejó en EN_REVISION. */
+  enRevisionDesde: string;
+  /** Ausente si el registro de la decisión no se puede leer. */
+  motivo?: MotivoDecisionSuscripcion;
+  /** Ausente si el registro de la decisión no se puede leer. */
+  reglaAplicada?: string;
+  /** Las reglas determinantes. Vacía con EVALUACION_NO_VERIFICABLE; ausente si no se puede leer. */
+  reglasSinResolver?: ReglaEvaluadaSuscripcion[];
+  /** False si un registro no se pudo leer o verificar al consultar. */
+  registrosVerificables: boolean;
+}
+
+/** `BandejaRevision` del contrato: una página de la bandeja y el total de pendientes. */
+export interface BandejaRevision {
+  solicitudes: SolicitudEnRevision[];
+  total: number;
+  pagina: number;
+  tamano: number;
 }

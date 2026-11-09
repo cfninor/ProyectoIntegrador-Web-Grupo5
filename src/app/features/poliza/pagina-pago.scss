@@ -1,0 +1,53 @@
+// SOLV-WEB-09: el pago de la primera prima (SOLVENTAG5-74).
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 480px;
+}
+
+h2,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  a {
+    text-decoration: none;
+  }
+}
+
+.formulario-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
