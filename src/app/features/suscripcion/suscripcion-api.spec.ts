@@ -89,6 +89,17 @@ describe('SuscripcionApi', () => {
     await expect(respuesta).resolves.toEqual(bandeja);
   });
 
+  it('pide el detalle de revisión por GET .../{solicitudId}/revision (SOLVENTAG5-53)', async () => {
+    const revision = { solicitudId: 's-1' };
+    const respuesta = firstValueFrom(api.obtenerRevision('s-1'));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/solicitudes-suscripcion/s-1/revision');
+    expect(peticion.request.method).toBe('GET');
+    peticion.flush(revision);
+
+    await expect(respuesta).resolves.toEqual(revision);
+  });
+
   it('codifica el id de la solicitud en la ruta', () => {
     void firstValueFrom(api.obtenerPerfilRiesgo('a/b'));
 

@@ -1,0 +1,186 @@
+// Detalle de revisión de una solicitud (SOLVENTAG5-53). Las señales siguen el estilo del perfil de
+// riesgo (SOLVENTAG5-67) y la tabla, el de la bandeja (SOLVENTAG5-52).
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+.volver {
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+.estado-carga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.solicitud,
+.reglas,
+.perfil {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.codigo {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+  margin: 0;
+
+  dd {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 6px 0 0;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .valor {
+    font-weight: 600;
+  }
+
+  .chip {
+    align-self: flex-start;
+  }
+}
+
+.motivo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.envoltura-tabla {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--outline-variant);
+  text-align: left;
+  vertical-align: middle;
+}
+
+thead th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody th {
+  font-weight: 400;
+}
+
+// Más claro que el chip «Sin resolver», para que el chip se distinga dentro de la fila.
+tr.sin-resolver {
+  background: color-mix(in srgb, var(--chip-ambar-fondo) 45%, white);
+
+  th {
+    font-weight: 600;
+  }
+}
+
+.aviso {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-size: 13px;
+
+  &.aviso-error {
+    background: var(--chip-rojo-fondo);
+    color: var(--chip-rojo-texto);
+  }
+}
+
+.senales {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.senal {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 110px;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--outline-variant);
+  font-size: 14px;
+}
+
+.barra {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--chip-gris-fondo);
+}
+
+.relleno {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+
+  &.favorable {
+    background: var(--chip-verde-texto);
+  }
+
+  &.medio {
+    background: #b07a12;
+  }
+
+  &.desfavorable {
+    background: var(--error);
+  }
+}
+
+.lectura {
+  text-align: right;
+  color: var(--on-surface-variant);
+}
+
+.sin-perfil {
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .senal {
+    grid-template-columns: minmax(0, 1fr) 90px;
+  }
+
+  .barra {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

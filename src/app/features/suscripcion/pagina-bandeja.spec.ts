@@ -146,6 +146,19 @@ describe('PaginaBandeja · SOLVENTAG5-52', () => {
     ).toHaveAttribute('href', `/riesgo/perfil-riesgo/${MONTO_ALTO.solicitudId}`);
   });
 
+  it('cada fila lleva «Revisar» al detalle de revisión de su solicitud (SOLVENTAG5-53)', async () => {
+    await cargar(BANDEJA);
+
+    expect(screen.getByRole('link', { name: 'Revisar la solicitud 9f1b3d5e' })).toHaveAttribute(
+      'href',
+      `/riesgo/bandeja/revision/${SIN_PERFIL.solicitudId}`,
+    );
+    expect(screen.getByRole('link', { name: 'Revisar la solicitud 4c6e8a0b' })).toHaveAttribute(
+      'href',
+      `/riesgo/bandeja/revision/${MONTO_ALTO.solicitudId}`,
+    );
+  });
+
   it('la bandeja vacía lo dice, sin tabla', async () => {
     await cargar(VACIA);
 

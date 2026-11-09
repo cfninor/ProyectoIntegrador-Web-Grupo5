@@ -3,7 +3,12 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { APP_CONFIG } from '../../core/config/app-config';
-import { BandejaRevision, PerfilRiesgoSolicitud, SolicitudSuscripcion } from './modelos';
+import {
+  BandejaRevision,
+  PerfilRiesgoSolicitud,
+  RevisionSolicitud,
+  SolicitudSuscripcion,
+} from './modelos';
 
 @Injectable({ providedIn: 'root' })
 export class SuscripcionApi {
@@ -58,6 +63,18 @@ export class SuscripcionApi {
     return this.http.get<BandejaRevision>(
       `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/en-revision`,
       { params: new HttpParams().set('pagina', pagina).set('tamano', tamano) },
+    );
+  }
+
+  /**
+   * El detalle de revisión de una solicitud (`obtenerRevisionSolicitud`, SOLVENTAG5-53): sus datos,
+   * quién la cotizó, las reglas evaluadas con las que quedaron sin resolver y el perfil con que se
+   * cotizó. Solo para el analista de riesgo. Un 404 llega como error.
+   */
+  obtenerRevision(solicitudId: string): Observable<RevisionSolicitud> {
+    const id = encodeURIComponent(solicitudId);
+    return this.http.get<RevisionSolicitud>(
+      `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/${id}/revision`,
     );
   }
 }

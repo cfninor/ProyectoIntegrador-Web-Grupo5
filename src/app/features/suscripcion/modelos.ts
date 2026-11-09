@@ -145,3 +145,67 @@ export interface BandejaRevision {
   pagina: number;
   tamano: number;
 }
+
+/** `Rol` del contrato: el grupo de Cognito del usuario. */
+export type RolUsuario = 'ASESOR' | 'CLIENTE' | 'ANALISTA_RIESGO' | 'OPERACIONES' | 'SOCIO';
+
+/**
+ * `Solicitante` del contrato: quién pidió la cotización, con su usuario y su rol, tal como quedó en
+ * el registro de la decisión de precio. El nombre no se registra (SOLVENTAG5-53).
+ */
+export interface Cotizante {
+  id: string;
+  rol: RolUsuario;
+}
+
+/** `ReglaRevisionSuscripcion` del contrato: la regla evaluada y si quedó sin resolver. */
+export interface ReglaRevisionSuscripcion extends ReglaEvaluadaSuscripcion {
+  /** Determinante de la decisión automática y la solicitud sigue EN_REVISION. */
+  sinResolver: boolean;
+}
+
+/**
+ * `PerfilRiesgoRevision` del contrato: el perfil con que se cotizó la solicitud, de la misma fuente
+ * que la consulta del perfil (SOLVENTAG5-67).
+ */
+export interface PerfilRiesgoRevision {
+  origen: OrigenPerfil;
+  /** False si la foto de la cotización no coincide con la de la solicitud: no llega el perfil. */
+  coincide: boolean;
+  /** Solo con origen PERFIL y `coincide`. */
+  perfil?: PerfilUsado;
+  /** Solo con perfil: ya no estaba vigente cuando el cliente aceptó la oferta. */
+  desactualizado?: boolean;
+  /** Solo con origen VALOR_POR_DEFECTO. */
+  motivoSinPerfil?: MotivoSinPerfil;
+}
+
+/**
+ * `RevisionSolicitud` del contrato: lo que el analista de riesgo necesita para revisar una
+ * solicitud (SOLVENTAG5-53), tal como quedó en sus registros. Solo lee.
+ */
+export interface RevisionSolicitud {
+  solicitudId: string;
+  cotizacionId: string;
+  clienteId?: string;
+  /** Ausente si la solicitud no tiene cliente o identidad no lo encuentra. */
+  cliente?: ClienteEncontrado;
+  estado: EstadoSolicitudSuscripcion;
+  cobertura: { ramo: string; datosBien: Record<string, unknown> };
+  prima: number;
+  moneda: string;
+  periodicidad: string;
+  canal: 'web' | 'movil' | 'socio';
+  aceptadaEn: string;
+  /** Ausente si la cotización llegó sin usuario o su registro no se puede leer. */
+  cotizadaPor?: Cotizante;
+  /** La decisión automática; ausente sin decisión o si su registro no se puede leer. */
+  decision?: DecisionSuscripcion;
+  /** Ausente sin evaluación o si su registro no se puede leer. */
+  versionReglas?: string;
+  /** En el orden del catálogo. Ausente sin evaluación o si su registro no se puede leer. */
+  reglasEvaluadas?: ReglaRevisionSuscripcion[];
+  perfilRiesgo: PerfilRiesgoRevision;
+  /** Solo con evaluación. False si un registro falta o no se pudo verificar al consultar. */
+  registrosVerificables?: boolean;
+}

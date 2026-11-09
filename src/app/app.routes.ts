@@ -139,6 +139,21 @@ const bandeja: Route = {
   loadComponent: () => import('./features/suscripcion/pagina-bandeja').then((m) => m.PaginaBandeja),
 };
 
+/**
+ * SOLVENTAG5-53: el detalle de revisión de una solicitud, que se abre con «Revisar» desde la
+ * bandeja. Cuelga de la bandeja para que el menú la siga marcando.
+ */
+const revision: Route = {
+  path: 'bandeja/revision/:solicitudId',
+  title: $localize`:@@revision.tituloPestana:Revisión de la solicitud · Solventa`,
+  data: datosPagina(
+    $localize`:@@revision.miga:Suscripción / Revisión`,
+    $localize`:@@revision.titulo:Revisión de la solicitud`,
+  ),
+  loadComponent: () =>
+    import('./features/suscripcion/pagina-revision').then((m) => m.PaginaRevision),
+};
+
 /** SOLVENTAG5-84: los consentimientos que el cliente ha otorgado. */
 const misAutorizaciones: Route = {
   path: 'autorizaciones',
@@ -185,6 +200,7 @@ export const routes: Routes = [
   portal('ANALISTA_RIESGO', [
     tablero,
     bandeja,
+    revision,
     perfilRiesgo('perfil-riesgo'),
     perfilRiesgo('perfil-riesgo/:solicitudId'),
   ]),
