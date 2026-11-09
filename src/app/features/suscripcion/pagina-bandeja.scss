@@ -104,9 +104,16 @@ th .chip {
   }
 }
 
+td a.boton-primario,
 td a.boton-secundario {
   white-space: nowrap;
   text-decoration: none;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .paginacion {

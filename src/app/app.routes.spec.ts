@@ -237,6 +237,33 @@ describe('routes', () => {
     expect(url).toBe('/asesor');
   });
 
+  it('el analista de riesgo abre el detalle de revisión de una solicitud (SOLVENTAG5-53)', async () => {
+    const { url, vista } = await navegar(
+      `/riesgo/bandeja/revision/${SOLICITUD_ID}`,
+      sesionDe('ANALISTA_RIESGO'),
+    );
+
+    expect(url).toBe(`/riesgo/bandeja/revision/${SOLICITUD_ID}`);
+    expect(document.title).toBe('Revisión de la solicitud · Solventa');
+    expect(
+      vista.getByRole('heading', { level: 1, name: 'Revisión de la solicitud' }),
+    ).toBeInTheDocument();
+    // Cuelga de la bandeja: el menú la sigue marcando.
+    expect(vista.getByRole('link', { name: 'Bandeja de suscripción' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    TestBed.inject(HttpTestingController).expectOne(
+      `http://bff.prueba/v1/solicitudes-suscripcion/${SOLICITUD_ID}/revision`,
+    );
+  });
+
+  it('el detalle de revisión no se abre con otro rol', async () => {
+    const { url } = await navegar(`/riesgo/bandeja/revision/${SOLICITUD_ID}`, sesionDe('ASESOR'));
+
+    expect(url).toBe('/asesor');
+  });
+
   it('el analista de riesgo abre la consulta del perfil de riesgo (SOLVENTAG5-67)', async () => {
     const { url, vista } = await navegar('/riesgo/perfil-riesgo', sesionDe('ANALISTA_RIESGO'));
 

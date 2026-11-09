@@ -125,13 +125,22 @@
                   <span class="texto-secundario">{{ f.recibidaHora }}</span>
                 </td>
                 <td>
-                  <a
-                    class="boton-secundario"
-                    [routerLink]="f.rutaPerfil"
-                    [attr.aria-label]="f.etiquetaPerfil"
-                    i18n="@@bandeja.verPerfil"
-                    >Ver perfil</a
-                  >
+                  <div class="acciones">
+                    <a
+                      class="boton-primario"
+                      [routerLink]="f.rutaRevision"
+                      [attr.aria-label]="f.etiquetaRevision"
+                      i18n="@@bandeja.revisar"
+                      >Revisar</a
+                    >
+                    <a
+                      class="boton-secundario"
+                      [routerLink]="f.rutaPerfil"
+                      [attr.aria-label]="f.etiquetaPerfil"
+                      i18n="@@bandeja.verPerfil"
+                      >Ver perfil</a
+                    >
+                  </div>
                 </td>
               </tr>
             }

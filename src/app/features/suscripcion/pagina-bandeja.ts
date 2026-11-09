@@ -17,10 +17,11 @@ import { fechaBogota, horaBogota, montoCop, numeroConMiles } from '../../core/id
 import { Idioma, idiomaDe } from '../../core/idioma/idioma';
 import { BandejaRevision, SolicitudEnRevision } from './modelos';
 import { RUTA_PERFIL_RIESGO } from './pagina-perfil-riesgo';
+import { RUTA_BANDEJA, RUTA_REVISION } from './rutas';
 import { reglaLegible, textoMotivo } from './reglas-legibles';
 import { SuscripcionApi } from './suscripcion-api';
 
-export const RUTA_BANDEJA = '/riesgo/bandeja';
+export { RUTA_BANDEJA };
 
 /** Solicitudes por página: el tamaño por defecto del contrato. */
 export const TAMANO_PAGINA = 20;
@@ -45,6 +46,10 @@ interface FilaBandeja {
   rutaPerfil: string;
   /** El nombre accesible de «Ver perfil», con el código de la solicitud. */
   etiquetaPerfil: string;
+  /** El detalle de revisión de la solicitud (SOLVENTAG5-53). */
+  rutaRevision: string;
+  /** El nombre accesible de «Revisar», con el código de la solicitud. */
+  etiquetaRevision: string;
 }
 
 /** La página pedida en `?pagina=`: un entero desde 1; cualquier otro valor es la primera. */
@@ -85,14 +90,16 @@ function fila(s: SolicitudEnRevision, idioma: Idioma): FilaBandeja {
     recibidaHora: horaBogota(s.enRevisionDesde, idioma),
     rutaPerfil: `${RUTA_PERFIL_RIESGO}/${s.solicitudId}`,
     etiquetaPerfil: $localize`:@@bandeja.verPerfil.etiqueta:Ver el perfil de riesgo de la solicitud ${codigo}:codigo:`,
+    rutaRevision: `${RUTA_REVISION}/${s.solicitudId}`,
+    etiquetaRevision: $localize`:@@bandeja.revisar.etiqueta:Revisar la solicitud ${codigo}:codigo:`,
   };
 }
 
 /**
  * Bandeja de suscripción asistida (SOLVENTAG5-52): las solicitudes que la decisión automática dejó
  * en revisión, de la que lleva más tiempo esperando a la más reciente, con el motivo que sale de
- * su registro y el total de pendientes. Solo lee: el detalle y la decisión del analista son de la
- * SOLVENTAG5-53 y la 54. La página va en `?pagina=`: se lee de la ruta y no como input, porque
+ * su registro y el total de pendientes. Solo lee: «Revisar» abre el detalle de revisión de cada
+ * solicitud (SOLVENTAG5-53), y la decisión del analista es de la SOLVENTAG5-54. La página va en `?pagina=`: se lee de la ruta y no como input, porque
  * `pagina` ya es la clave de los datos de la barra superior (`datosPagina`).
  */
 @Component({

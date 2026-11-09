@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.4.0
+  version: 1.5.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -55,7 +55,9 @@ tags:
       solicitud también da el resultado de la suscripción o, sin decisión, el último estado
       conocido (SOLVENTAG5-55). Con una solicitud AJUSTADA, el cliente titular acepta la nueva
       prima antes de continuar a cobro y emisión (SOLVENTAG5-56). El analista de riesgo ve en su
-      bandeja las solicitudes que la decisión automática dejó EN_REVISION (SOLVENTAG5-52).
+      bandeja las solicitudes que la decisión automática dejó EN_REVISION (SOLVENTAG5-52) y abre
+      cada una para revisarla con sus reglas, su perfil y la verificación de sus registros
+      (SOLVENTAG5-53).
   - name: polizas
     description: >
       Póliza preparada para firma electrónica (SOLVENTAG5-56). Se genera desde una solicitud de
@@ -64,6 +66,13 @@ tags:
       petición responde de inmediato con el documento en GENERANDO y el canal consulta la póliza
       hasta ver GENERADO. Solo el asesor de la cartera y el cliente titular ven la póliza y su
       documento.
+  - name: pagos
+    description: >
+      Cobros de la prima sobre una póliza PENDIENTE_FIRMA (SOLVENTAG5-74, épica EW9). El PAN de
+      la tarjeta nunca llega a Solventa: la pasarela lo tokeniza en el frontend (ADR 0004 D8).
+      Cada solicitud lleva su `Idempotency-Key` (SOLVENTAG5-121): repetirla nunca cobra dos
+      veces. Si la pasarela no responde a tiempo, el pago queda `PROCESANDO`, nunca se aprueba
+      ni se rechaza a ciegas (R3, BA-02).
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -845,6 +854,54 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}/revision:
+    get:
+      tags: [suscripcion]
+      operationId: obtenerRevisionSolicitud
+      summary: Consultar una solicitud para revisarla
+      description: >
+        Detalle de revisión de la suscripción asistida (SOLVENTAG5-53). El analista lo abre desde
+        la bandeja (SOLVENTAG5-52) y ve en una sola respuesta los datos de la solicitud y quién la
+        cotizó; las reglas evaluadas con su versión, cada una con su límite (parametros), el
+        valor del cliente (senales) y su resultado, con las que la mandaron a revisión marcadas
+        en sinResolver; y el perfil de riesgo con que se cotizó, de la misma fuente que
+        obtenerPerfilRiesgoSolicitud (SOLVENTAG5-67). Todo sale de lo guardado: la solicitud y los
+        registros de la evaluación y de la decisión (ADR 0006), sin volver a evaluar ni
+        recalcular. Un registro que no se puede leer o verificar no oculta la solicitud:
+        registrosVerificables llega en false y faltan solo las partes que no se pudieron leer. Si
+        la foto del perfil no coincide con la que guardó la solicitud, perfilRiesgo.coincide llega
+        en false, sin el perfil, en lugar del 409 de obtenerPerfilRiesgoSolicitud. Solo lee: no
+        cambia el estado. Una solicitud que ya no está EN_REVISION llega con su estado y su
+        resultado, y ninguna regla queda sin resolver. Solo para el analista de riesgo.
+      x-roles: [ANALISTA_RIESGO]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      responses:
+        '200':
+          description: La solicitud con lo que el analista necesita para revisarla.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionSolicitud'
+              examples:
+                enRevision:
+                  $ref: '#/components/examples/RevisionEnRevision'
+                sinPerfil:
+                  $ref: '#/components/examples/RevisionSinPerfil'
+                conAvisos:
+                  $ref: '#/components/examples/RevisionConAvisos'
+                yaDecidida:
+                  $ref: '#/components/examples/RevisionYaDecidida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
   /v1/solicitudes-suscripcion/{solicitudId}/aceptacion-prima:
     post:
       tags: [suscripcion]
@@ -1029,6 +1086,67 @@ paths:
           $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/polizas/{polizaId}/cobro:
+    post:
+      tags: [pagos]
+      operationId: cobrarPrimaPoliza
+      summary: Cobrar la primera prima de una póliza
+      description: >
+        Cobra la prima que trae la póliza PENDIENTE_FIRMA (SOLVENTAG5-56), sin recalcularla
+        (SOLVENTAG5-74). El token lo entrega la pasarela de pagos al tokenizar la tarjeta en el
+        frontend; el PAN nunca llega a Solventa (R1, ADR 0004 D8). Cada solicitud lleva su
+        encabezado Idempotency-Key (SOLVENTAG5-121): repetirla devuelve la misma respuesta sin
+        cobrar dos veces. Si la póliza ya tiene un pago APROBADO de la primera prima, responde
+        200 con ese pago, no un error (D4): no admite dos cobros aprobados. Si la pasarela no
+        responde a tiempo, el pago queda PROCESANDO (R3, BA-02): nunca se aprueba ni se rechaza
+        a ciegas; el canal consulta obtenerPoliza o este mismo recurso hasta que cambie. Con la
+        sesión del cliente, una póliza que no es suya responde 404 POLIZA_NO_ENCONTRADA; igual
+        con la del asesor si la solicitud de la póliza no está en su cartera.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CobroPrima'
+      responses:
+        '200':
+          description: La póliza ya tenía un pago APROBADO de la primera prima; es el existente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              examples:
+                aprobado:
+                  $ref: '#/components/examples/PagoAprobado'
+        '201':
+          description: Intento de cobro nuevo, con el resultado de la pasarela.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              examples:
+                aprobado:
+                  $ref: '#/components/examples/PagoAprobado'
+                rechazado:
+                  $ref: '#/components/examples/PagoRechazado'
+                procesando:
+                  $ref: '#/components/examples/PagoProcesando'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/PolizaNoPagableOClaveEnCurso'
+        '422':
+          $ref: '#/components/responses/ValidacionOClaveReutilizada'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
 components:
   securitySchemes:
     tokenCognito:
@@ -1086,7 +1204,49 @@ components:
       schema:
         type: string
         format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        UUID v4 que el cliente genera por cada intento de cobro, reversa o desembolso; repetirla
+        en un reintento de red evita cobrar dos veces (SOLVENTAG5-121, ADR 0011). El BFF la
+        reenvía sin cambiarla. Vence a las 24 horas: pasado ese tiempo se trata como una
+        solicitud nueva.
+      schema:
+        type: string
+        format: uuid
   responses:
+    ClaveIdempotenciaEnCurso:
+      description: >
+        Ya hay una solicitud en curso con la misma clave de idempotencia (ADR 0011): otra
+        petición con la misma clave todavía no terminó. No se reprocesó.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CLAVE_IDEMPOTENCIA_EN_CURSO
+          example:
+            codigo: CLAVE_IDEMPOTENCIA_EN_CURSO
+            detalle: Ya hay una solicitud en curso con la misma clave de idempotencia.
+    ClaveIdempotenciaReutilizada:
+      description: >
+        La clave de idempotencia ya se usó con una solicitud de cuerpo distinto: no es un
+        reintento válido del mismo intento de pago.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: CLAVE_IDEMPOTENCIA_REUTILIZADA
+          example:
+            codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+            detalle: La clave de idempotencia ya se usó con una solicitud distinta.
     NoAutenticado:
       description: >
         Sin token, o con un token que no es válido (firma, emisor, audiencia, tipo o vencimiento)
@@ -1488,6 +1648,58 @@ components:
           example:
             codigo: DOCUMENTO_EN_GENERACION
             detalle: El documento de la póliza todavía se está generando.
+    PolizaNoPagableOClaveEnCurso:
+      description: >
+        La póliza no admite un cobro porque no está PENDIENTE_FIRMA (POLIZA_NO_PAGABLE; si ya
+        tiene un pago APROBADO de la primera prima, en cambio, se responde 200 con ese pago, no
+        un error, D4), o ya hay una solicitud en curso con la misma clave de idempotencia
+        (CLAVE_IDEMPOTENCIA_EN_CURSO, SOLVENTAG5-121).
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    enum: [POLIZA_NO_PAGABLE, CLAVE_IDEMPOTENCIA_EN_CURSO]
+          examples:
+            polizaNoPagable:
+              summary: La póliza no está PENDIENTE_FIRMA
+              value:
+                codigo: POLIZA_NO_PAGABLE
+                detalle: La póliza no admite un cobro en su estado actual.
+            claveEnCurso:
+              summary: Ya hay una solicitud en curso con la misma clave
+              value:
+                codigo: CLAVE_IDEMPOTENCIA_EN_CURSO
+                detalle: Ya hay una solicitud en curso con la misma clave de idempotencia.
+    ValidacionOClaveReutilizada:
+      description: >
+        El cuerpo no cumple el contrato (ErrorValidacion), o la clave de idempotencia ya se usó
+        con una solicitud de cuerpo distinto (CLAVE_IDEMPOTENCIA_REUTILIZADA, SOLVENTAG5-121).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ErrorValidacion'
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - properties:
+                      codigo:
+                        const: CLAVE_IDEMPOTENCIA_REUTILIZADA
+          examples:
+            validacion:
+              summary: Cuerpo mal formado
+              value:
+                detail:
+                  - loc: [body, medioPago]
+                    msg: "Input should be 'TARJETA'"
+                    type: enum
+            claveReutilizada:
+              summary: Clave usada con otra solicitud
+              value:
+                codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+                detalle: La clave de idempotencia ya se usó con una solicitud distinta.
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -2292,6 +2504,152 @@ components:
           description: >
             false si el registro de la evaluación o el de la decisión no se pudo leer o verificar
             al consultar; los datos son los guardados, sin corregirlos.
+    RevisionSolicitud:
+      type: object
+      description: >
+        Una solicitud con lo que el analista de riesgo necesita para revisarla (SOLVENTAG5-53),
+        tal como quedó en sus registros (ADR 0006).
+      required:
+        - solicitudId
+        - cotizacionId
+        - estado
+        - cobertura
+        - prima
+        - moneda
+        - periodicidad
+        - canal
+        - aceptadaEn
+        - perfilRiesgo
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        cotizacionId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        cliente:
+          $ref: '#/components/schemas/ClienteEncontrado'
+          description: Ausente si la solicitud no tiene cliente o identidad no lo encuentra.
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitudSuscripcion'
+          description: >
+            EN_REVISION si el analista puede revisarla. Con otro estado, la pantalla muestra el
+            resultado y no ofrece revisarla.
+        cobertura:
+          $ref: '#/components/schemas/Cobertura'
+          description: >
+            El producto (ramo) y los datos del bien con que se cotizó. En vida hipotecario, la suma
+            asegurada es montoCredito y el plazo, plazoAnios.
+        prima:
+          type: integer
+          minimum: 0
+          description: Prima ofertada en COP, redondeada al peso.
+        moneda:
+          type: string
+        periodicidad:
+          type: string
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        aceptadaEn:
+          type: string
+          format: date-time
+        cotizadaPor:
+          $ref: '#/components/schemas/Solicitante'
+          description: >
+            Quién pidió la cotización, tal como quedó en el registro de la decisión de precio
+            (SOLVENTAG5-207): su usuario y su rol, ASESOR o CLIENTE. El nombre no se registra.
+            Ausente si la cotización llegó sin usuario (canal móvil o socio) o si ese registro no
+            se puede leer.
+        decision:
+          $ref: '#/components/schemas/DecisionSuscripcion'
+          description: >
+            La decisión automática (SOLVENTAG5-51), con el motivo y la regla que la mandó a
+            revisión. Ausente sin decisión o si su registro no se puede leer.
+        versionReglas:
+          type: string
+          description: >
+            Versión del conjunto de reglas con que se evaluó. Ausente sin evaluación o si su
+            registro no se puede leer.
+          examples: [VIDA_HIPOTECARIO.SUSCRIPCION.v1]
+        reglasEvaluadas:
+          type: array
+          description: >
+            Cada regla tal como quedó registrada, en el orden del catálogo. Ausente sin evaluación
+            o si su registro no se puede leer.
+          items:
+            $ref: '#/components/schemas/ReglaRevisionSuscripcion'
+        perfilRiesgo:
+          $ref: '#/components/schemas/PerfilRiesgoRevision'
+        registrosVerificables:
+          type: boolean
+          description: >
+            Solo cuando la solicitud ya se evaluó. false si el registro de la evaluación o el de
+            la decisión falta o no se pudo verificar al consultar (su huella no coincide); los
+            datos son los guardados, sin corregirlos.
+    ReglaRevisionSuscripcion:
+      type: object
+      description: Una regla evaluada (ReglaEvaluadaSuscripcion) y si quedó sin resolver.
+      required: [codigo, tipo, efecto, parametros, senales, resultado, sinResolver]
+      properties:
+        codigo:
+          type: string
+          description: Código de la regla con su versión.
+          examples: [VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1]
+        tipo:
+          $ref: '#/components/schemas/TipoReglaSuscripcion'
+        efecto:
+          $ref: '#/components/schemas/EfectoReglaSuscripcion'
+        parametros:
+          type: object
+          additionalProperties: true
+          description: Parámetros tal como se aplicaron, como el límite; dependen del tipo.
+        senales:
+          type: object
+          additionalProperties: true
+          description: >
+            Valores del cliente que usó la regla; dependen del tipo. Un valor es null si la regla
+            no aplica.
+        resultado:
+          $ref: '#/components/schemas/ResultadoReglaSuscripcion'
+        determinante:
+          type: boolean
+          description: Si la regla determinó la decisión automática. Solo con decisión.
+        sinResolver:
+          type: boolean
+          description: >
+            true si la regla mandó la solicitud a revisión y sigue sin resolver: es determinante
+            de la decisión automática y la solicitud está EN_REVISION.
+    PerfilRiesgoRevision:
+      type: object
+      description: >
+        El perfil de riesgo con que se cotizó la solicitud, de la misma fuente que
+        obtenerPerfilRiesgoSolicitud (SOLVENTAG5-67): la foto que guardó la cotización, sin
+        recalcularla ni consultar otra vez a ms-perfilamiento.
+      required: [origen, coincide]
+      properties:
+        origen:
+          $ref: '#/components/schemas/OrigenPerfil'
+        coincide:
+          type: boolean
+          description: >
+            false si la foto de la cotización no coincide con el perfil y la versión que guardó la
+            solicitud (el PERFIL_NO_COINCIDE de obtenerPerfilRiesgoSolicitud): no llega el perfil.
+            Siempre true con VALOR_POR_DEFECTO.
+        perfil:
+          $ref: '#/components/schemas/PerfilUsado'
+          description: >
+            Solo con origen PERFIL y coincide en true. calculadoEn es la fecha del perfil.
+        desactualizado:
+          type: boolean
+          description: >
+            Solo con perfil. true si el perfil ya no estaba vigente (vigenteHasta) cuando el
+            cliente aceptó la oferta (aceptadaEn de la solicitud).
+        motivoSinPerfil:
+          $ref: '#/components/schemas/MotivoSinPerfil'
+          description: Solo con origen VALOR_POR_DEFECTO.
     MotivoNoEmitible:
       type: string
       description: >
@@ -2434,6 +2792,76 @@ components:
           $ref: '#/components/schemas/CondicionesPoliza'
         documento:
           $ref: '#/components/schemas/DocumentoPoliza'
+    MedioPago:
+      type: string
+      description: Único medio soportado por ahora (D2 de SOLVENTAG5-74).
+      enum: [TARJETA]
+    EstadoPago:
+      type: string
+      description: >
+        PROCESANDO mientras la pasarela no responde a tiempo (R3); pasa a APROBADO o
+        RECHAZADO cuando responde. Desde RECHAZADO, un intento nuevo usa otra Idempotency-Key
+        (no reabre el mismo pago).
+      enum: [PROCESANDO, APROBADO, RECHAZADO]
+    CobroPrima:
+      type: object
+      description: Cuerpo para cobrar la prima de una póliza PENDIENTE_FIRMA (SOLVENTAG5-74).
+      required: [medioPago, token]
+      properties:
+        medioPago:
+          $ref: '#/components/schemas/MedioPago'
+        token:
+          type: string
+          minLength: 1
+          description: >
+            Token que entrega la pasarela de pagos al tokenizar la tarjeta en el frontend; el
+            PAN nunca llega al BFF ni al núcleo (R1, ADR 0004 D8).
+    Pago:
+      type: object
+      description: >
+        Intento de cobro de la primera prima de una póliza (SOLVENTAG5-74). referenciaPasarela,
+        marca, ultimos4 y vencimiento solo vienen cuando la pasarela ya respondió (APROBADO o
+        RECHAZADO); en PROCESANDO todavía no hay respuesta que guardar.
+      required: [pagoId, polizaId, estado, monto, moneda, medio, creadoEn]
+      properties:
+        pagoId:
+          type: string
+          format: uuid
+        polizaId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoPago'
+        referenciaPasarela:
+          type: string
+          description: Referencia que asigna la pasarela al intento; solo si ya respondió.
+        marca:
+          type: string
+          description: Marca de la tarjeta (por ejemplo VISA); nunca el número completo (R1).
+        ultimos4:
+          type: string
+          pattern: '^[0-9]{4}$'
+        vencimiento:
+          type: string
+          description: Mes y año de vencimiento de la tarjeta.
+          pattern: '^(0[1-9]|1[0-2])/[0-9]{2}$'
+          examples: ['09/28']
+        monto:
+          type: integer
+          minimum: 0
+          description: La prima de la póliza en el momento del cobro, en COP.
+        moneda:
+          type: string
+          enum: [COP]
+        medio:
+          $ref: '#/components/schemas/MedioPago'
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+          description: Cuándo cambió de PROCESANDO a su estado final.
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -2667,8 +3095,9 @@ components:
             COTIZACION_NO_ENCONTRADA, OFERTA_VENCIDA, SOLICITUD_SUSCRIPCION_NO_ENCONTRADA,
             PERFIL_NO_COINCIDE, CUENTA_NO_ENLAZABLE, DECISION_NO_ENCONTRADA,
             NUCLEO_NO_DISPONIBLE, IDENTIDAD_NO_DISPONIBLE, AJUSTE_NO_APLICA,
-            SOLICITUD_NO_EMITIBLE, SOLICITUD_SIN_CLIENTE, POLIZA_NO_ENCONTRADA y
-            DOCUMENTO_EN_GENERACION.
+            SOLICITUD_NO_EMITIBLE, SOLICITUD_SIN_CLIENTE, POLIZA_NO_ENCONTRADA,
+            DOCUMENTO_EN_GENERACION, CLAVE_IDEMPOTENCIA_EN_CURSO,
+            CLAVE_IDEMPOTENCIA_REUTILIZADA y POLIZA_NO_PAGABLE.
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -3414,6 +3843,405 @@ components:
         total: 0
         pagina: 1
         tamano: 20
+    RevisionEnRevision:
+      summary: En revisión porque la suma asegurada supera el máximo de la regla
+      value:
+        solicitudId: 4c6e8a0b-2d4f-4e6a-9c8e-3f5a7b9c1d3e
+        cotizacionId: 7e9a1c3e-5b7d-4f9b-8d1f-6a8c0e2a4b6c
+        clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+        cliente:
+          clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+          nombres: Carlos Andrés
+          apellidos: Peña Ruiz
+          documentoEnmascarado: CC ••••5120
+        estado: EN_REVISION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 950000000
+            plazoAnios: 20
+            ciudadInmueble: Medellín
+            entidadAcreedora: Banco de Ejemplo
+        prima: 231900
+        moneda: COP
+        periodicidad: MENSUAL
+        canal: web
+        aceptadaEn: '2026-10-15T14:05:00Z'
+        cotizadaPor:
+          id: 3f6a9c2e-8b1d-4e7a-9c5f-2d8e1a4b7c0f
+          rol: ASESOR
+        decision:
+          resultado: EN_REVISION
+          continuaAEmision: false
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 231900
+          tiempoDecisionMs: 1240
+          trazaId: a6d1d4ea8e5a4fa08e8438c91ab01e2055faf19e5134fddd3a61efc0c133aa46
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 684 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 72 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 41 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 950000000 }
+            resultado: NO_CUMPLE
+            determinante: true
+            sinResolver: true
+        perfilRiesgo:
+          origen: PERFIL
+          coincide: true
+          perfil:
+            perfilId: 6b8d0f2a-4c6e-4a8b-9d0f-1a3c5e7a9b1d
+            version: 2
+            score: 684
+            nivel: MEDIO
+            senales:
+              comportamientoPago: 72
+              estabilidadIngresos: 80
+              ubicacion: 66
+              endeudamiento: 41
+            calculadoEn: '2026-10-15T13:14:00Z'
+            vigenteHasta: '2026-10-16T13:14:00Z'
+          desactualizado: false
+        registrosVerificables: true
+    RevisionSinPerfil:
+      summary: En revisión porque se cotizó sin perfil; la cotizó el mismo cliente
+      value:
+        solicitudId: 9f1b3d5e-0c2e-4f4a-9b7d-1e3f5a7b9c1d
+        cotizacionId: 0a2c4e6f-1d3f-4a5b-8c8e-2f4a6b8c0d2e
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        cliente:
+          clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+          nombres: María Fernanda
+          apellidos: López Rojas
+          documentoEnmascarado: CC ••••5678
+        estado: EN_REVISION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 200000000
+            plazoAnios: 20
+            ciudadInmueble: Bogotá
+            entidadAcreedora: Banco de Ejemplo
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        canal: web
+        aceptadaEn: '2026-10-14T16:30:00Z'
+        cotizadaPor:
+          id: b0772cee-ddb2-4c4c-b349-ce1d8a32ff14
+          rol: CLIENTE
+        decision:
+          resultado: EN_REVISION
+          continuaAEmision: false
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 70000
+          tiempoDecisionMs: 1090
+          trazaId: 3e3b227afb28e75f0b3fb02a61f8dc178f6128acbb354ed27310dc4638738677
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: VALOR_POR_DEFECTO, motivoSinPerfil: PERFIL_NO_DISPONIBLE, perfilConsistente: true }
+            resultado: NO_CUMPLE
+            determinante: true
+            sinResolver: true
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: null }
+            resultado: NO_APLICA
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: null }
+            resultado: NO_APLICA
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: null }
+            resultado: NO_APLICA
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: null }
+            resultado: NO_APLICA
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 200000000 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+        perfilRiesgo:
+          origen: VALOR_POR_DEFECTO
+          coincide: true
+          motivoSinPerfil: PERFIL_NO_DISPONIBLE
+        registrosVerificables: true
+    RevisionConAvisos:
+      summary: >
+        La huella del registro de la decisión no coincide y el perfil ya no estaba vigente al
+        aceptar; se cotizó en el canal móvil, sin usuario
+      value:
+        solicitudId: 22b36d8b-7e75-43fb-af36-623872c40358
+        cotizacionId: 86728024-5f16-4e8d-96f8-929f3450cd42
+        clienteId: 984bee60-672c-40f8-81b8-956d4fa85257
+        cliente:
+          clienteId: 984bee60-672c-40f8-81b8-956d4fa85257
+          nombres: Laura Valentina
+          apellidos: Gómez Díaz
+          documentoEnmascarado: CC ••••3391
+        estado: EN_REVISION
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 450000000
+            plazoAnios: 15
+            ciudadInmueble: Cali
+            entidadAcreedora: Banco de Ejemplo
+        prima: 128400
+        moneda: COP
+        periodicidad: MENSUAL
+        canal: movil
+        aceptadaEn: '2026-10-20T15:40:00Z'
+        decision:
+          resultado: EN_REVISION
+          continuaAEmision: false
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 128400
+          tiempoDecisionMs: 1150
+          trazaId: c64a4543ce76fcbcade5797b53bedc08e6d81e9e031a72380c03a07cb788efce
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 590 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 55 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 28 }
+            resultado: NO_CUMPLE
+            determinante: true
+            sinResolver: true
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 450000000 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+        perfilRiesgo:
+          origen: PERFIL
+          coincide: true
+          perfil:
+            perfilId: 0d5f1b7c-3e9a-4c2d-8f6b-5a1e7c3d9b2f
+            version: 1
+            score: 590
+            nivel: MEDIO
+            senales:
+              comportamientoPago: 55
+              estabilidadIngresos: 61
+              ubicacion: 70
+              endeudamiento: 28
+            calculadoEn: '2026-10-17T09:12:00Z'
+            vigenteHasta: '2026-10-18T09:12:00Z'
+          desactualizado: true
+        registrosVerificables: false
+    RevisionYaDecidida:
+      summary: Rechazada por la decisión automática; ya no está en revisión
+      value:
+        solicitudId: fe6a2073-4498-4389-9320-7bc6adcc2ab4
+        cotizacionId: a8571d8f-d3e7-4962-a8eb-ae3911cc6e9e
+        clienteId: 92319d15-3c75-47cb-b2ef-7624d5add7fe
+        cliente:
+          clienteId: 92319d15-3c75-47cb-b2ef-7624d5add7fe
+          nombres: Andrés Felipe
+          apellidos: Mora Castro
+          documentoEnmascarado: CC ••••8842
+        estado: RECHAZADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 300000000
+            plazoAnios: 25
+            ciudadInmueble: Barranquilla
+            entidadAcreedora: Banco de Ejemplo
+        prima: 98600
+        moneda: COP
+        periodicidad: MENSUAL
+        canal: web
+        aceptadaEn: '2026-10-21T11:20:00Z'
+        cotizadaPor:
+          id: d242691c-78c7-4c4c-87ad-1a816c8a0752
+          rol: ASESOR
+        decision:
+          resultado: RECHAZADA
+          continuaAEmision: false
+          motivo: REGLA_DE_RECHAZO
+          reglaAplicada: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 98600
+          tiempoDecisionMs: 980
+          trazaId: f26df72f284b3a7324ebd95bd742f3a790f4127d2013a6d9a5dc3839a3d0c70a
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 410 }
+            resultado: NO_CUMPLE
+            determinante: true
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: ALTO }
+            resultado: NO_CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 35 }
+            resultado: NO_CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 44 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 300000000 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+        perfilRiesgo:
+          origen: PERFIL
+          coincide: true
+          perfil:
+            perfilId: 7c1e3a5b-9d2f-4b8e-a6c0-4e2a8c6b0d3f
+            version: 1
+            score: 410
+            nivel: ALTO
+            senales:
+              comportamientoPago: 35
+              estabilidadIngresos: 50
+              ubicacion: 62
+              endeudamiento: 44
+            calculadoEn: '2026-10-21T10:02:00Z'
+            vigenteHasta: '2026-10-22T10:02:00Z'
+          desactualizado: false
+        registrosVerificables: true
     PolizaGenerando:
       summary: Solicitud aceptada, con el documento todavía generándose
       value:
@@ -3542,6 +4370,47 @@ components:
           estado: GENERADO
           generadoEn: '2026-10-14T16:32:41.120Z'
           huella: 4e1a06d53e8edc65c35282b61b00695414dd19c435a2cba0c9f4cb3131879049
+    PagoAprobado:
+      summary: La pasarela aprobó el cobro
+      value:
+        pagoId: 1f3a5c7e-9b1d-4e3f-8a5c-7e9b1d3f5a7c
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: APROBADO
+        referenciaPasarela: pasarela-sim-00f4c8a2
+        marca: VISA
+        ultimos4: '4242'
+        vencimiento: '09/28'
+        monto: 70000
+        moneda: COP
+        medio: TARJETA
+        creadoEn: '2026-11-06T15:00:00.000Z'
+        actualizadoEn: '2026-11-06T15:00:01.200Z'
+    PagoRechazado:
+      summary: La pasarela rechazó el cobro
+      value:
+        pagoId: 3c5e7a9b-1d3f-4e5a-9c7e-1b3d5f7a9c1e
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: RECHAZADO
+        referenciaPasarela: pasarela-sim-7a2b4c6d
+        marca: MASTERCARD
+        ultimos4: '0366'
+        vencimiento: '03/27'
+        monto: 70000
+        moneda: COP
+        medio: TARJETA
+        creadoEn: '2026-11-06T15:05:00.000Z'
+        actualizadoEn: '2026-11-06T15:05:00.900Z'
+    PagoProcesando:
+      summary: >-
+        La pasarela no respondió a tiempo (R3): nunca se aprueba ni se rechaza a ciegas
+      value:
+        pagoId: 5a7c9e1b-3d5f-4a7c-9e1b-3d5f7a9c1e3d
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: PROCESANDO
+        monto: 70000
+        moneda: COP
+        medio: TARJETA
+        creadoEn: '2026-11-06T15:10:00.000Z'
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:

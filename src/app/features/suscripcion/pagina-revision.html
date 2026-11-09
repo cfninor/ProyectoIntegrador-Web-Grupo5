@@ -1,0 +1,249 @@
+<a class="boton-secundario volver" [routerLink]="rutaBandeja" i18n="@@revision.volver"
+  >Volver a la bandeja</a
+>
+
+<div aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <p class="tarjeta estado-carga" i18n="@@revision.cargando">Cargando la solicitud…</p>
+    }
+    @case ('no-encontrada') {
+      <p class="tarjeta estado-carga mensaje-error" i18n="@@revision.noEncontrada">
+        No encontramos una solicitud de suscripción con ese id.
+      </p>
+    }
+    @case ('error') {
+      <div class="tarjeta estado-carga">
+        <p class="mensaje-error" i18n="@@revision.error">
+          No pudimos cargar la solicitud. Intenta de nuevo.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="reintentar()"
+          i18n="@@revision.reintentar"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+  }
+</div>
+
+@if (vista(); as v) {
+  <section class="tarjeta solicitud" aria-labelledby="revision-solicitud-titulo">
+    <div class="encabezado">
+      <div>
+        <h2 id="revision-solicitud-titulo">
+          <span i18n="@@revision.solicitud.titulo"
+            >Solicitud <span class="codigo" [attr.title]="v.solicitudId">{{ v.codigo }}</span></span
+          >
+          @if (v.cliente) {
+            · {{ v.cliente }}
+          }
+        </h2>
+        @if (v.documento) {
+          <p class="texto-secundario">{{ v.documento }}</p>
+        } @else if (!v.cliente) {
+          <p class="texto-secundario" i18n="@@revision.sinCliente">Sin cliente identificado</p>
+        }
+      </div>
+      <span class="chip {{ v.claseEstado }}">{{ v.estado }}</span>
+    </div>
+
+    <dl class="datos">
+      @for (dato of v.datos; track dato.etiqueta) {
+        <div>
+          <dt class="etiqueta">{{ dato.etiqueta }}</dt>
+          <dd>
+            <span class="valor">{{ dato.valor }}</span>
+            @if (dato.detalle) {
+              <span class="texto-secundario">{{ dato.detalle }}</span>
+            }
+          </dd>
+        </div>
+      }
+    </dl>
+  </section>
+
+  @if (!v.enRevision) {
+    <p class="aviso" i18n="@@revision.aviso.noEnRevision">
+      Esta solicitud no está en revisión: su estado es {{ v.estado }}. No hay nada que revisar.
+    </p>
+  }
+  @if (v.noVerificable) {
+    <p class="aviso aviso-error" i18n="@@revision.aviso.noVerificable">
+      Un registro de esta solicitud no se pudo verificar: su huella no coincide con lo guardado. Ves
+      los datos tal como están, sin corregirlos. Repórtalo a soporte antes de decidir.
+    </p>
+  }
+
+  <section class="tarjeta reglas" aria-labelledby="revision-reglas-titulo">
+    <h2 id="revision-reglas-titulo">
+      @if (v.versionReglas) {
+        <ng-container i18n="@@revision.reglas.tituloVersion"
+          >Reglas evaluadas · versión {{ v.versionReglas }}</ng-container
+        >
+      } @else {
+        <ng-container i18n="@@revision.reglas.titulo">Reglas evaluadas</ng-container>
+      }
+    </h2>
+    @if (v.motivo) {
+      <p class="motivo">
+        @if (v.enRevision) {
+          <span class="etiqueta" i18n="@@revision.motivo.revision">Motivo de la revisión</span>
+        } @else {
+          <span class="etiqueta" i18n="@@revision.motivo.resultado"
+            >Resultado de la decisión automática</span
+          >
+        }
+        <span>{{ v.motivo }}</span>
+      </p>
+    }
+
+    @switch (v.sinReglas) {
+      @case ('sin-evaluar') {
+        <p class="texto-secundario" i18n="@@revision.reglas.sinEvaluar">
+          La solicitud aún no se ha evaluado: todavía no hay reglas que mostrar.
+        </p>
+      }
+      @case ('ilegibles') {
+        <p class="mensaje-error" i18n="@@revision.reglas.ilegibles">
+          No pudimos leer las reglas en el registro de la decisión.
+        </p>
+      }
+      @default {
+        <div class="envoltura-tabla">
+          <table>
+            <caption class="visualmente-oculto" i18n="@@revision.reglas.caption">
+              Reglas evaluadas, en el orden del catálogo, con las que mandaron la solicitud a
+              revisión marcadas «Sin resolver»
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@revision.reglas.regla">Regla</th>
+                <th scope="col" i18n="@@revision.reglas.limite">Límite</th>
+                <th scope="col" i18n="@@revision.reglas.valor">Valor del cliente</th>
+                <th scope="col" i18n="@@revision.reglas.resultado">Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of v.reglas; track r.codigo) {
+                <tr [class.sin-resolver]="r.sinResolver">
+                  <th scope="row">{{ r.nombre }}</th>
+                  <td>{{ r.limite }}</td>
+                  <td>{{ r.valor }}</td>
+                  <td>
+                    <span class="chip {{ r.claseResultado }}">{{ r.resultado }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </section>
+
+  <section class="tarjeta perfil" aria-labelledby="revision-perfil-titulo">
+    <div class="encabezado">
+      <h2 id="revision-perfil-titulo" i18n="@@revision.perfil.titulo">
+        Señales del perfil de riesgo
+      </h2>
+      @switch (v.perfil.tipo) {
+        @case ('perfil') {
+          @if (v.perfil.desactualizado) {
+            <span class="chip chip-ambar" i18n="@@revision.perfil.chipDesactualizado"
+              >Perfil desactualizado · {{ v.perfil.calculadoFecha }}
+              {{ v.perfil.calculadoHora }}</span
+            >
+          } @else {
+            <span class="chip chip-verde-azulado" i18n="@@revision.perfil.chipVigente"
+              >Perfil vigente · {{ v.perfil.calculadoFecha }} {{ v.perfil.calculadoHora }}</span
+            >
+          }
+        }
+        @case ('sin-perfil') {
+          <span class="chip chip-gris" i18n="@@perfilRiesgo.origen.valorPorDefecto"
+            >Valor por defecto</span
+          >
+        }
+      }
+    </div>
+
+    @switch (v.perfil.tipo) {
+      @case ('perfil') {
+        @if (v.perfil.desactualizado) {
+          <p class="aviso" i18n="@@revision.perfil.desactualizado">
+            El perfil venció el {{ v.perfil.vigenteHasta }}, antes de que el cliente aceptara la
+            oferta. La prima se cotizó con este perfil.
+          </p>
+        }
+        <dl class="datos">
+          <div>
+            <dt class="etiqueta" i18n="@@perfilRiesgo.dato.score">Score</dt>
+            <dd i18n="@@perfilRiesgo.dato.scoreValor">{{ v.perfil.score }} de 850</dd>
+          </div>
+          <div>
+            <dt class="etiqueta" i18n="@@perfilRiesgo.dato.nivel">Nivel</dt>
+            <dd>
+              <span class="chip {{ v.perfil.claseNivel }}">{{ v.perfil.nivel }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt class="etiqueta" i18n="@@revision.perfil.version">Versión del perfil</dt>
+            <dd>{{ v.perfil.version }}</dd>
+          </div>
+          <div>
+            <dt class="etiqueta" i18n="@@perfilRiesgo.dato.vigenteHasta">Vigente hasta</dt>
+            <dd>{{ v.perfil.vigenteHasta }}</dd>
+          </div>
+        </dl>
+        <ul class="senales">
+          @for (senal of v.perfil.senales; track senal.senal) {
+            <li class="senal">
+              <span>{{ senal.nombre }}</span>
+              <span class="barra" aria-hidden="true">
+                <span class="relleno {{ senal.tramo }}" [style.width.%]="senal.valor"></span>
+              </span>
+              <span class="lectura"
+                >{{ senal.lectura }}
+                <span class="visualmente-oculto" i18n="@@perfilRiesgo.senal.valor"
+                  >({{ senal.valor }} de 100)</span
+                ></span
+              >
+            </li>
+          }
+        </ul>
+      }
+      @case ('sin-perfil') {
+        <div class="sin-perfil">
+          @switch (v.perfil.motivo) {
+            @case ('SIN_CLIENTE') {
+              <p i18n="@@perfilRiesgo.motivo.sinCliente">
+                Se cotizó sin perfil de riesgo porque no había un cliente identificado.
+              </p>
+            }
+            @case ('SIN_CONSENTIMIENTO') {
+              <p i18n="@@perfilRiesgo.motivo.sinConsentimiento">
+                Se cotizó sin perfil de riesgo porque el cliente no tenía una autorización de datos
+                vigente.
+              </p>
+            }
+            @default {
+              <p i18n="@@perfilRiesgo.motivo.noDisponible">
+                Se cotizó sin perfil de riesgo porque el perfil no estuvo disponible a tiempo.
+              </p>
+            }
+          }
+        </div>
+      }
+      @case ('no-coincide') {
+        <p class="aviso aviso-error" i18n="@@revision.perfil.noCoincide">
+          El perfil guardado en la cotización no coincide con el de la solicitud. No la decidas y
+          repórtalo a soporte.
+        </p>
+      }
+    }
+  </section>
+}
