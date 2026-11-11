@@ -1,0 +1,82 @@
+// La página pública para firmar la póliza (SOLVENTAG5-57), con las medidas de la de autorización
+// de datos (SOLV-WEB-20).
+:host {
+  display: block;
+}
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aviso,
+.resultado,
+.formulario,
+.certificado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.formulario {
+  label {
+    margin-bottom: 0;
+  }
+
+  // Seis dígitos: el campo no ocupa todo el ancho.
+  .campo {
+    max-width: 16ch;
+    font-size: 18px;
+    letter-spacing: 0.2em;
+  }
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
+.huella {
+  font-family: monospace;
+  font-size: 12px;
+}

@@ -173,52 +173,7 @@
       </button>
     }
 
-    <article class="vista-previa" aria-labelledby="firma-resumen">
-      @if (actor() === 'asesor') {
-        <h3 id="firma-resumen" i18n="@@firma.resumen.asesor">Resumen de la póliza</h3>
-      } @else {
-        <h3 id="firma-resumen" i18n="@@firma.resumen.cliente">Resumen de tu póliza</h3>
-      }
-      <dl class="resumen">
-        <dt i18n="@@firma.tomador">Tomador</dt>
-        <dd>{{ v.tomador }}</dd>
-        <dt i18n="@@firma.documentoIdentidad">Documento de identidad</dt>
-        <dd>{{ v.p.tomador.documentoEnmascarado }}</dd>
-        <dt i18n="@@suscripcion.tarjeta.producto">Producto</dt>
-        <dd>{{ v.producto }}</dd>
-        <dt i18n="@@cotizacion.panel.sumaAsegurada">Suma asegurada</dt>
-        <dd>{{ v.sumaAsegurada }}</dd>
-        @if (v.mensual) {
-          <dt i18n="@@suscripcion.prima">Prima mensual</dt>
-        } @else {
-          <dt i18n="@@firma.prima">Prima</dt>
-        }
-        <dd>{{ v.prima }}</dd>
-        <dt i18n="@@suscripcion.tarjeta.vigencia">Vigencia</dt>
-        <dd>{{ v.vigencia }}</dd>
-      </dl>
-      <div class="condiciones">
-        <div class="bloque">
-          <h4 id="firma-coberturas" i18n="@@firma.coberturas">Coberturas</h4>
-          <ul aria-labelledby="firma-coberturas">
-            @for (cobertura of v.p.condiciones.coberturas; track cobertura) {
-              <li>{{ cobertura }}</li>
-            }
-          </ul>
-        </div>
-        <div class="bloque">
-          <h4 id="firma-exclusiones" i18n="@@firma.exclusiones">Exclusiones</h4>
-          <ul aria-labelledby="firma-exclusiones">
-            @for (exclusion of v.p.condiciones.exclusiones; track exclusion) {
-              <li>{{ exclusion }}</li>
-            }
-          </ul>
-        </div>
-      </div>
-      <p class="texto-secundario" i18n="@@firma.condiciones.version">
-        Condiciones del producto, versión {{ v.p.condiciones.version }}.
-      </p>
-    </article>
+    <app-vista-previa-poliza [datos]="v.p" [actor]="actor()" />
 
     <div class="descarga">
       <button
@@ -244,24 +199,22 @@
       }
     </div>
 
-    <div class="bloque">
-      <h3 id="firma-seguimiento" i18n="@@firma.seguimiento">Seguimiento de la firma</h3>
-      <ol class="linea-tiempo" aria-labelledby="firma-seguimiento">
-        @if (v.generadoEl; as generadoEl) {
-          <li class="hecho">
-            <span i18n="@@firma.hito.generado">Documento generado</span>&ngsp;
-            <span class="texto-secundario">{{ generadoEl }}</span>
-          </li>
-        } @else {
+    @if (v.generadoEn; as generadoEn) {
+      <app-tarjeta-firma
+        [polizaId]="v.p.polizaId"
+        [actor]="actor()"
+        [generadoEn]="generadoEn"
+        [huella]="v.p.documento.huella"
+        [rutaPago]="rutaPago()"
+        [solicitudId]="solicitudId()"
+      />
+    } @else {
+      <div class="bloque">
+        <h3 id="firma-seguimiento" i18n="@@firma.seguimiento">Seguimiento de la firma</h3>
+        <ol class="linea-tiempo" aria-labelledby="firma-seguimiento">
           <li aria-current="step" i18n="@@firma.hito.generando">Generando el documento</li>
-        }
-      </ol>
-      @if (v.p.documento.huella; as huella) {
-        <dl class="resumen">
-          <dt i18n="@@firma.huella">Huella del documento</dt>
-          <dd class="huella">{{ huella }}</dd>
-        </dl>
-      }
-    </div>
+        </ol>
+      </div>
+    }
   }
 </section>

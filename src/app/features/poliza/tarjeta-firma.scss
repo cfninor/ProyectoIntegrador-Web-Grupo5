@@ -1,0 +1,96 @@
+// La tarjeta de la firma electrónica de SOLV-WEB-10 (SOLVENTAG5-57, D14), con las medidas de la
+// página de la póliza.
+:host {
+  display: block;
+}
+
+.firma {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-control);
+}
+
+h3,
+h4,
+p,
+ol,
+dl,
+dd {
+  margin: 0;
+}
+
+h3,
+h4 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.estado,
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.estado {
+  align-items: flex-start;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  a {
+    text-decoration: none;
+  }
+}
+
+.linea-tiempo {
+  padding-left: 20px;
+
+  .hecho {
+    color: var(--chip-verde-texto);
+  }
+
+  [aria-current='step'] {
+    font-weight: 600;
+  }
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
+.certificado {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.huella {
+  font-family: monospace;
+  font-size: 12px;
+}

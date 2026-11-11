@@ -135,6 +135,8 @@ test.describe('en español', () => {
       `POST /v1/solicitudes-suscripcion/${SOLICITUD_ID_POLIZA}/poliza`,
       `GET /v1/polizas/${POLIZA_ID}`,
       `GET /v1/polizas/${POLIZA_ID}`,
+      // Con el documento GENERADO, la tarjeta de la firma la consulta (SOLVENTAG5-57).
+      `GET /v1/polizas/${POLIZA_ID}/firma`,
     ]);
   });
 

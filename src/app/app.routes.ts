@@ -237,6 +237,12 @@ export const routes: Routes = [
           ),
       },
       {
+        // Enlace que recibe el cliente para firmar su póliza con el código (SOLVENTAG5-57, D14).
+        path: 'firmar/:firmaId',
+        title: $localize`:@@firmar.tituloPestana:Firma tu póliza · Solventa`,
+        loadComponent: () => import('./features/firmar/pagina-firmar').then((m) => m.PaginaFirmar),
+      },
+      {
         path: '**',
         title: $localize`:@@portal.noEncontrada.tituloPestana:Página no encontrada · Solventa`,
         loadComponent: () =>

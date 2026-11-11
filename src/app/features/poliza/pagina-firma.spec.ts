@@ -24,10 +24,14 @@ const BFF = 'http://bff.prueba';
 const URL_GENERAR = `${BFF}/v1/solicitudes-suscripcion/${SOLICITUD_ID_POLIZA}/poliza`;
 const URL_POLIZA = `${BFF}/v1/polizas/${POLIZA_ID}`;
 const URL_DOCUMENTO = `${URL_POLIZA}/documento`;
+// La tarjeta de la firma (SOLVENTAG5-57) consulta la firma con el documento GENERADO; sus casos
+// están en tarjeta-firma.spec.ts.
+const URL_FIRMA = `${URL_POLIZA}/firma`;
 
 let http: HttpTestingController | undefined;
 
 afterEach(() => {
+  http?.match(URL_FIRMA);
   http?.verify();
   http = undefined;
   jest.useRealTimers();
