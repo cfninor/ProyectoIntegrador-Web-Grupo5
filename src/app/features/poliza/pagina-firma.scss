@@ -15,10 +15,8 @@
 
 h2,
 h3,
-h4,
 p,
 ol,
-ul,
 dl,
 dd {
   margin: 0;
@@ -29,8 +27,7 @@ h2 {
   font-weight: 600;
 }
 
-h3,
-h4 {
+h3 {
   font-size: 14px;
   font-weight: 600;
 }
@@ -52,25 +49,6 @@ h4 {
 // «El documento sigue generándose»: un <output>, que es en línea, con el aspecto de un párrafo.
 .aviso {
   display: block;
-}
-
-.vista-previa {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radio-control);
-}
-
-.condiciones {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px 24px;
-
-  ul {
-    padding-left: 20px;
-  }
 }
 
 .bloque {
@@ -101,9 +79,4 @@ h4 {
   [aria-current='step'] {
     font-weight: 600;
   }
-}
-
-.huella {
-  font-family: monospace;
-  font-size: 12px;
 }

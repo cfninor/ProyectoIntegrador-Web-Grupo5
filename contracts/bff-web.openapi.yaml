@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.5.0
+  version: 1.6.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -73,6 +73,15 @@ tags:
       Cada solicitud lleva su `Idempotency-Key` (SOLVENTAG5-121): repetirla nunca cobra dos
       veces. Si la pasarela no responde a tiempo, el pago queda `PROCESANDO`, nunca se aprueba
       ni se rechaza a ciegas (R3, BA-02).
+  - name: firma
+    description: >
+      Firma electrónica de la póliza (SOLVENTAG5-57, Ley 527 de 1999). Se pide con el documento
+      GENERADO y el cobro de la primera prima APROBADO. El cliente recibe por correo y por SMS un
+      enlace y un código de un solo uso, y firma sin iniciar sesión, con el id aleatorio del
+      enlace. Al firmar queda un certificado con la fecha y hora, la IP y la huella del
+      documento. El enlace vence a las 72 horas: la póliza queda CANCELADA y el cobro se reversa.
+      El asesor de la cartera y el cliente titular piden la firma, la reenvían y siguen su
+      estado.
 paths:
   /v1/clientes/{clienteId}/solicitudes-autorizacion:
     post:
@@ -1147,6 +1156,226 @@ paths:
           $ref: '#/components/responses/ValidacionOClaveReutilizada'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/polizas/{polizaId}/firma:
+    post:
+      tags: [firma]
+      operationId: enviarFirma
+      summary: Pedir la firma electrónica de una póliza y enviar el enlace al cliente
+      description: >
+        Crea la firma de la póliza en PENDIENTE_ENVIO, con el vencimiento a las 72 horas, y
+        responde sin esperar al proveedor de firma (SOLVENTAG5-57, R1 y D7). El envío del enlace
+        y del código de un solo uso por correo y por SMS se hace en segundo plano; si el
+        proveedor no responde, se reintenta solo y el canal muestra «Esperando firma». Solo se
+        habilita con el documento de la póliza en GENERADO y el cobro de la primera prima
+        APROBADO (CA1): si no, 409 DOCUMENTO_EN_GENERACION o PAGO_NO_APROBADO, en ese orden. Sin
+        correo ni celular del cliente, 409 CLIENTE_SIN_CONTACTO. Una póliza tiene una sola
+        firma: si ya la tiene, responde 200 con ella, en cualquier estado. Con la sesión del
+        cliente, una póliza que no es suya responde 404 POLIZA_NO_ENCONTRADA; igual con la del
+        asesor si la solicitud de la póliza no está en su cartera. No lleva cuerpo.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: La póliza ya tenía su firma; es la existente, en el estado en que esté.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firma'
+              examples:
+                enviada:
+                  $ref: '#/components/examples/FirmaEnviada'
+                firmada:
+                  $ref: '#/components/examples/FirmaFirmada'
+                vencida:
+                  $ref: '#/components/examples/FirmaVencida'
+        '201':
+          description: Firma creada en PENDIENTE_ENVIO; el envío sigue en segundo plano.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firma'
+              examples:
+                pendienteEnvio:
+                  $ref: '#/components/examples/FirmaPendienteEnvio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/FirmaNoHabilitada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+    get:
+      tags: [firma]
+      operationId: obtenerFirma
+      summary: Consultar el seguimiento de la firma de una póliza
+      description: >
+        Devuelve la firma con su estado y sus hitos: documento generado, enviado, abierto y
+        firmado o vencido, cada uno con su hora (SOLVENTAG5-57, CA4 y R10). En FIRMADA trae el
+        certificado. PENDIENTE_ENVIO, ENVIADA y ABIERTA se muestran como «Esperando firma»;
+        FIRMADA habilita la emisión (SOLVENTAG5-58). Una póliza sin firma responde 404
+        FIRMA_NO_ENCONTRADA, y el canal ofrece enviar el enlace. Con la sesión del cliente, una
+        póliza que no es suya responde 404 POLIZA_NO_ENCONTRADA; igual con la del asesor si la
+        solicitud de la póliza no está en su cartera.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: Firma de la póliza con su seguimiento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firma'
+              examples:
+                pendienteEnvio:
+                  $ref: '#/components/examples/FirmaPendienteEnvio'
+                enviada:
+                  $ref: '#/components/examples/FirmaEnviada'
+                abierta:
+                  $ref: '#/components/examples/FirmaAbierta'
+                firmada:
+                  $ref: '#/components/examples/FirmaFirmada'
+                vencida:
+                  $ref: '#/components/examples/FirmaVencida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaOFirmaNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/polizas/{polizaId}/firma/reenvio:
+    post:
+      tags: [firma]
+      operationId: reenviarFirma
+      summary: Reenviar el enlace de firma con un código nuevo
+      description: >
+        Envía otra vez el enlace al cliente con un código nuevo de un solo uso, que deja sin
+        efecto el anterior y reinicia los intentos (SOLVENTAG5-57, CA2, R3 y D5). El enlace y el
+        vencimiento no cambian: reenviar no extiende las 72 horas. Solo con la firma en ENVIADA
+        o ABIERTA; si no, 409 FIRMA_NO_REENVIABLE. Espera al proveedor de firma: si no
+        responde, 503 y el código anterior sigue valiendo. Una póliza sin firma responde 404
+        FIRMA_NO_ENCONTRADA. Con la sesión del cliente, una póliza que no es suya responde 404
+        POLIZA_NO_ENCONTRADA; igual con la del asesor si la solicitud de la póliza no está en su
+        cartera. No lleva cuerpo.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: Enlace reenviado; la firma conserva su estado, su enlace y su vencimiento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firma'
+              examples:
+                enviada:
+                  $ref: '#/components/examples/FirmaEnviada'
+                abierta:
+                  $ref: '#/components/examples/FirmaAbierta'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaOFirmaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/FirmaNoReenviable'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+          description: >
+            El BFF no alcanza al núcleo, o el proveedor de firma no respondió y no se envió un
+            código nuevo: el anterior sigue valiendo. Repetir la llamada es seguro.
+  /v1/firmas/{firmaId}:
+    get:
+      tags: [firma]
+      operationId: abrirFirma
+      summary: Abrir el documento a firmar (página pública del cliente)
+      description: >
+        Devuelve el documento a firmar, con su huella, su vencimiento y el estado de la firma
+        (SOLVENTAG5-57, R4). La primera vez que se abre una firma ENVIADA pasa a ABIERTA, que es
+        el hito «abierto» del seguimiento. Si ya pasaron las 72 horas responde con el estado
+        VENCIDA, aunque el vencimiento todavía no se haya procesado. Pública: el cliente llega
+        sin iniciar sesión, con el id aleatorio del enlace que recibió por correo y por SMS.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/FirmaId'
+      responses:
+        '200':
+          description: Documento a firmar y estado de la firma.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentoParaFirmar'
+              examples:
+                abierta:
+                  $ref: '#/components/examples/DocumentoParaFirmarAbierto'
+                vencida:
+                  $ref: '#/components/examples/DocumentoParaFirmarVencido'
+        '404':
+          $ref: '#/components/responses/FirmaNoEncontrada'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/firmas/{firmaId}/validacion:
+    post:
+      tags: [firma]
+      operationId: firmarConCodigo
+      summary: Firmar el documento con el código de un solo uso
+      description: >
+        Valida el código de 6 dígitos que el cliente recibió y firma el documento (SOLVENTAG5-57,
+        CA2, CA3, R5 y D8). Antes de llamar al proveedor compara la huella actual del documento
+        con la enviada: si cambió, 409 DOCUMENTO_ALTERADO y la firma no se acepta. Con el código
+        correcto, la firma pasa a FIRMADA con el certificado: fecha y hora en UTC, la IP del
+        cliente, la huella y la referencia del proveedor. Un código errado responde 409
+        CODIGO_INVALIDO con los intentos que quedan; después de 5 seguidos el código queda sin
+        efecto (409 CODIGO_VENCIDO) y hay que reenviar el enlace. Si el proveedor no responde,
+        503 sin gastar un intento. Pública: el cliente llega sin iniciar sesión, con el id
+        aleatorio del enlace.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/FirmaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodigoFirma'
+            example:
+              codigo: '042817'
+      responses:
+        '200':
+          description: Documento firmado, con su certificado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firma'
+              examples:
+                firmada:
+                  $ref: '#/components/examples/FirmaFirmada'
+        '404':
+          $ref: '#/components/responses/FirmaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/FirmaRechazada'
+        '422':
+          $ref: '#/components/responses/ValidacionCodigoFirma'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+          description: >
+            El BFF no alcanza al núcleo, o el proveedor de firma no respondió: no se gastó un
+            intento y el cliente puede repetir el mismo código.
 components:
   securitySchemes:
     tokenCognito:
@@ -1201,6 +1430,16 @@ components:
       in: path
       required: true
       description: Id (UUID v4) de la póliza.
+      schema:
+        type: string
+        format: uuid
+    FirmaId:
+      name: firmaId
+      in: path
+      required: true
+      description: >
+        Id aleatorio (UUID v4) de la firma; es el que va en el enlace que recibe el cliente
+        (PORTAL_WEB_URL/firmar/{firmaId}).
       schema:
         type: string
         format: uuid
@@ -1700,6 +1939,157 @@ components:
               value:
                 codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
                 detalle: La clave de idempotencia ya se usó con una solicitud distinta.
+    FirmaNoHabilitada:
+      description: >
+        La firma todavía no se puede pedir (SOLVENTAG5-57, R1): el documento de la póliza sigue
+        en GENERANDO (DOCUMENTO_EN_GENERACION), el cobro de la primera prima no está APROBADO
+        (PAGO_NO_APROBADO, CA1) o el cliente no tiene correo ni celular (CLIENTE_SIN_CONTACTO).
+        Se revisan en ese orden.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    enum: [DOCUMENTO_EN_GENERACION, PAGO_NO_APROBADO, CLIENTE_SIN_CONTACTO]
+          examples:
+            documentoEnGeneracion:
+              summary: El documento todavía se está generando
+              value:
+                codigo: DOCUMENTO_EN_GENERACION
+                detalle: El documento de la póliza todavía se está generando.
+            pagoNoAprobado:
+              summary: Falta el pago aprobado de la primera prima
+              value:
+                codigo: PAGO_NO_APROBADO
+                detalle: La firma se habilita cuando el pago de la primera prima está aprobado.
+            clienteSinContacto:
+              summary: El cliente no tiene correo ni celular
+              value:
+                codigo: CLIENTE_SIN_CONTACTO
+                detalle: El cliente no tiene un correo ni un celular para enviarle el enlace.
+    PolizaOFirmaNoEncontrada:
+      description: >
+        La póliza no existe o es ajena (POLIZA_NO_ENCONTRADA: el cliente no es su titular o el
+        asesor no tiene la solicitud de la póliza en su cartera), o la póliza todavía no tiene
+        firma (FIRMA_NO_ENCONTRADA).
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    enum: [POLIZA_NO_ENCONTRADA, FIRMA_NO_ENCONTRADA]
+          examples:
+            polizaNoEncontrada:
+              summary: La póliza no existe o es ajena
+              value:
+                codigo: POLIZA_NO_ENCONTRADA
+                detalle: No encontramos la póliza.
+            firmaNoEncontrada:
+              summary: La póliza todavía no tiene firma
+              value:
+                codigo: FIRMA_NO_ENCONTRADA
+                detalle: La póliza todavía no tiene una firma.
+    FirmaNoEncontrada:
+      description: >
+        No hay una firma con ese id. Desde el enlace público no se distingue entre un id que
+        nunca existió y uno mal copiado.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: FIRMA_NO_ENCONTRADA
+          example:
+            codigo: FIRMA_NO_ENCONTRADA
+            detalle: No encontramos la firma.
+    FirmaNoReenviable:
+      description: >
+        La firma no está en ENVIADA ni en ABIERTA (SOLVENTAG5-57, R3): todavía se está enviando
+        (PENDIENTE_ENVIO), ya está FIRMADA o ya está VENCIDA.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: FIRMA_NO_REENVIABLE
+          example:
+            codigo: FIRMA_NO_REENVIABLE
+            detalle: El enlace de firma no se puede reenviar en su estado actual.
+    FirmaRechazada:
+      description: >
+        La firma no se aceptó (SOLVENTAG5-57, R5). ENLACE_VENCIDO pasaron las 72 horas o la
+        firma está VENCIDA; CODIGO_USADO la firma ya está FIRMADA; CODIGO_VENCIDO el código ya no
+        vale (cinco códigos errados, el envío todavía no salió o el proveedor ya no conoce la
+        solicitud) y hay que reenviar el enlace; DOCUMENTO_ALTERADO la huella actual del
+        documento no es la que se envió; CODIGO_INVALIDO el código no es el enviado, con los
+        intentos que quedan en intentosRestantes. Se revisan en ese orden.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - properties:
+                      codigo:
+                        enum: [ENLACE_VENCIDO, CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO]
+              - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - required: [intentosRestantes]
+                    properties:
+                      codigo:
+                        const: CODIGO_INVALIDO
+                      intentosRestantes:
+                        type: integer
+                        minimum: 0
+                        description: >
+                          Cuántos códigos errados más admite el código antes de quedar sin
+                          efecto. Con 0, el siguiente intento responde CODIGO_VENCIDO.
+          examples:
+            enlaceVencido:
+              summary: Pasaron las 72 horas
+              value:
+                codigo: ENLACE_VENCIDO
+                detalle: El enlace de firma venció.
+            codigoUsado:
+              summary: El documento ya se firmó
+              value:
+                codigo: CODIGO_USADO
+                detalle: El código ya se usó y el documento ya está firmado.
+            codigoVencido:
+              summary: El código ya no vale; hay que reenviar el enlace
+              value:
+                codigo: CODIGO_VENCIDO
+                detalle: El código ya no es válido. Pide que te reenvíen el enlace.
+            documentoAlterado:
+              summary: El documento cambió después de enviarse
+              value:
+                codigo: DOCUMENTO_ALTERADO
+                detalle: El documento cambió después de enviarse y no se puede firmar.
+            codigoInvalido:
+              summary: Código errado, con los intentos que quedan
+              value:
+                codigo: CODIGO_INVALIDO
+                detalle: El código no es correcto.
+                intentosRestantes: 3
+    ValidacionCodigoFirma:
+      description: El id de la firma no es un UUID, o el código no tiene 6 dígitos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorValidacion'
+          example:
+            detail:
+              - loc: [body, codigo]
+                msg: "String should match pattern '^[0-9]{6}$'"
+                type: string_pattern_mismatch
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -2660,9 +3050,10 @@ components:
     EstadoPoliza:
       type: string
       description: >
-        PENDIENTE_FIRMA al generarse (SOLVENTAG5-56). La firma (SOLVENTAG5-57) y la emisión
-        (SOLVENTAG5-58) suman sus estados en versiones posteriores.
-      enum: [PENDIENTE_FIRMA]
+        PENDIENTE_FIRMA al generarse (SOLVENTAG5-56). CANCELADA cuando el cliente no firma en 72
+        horas (SOLVENTAG5-57, CA5): no se emite y el cobro de la primera prima se reversa. La
+        emisión (SOLVENTAG5-58) suma su estado en una versión posterior.
+      enum: [PENDIENTE_FIRMA, CANCELADA]
     EstadoDocumentoPoliza:
       type: string
       description: >
@@ -2862,6 +3253,148 @@ components:
           type: string
           format: date-time
           description: Cuándo cambió de PROCESANDO a su estado final.
+    EstadoFirma:
+      type: string
+      description: >
+        Estado de la firma electrónica de la póliza (SOLVENTAG5-57, R2). PENDIENTE_ENVIO →
+        ENVIADA → ABIERTA → FIRMADA, y VENCIDA desde cualquiera de los tres primeros a las 72
+        horas. El canal muestra «Esperando firma» en PENDIENTE_ENVIO, ENVIADA y ABIERTA.
+      enum: [PENDIENTE_ENVIO, ENVIADA, ABIERTA, FIRMADA, VENCIDA]
+    CertificadoFirma:
+      type: object
+      description: >
+        Certificado de la firma (SOLVENTAG5-57, CA3, D8): cuándo, desde qué IP y sobre qué
+        documento se firmó, con la referencia del proveedor de firma.
+      required: [firmadaEn, ip, huella, referencia]
+      properties:
+        firmadaEn:
+          type: string
+          format: date-time
+          description: Fecha y hora de la firma, en UTC.
+        ip:
+          type: string
+          description: IP del cliente al firmar (IPv4 o IPv6).
+          examples: [203.0.113.24]
+        huella:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Huella SHA-256 del documento firmado; es la de documento.huella de la póliza.
+        referencia:
+          type: string
+          description: Referencia de la firma en el proveedor de firma electrónica.
+    Firma:
+      type: object
+      description: >
+        Firma electrónica de una póliza y su seguimiento (SOLVENTAG5-57, R10). Cada hito trae su
+        hora desde que ocurre; certificado solo viene en FIRMADA.
+      required: [firmaId, polizaId, estado, venceEn, documentoGeneradoEn]
+      properties:
+        firmaId:
+          type: string
+          format: uuid
+          description: Id aleatorio de la firma; es el del enlace del cliente.
+        polizaId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoFirma'
+        venceEn:
+          type: string
+          format: date-time
+          description: >
+            72 horas después de pedir la firma. Reenviar el enlace no lo cambia.
+        documentoGeneradoEn:
+          type: string
+          format: date-time
+          description: Hito «Documento generado»; es documento.generadoEn de la póliza.
+        enviadaEn:
+          type: string
+          format: date-time
+          description: Hito «Enviado»; la primera vez que el proveedor envió el enlace.
+        abiertaEn:
+          type: string
+          format: date-time
+          description: Hito «Abierto»; la primera vez que el cliente abrió el enlace.
+        firmadaEn:
+          type: string
+          format: date-time
+          description: Hito «Firmado»; la hora del certificado.
+        vencidaEn:
+          type: string
+          format: date-time
+          description: Hito «Vencido»; cuándo se procesó el vencimiento.
+        certificado:
+          $ref: '#/components/schemas/CertificadoFirma'
+    DocumentoParaFirmar:
+      type: object
+      description: >
+        Lo que ve el cliente en la página pública de firma (SOLVENTAG5-57, R4 y R10): el estado
+        de la firma, su vencimiento, la huella del documento y su vista previa, con los campos de
+        la póliza que ve el cliente. El documento del tomador va enmascarado. No trae ids de la
+        póliza, de la solicitud ni del cliente.
+      required:
+        - firmaId
+        - estado
+        - venceEn
+        - huella
+        - tomador
+        - ramo
+        - sumaAsegurada
+        - prima
+        - moneda
+        - periodicidad
+        - vigenciaDesde
+        - vigenciaHasta
+        - condiciones
+      properties:
+        firmaId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoFirma'
+        venceEn:
+          type: string
+          format: date-time
+        huella:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Huella SHA-256 del documento que se firma.
+        tomador:
+          $ref: '#/components/schemas/TomadorPoliza'
+        ramo:
+          $ref: '#/components/schemas/Ramo'
+        sumaAsegurada:
+          type: integer
+          minimum: 0
+          description: Suma asegurada en COP.
+        prima:
+          type: integer
+          minimum: 0
+          description: Prima en COP.
+        moneda:
+          type: string
+          enum: [COP]
+        periodicidad:
+          type: string
+          enum: [MENSUAL]
+        vigenciaDesde:
+          type: string
+          format: date
+        vigenciaHasta:
+          type: string
+          format: date
+        condiciones:
+          $ref: '#/components/schemas/CondicionesPoliza'
+    CodigoFirma:
+      type: object
+      description: Código de un solo uso que el cliente recibió por correo y por SMS.
+      required: [codigo]
+      properties:
+        codigo:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: Seis dígitos; puede empezar por cero.
+          examples: ['042817']
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -3097,7 +3630,10 @@ components:
             NUCLEO_NO_DISPONIBLE, IDENTIDAD_NO_DISPONIBLE, AJUSTE_NO_APLICA,
             SOLICITUD_NO_EMITIBLE, SOLICITUD_SIN_CLIENTE, POLIZA_NO_ENCONTRADA,
             DOCUMENTO_EN_GENERACION, CLAVE_IDEMPOTENCIA_EN_CURSO,
-            CLAVE_IDEMPOTENCIA_REUTILIZADA y POLIZA_NO_PAGABLE.
+            CLAVE_IDEMPOTENCIA_REUTILIZADA, POLIZA_NO_PAGABLE, PAGO_NO_APROBADO,
+            CLIENTE_SIN_CONTACTO, FIRMA_NO_ENCONTRADA, FIRMA_NO_REENVIABLE, ENLACE_VENCIDO,
+            CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO y CODIGO_INVALIDO. CODIGO_INVALIDO
+            lleva además intentosRestantes (respuesta FirmaRechazada).
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -4411,6 +4947,116 @@ components:
         moneda: COP
         medio: TARJETA
         creadoEn: '2026-11-06T15:10:00.000Z'
+    FirmaPendienteEnvio:
+      summary: Firma pedida; el envío del enlace todavía no sale («Esperando firma»)
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: PENDIENTE_ENVIO
+        venceEn: '2026-11-09T15:02:00.000Z'
+        documentoGeneradoEn: '2026-10-14T16:32:10.850Z'
+    FirmaEnviada:
+      summary: Enlace y código enviados por correo y por SMS («Esperando firma»)
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: ENVIADA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        documentoGeneradoEn: '2026-10-14T16:32:10.850Z'
+        enviadaEn: '2026-11-06T15:02:01.400Z'
+    FirmaAbierta:
+      summary: El cliente abrió el enlace y todavía no firma («Esperando firma»)
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: ABIERTA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        documentoGeneradoEn: '2026-10-14T16:32:10.850Z'
+        enviadaEn: '2026-11-06T15:02:01.400Z'
+        abiertaEn: '2026-11-06T15:20:12.300Z'
+    FirmaFirmada:
+      summary: Documento firmado, con su certificado
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: FIRMADA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        documentoGeneradoEn: '2026-10-14T16:32:10.850Z'
+        enviadaEn: '2026-11-06T15:02:01.400Z'
+        abiertaEn: '2026-11-06T15:20:12.300Z'
+        firmadaEn: '2026-11-06T15:23:45.120Z'
+        certificado:
+          firmadaEn: '2026-11-06T15:23:45.120Z'
+          ip: 203.0.113.24
+          huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+          referencia: 4d6f8a1c-3e5b-4c7d-9f1a-2b4c6d8e0f1a
+    FirmaVencida:
+      summary: El cliente no firmó en 72 horas; la póliza quedó CANCELADA
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: VENCIDA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        documentoGeneradoEn: '2026-10-14T16:32:10.850Z'
+        enviadaEn: '2026-11-06T15:02:01.400Z'
+        abiertaEn: '2026-11-06T15:20:12.300Z'
+        vencidaEn: '2026-11-09T15:02:30.000Z'
+    DocumentoParaFirmarAbierto:
+      summary: El cliente abre el enlace para firmar
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        estado: ABIERTA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+    DocumentoParaFirmarVencido:
+      summary: El enlace se abre después de las 72 horas
+      value:
+        firmaId: 8c1e3a5f-7b9d-4f2a-8e4c-6a8b0d2f4e6a
+        estado: VENCIDA
+        venceEn: '2026-11-09T15:02:00.000Z'
+        huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-10-14'
+        vigenciaHasta: '2046-10-14'
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:

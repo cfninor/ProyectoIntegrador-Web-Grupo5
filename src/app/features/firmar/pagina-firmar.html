@@ -1,0 +1,188 @@
+<div class="pagina" [attr.aria-busy]="vista() === 'cargando'">
+  <h1 i18n="@@firmar.titulo">Firma tu póliza</h1>
+
+  @switch (vista()) {
+    @case ('cargando') {
+      <p class="texto-secundario" i18n="@@firmar.cargando">Cargando el documento…</p>
+    }
+
+    @case ('error-carga') {
+      <section class="tarjeta aviso" role="alert">
+        <p i18n="@@firmar.errorCarga">
+          El servicio no está disponible. Intenta de nuevo en unos minutos.
+        </p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="cargar()"
+          i18n="@@firmar.intentarDeNuevo"
+        >
+          Intentar de nuevo
+        </button>
+      </section>
+    }
+
+    @case ('no-encontrada') {
+      <section class="tarjeta aviso">
+        <h2 i18n="@@firmar.noEncontrada.titulo">No encontramos este enlace</h2>
+        <p class="texto-secundario" i18n="@@firmar.noEncontrada.texto">
+          Revisa el enlace que recibiste por correo o por SMS, o pide a tu asesor que te lo reenvíe.
+        </p>
+      </section>
+    }
+
+    @case ('documento') {
+      @if (documento(); as d) {
+        <p i18n="@@firmar.instrucciones">
+          Revisa el documento y fírmalo con el código de 6 dígitos que te enviamos por correo y por
+          SMS.
+        </p>
+        <p class="texto-secundario" i18n="@@firmar.vence">El enlace vence el {{ vence() }}.</p>
+
+        <app-vista-previa-poliza [datos]="d" actor="cliente" />
+
+        <dl class="resumen">
+          <dt i18n="@@firma.huella">Huella del documento</dt>
+          <dd class="huella">{{ d.huella }}</dd>
+        </dl>
+
+        <form class="tarjeta formulario" novalidate (submit)="firmar($event)">
+          <label for="firmar-codigo" class="etiqueta-campo" i18n="@@firmar.codigo.etiqueta"
+            >Código de firma</label
+          >
+          <p id="firmar-codigo-ayuda" class="texto-secundario" i18n="@@firmar.codigo.ayuda">
+            Tiene 6 dígitos y solo sirve una vez.
+          </p>
+          <input
+            id="firmar-codigo"
+            class="campo"
+            name="codigo"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            required
+            [value]="codigo()"
+            [attr.aria-invalid]="errorCodigo() ? 'true' : null"
+            [attr.aria-describedby]="
+              errorCodigo() ? 'firmar-codigo-ayuda firmar-codigo-error' : 'firmar-codigo-ayuda'
+            "
+            (input)="alEscribir($event)"
+          />
+          @if (errorCodigo(); as e) {
+            <div id="firmar-codigo-error" class="error" role="alert">
+              @switch (e.tipo) {
+                @case ('formato') {
+                  <p i18n="@@firmar.error.formato">Escribe los 6 dígitos del código.</p>
+                }
+                @case ('invalido') {
+                  @if (e.intentosRestantes === 0) {
+                    <p i18n="@@firmar.error.invalido.sinIntentos">
+                      El código no es correcto y ya no te quedan intentos. Pide a tu asesor que te
+                      reenvíe el enlace con un código nuevo.
+                    </p>
+                  } @else if (e.intentosRestantes === 1) {
+                    <p i18n="@@firmar.error.invalido.uno">
+                      El código no es correcto. Te queda 1 intento.
+                    </p>
+                  } @else {
+                    <p i18n="@@firmar.error.invalido.varios">
+                      El código no es correcto. Te quedan {{ e.intentosRestantes }} intentos.
+                    </p>
+                  }
+                }
+                @case ('no-disponible') {
+                  <p i18n="@@firmar.error.noDisponible">
+                    El servicio no está disponible. Tu código sigue valiendo: intenta de nuevo en
+                    unos minutos.
+                  </p>
+                  <button
+                    type="button"
+                    class="boton-secundario"
+                    (click)="firmar()"
+                    i18n="@@firmar.intentarDeNuevo"
+                  >
+                    Intentar de nuevo
+                  </button>
+                }
+              }
+            </div>
+          }
+          <button
+            type="submit"
+            class="boton-primario"
+            [disabled]="firmando()"
+            [attr.aria-busy]="firmando()"
+            i18n="@@firmar.firmar"
+          >
+            Firmar
+          </button>
+        </form>
+      }
+    }
+
+    @case ('resultado') {
+      <section class="tarjeta resultado" aria-live="polite">
+        @switch (resultado()?.tipo) {
+          @case ('firmada') {
+            <h2 #tituloResultado tabindex="-1" i18n="@@firmar.firmada.titulo">
+              Firmaste tu póliza
+            </h2>
+            <p i18n="@@firmar.firmada.texto">
+              Tu firma quedó registrada. Tu asesor continúa con la emisión de la póliza.
+            </p>
+            @if (certificado(); as cert) {
+              <article class="certificado" aria-labelledby="firmar-certificado">
+                <h3 id="firmar-certificado" i18n="@@firma.electronica.certificado">
+                  Certificado de firma electrónica
+                </h3>
+                <dl class="resumen">
+                  <dt i18n="@@firma.electronica.certificado.fecha">Fecha y hora</dt>
+                  <dd>{{ cert.fechaHora }}</dd>
+                  <dt i18n="@@firma.electronica.certificado.ip">IP</dt>
+                  <dd>{{ cert.ip }}</dd>
+                  <dt i18n="@@firma.electronica.certificado.huella">Huella firmada</dt>
+                  <dd class="huella">{{ cert.huella }}</dd>
+                </dl>
+              </article>
+            }
+          }
+          @case ('ya-firmada') {
+            <h2 #tituloResultado tabindex="-1" i18n="@@firmar.yaFirmada.titulo">
+              Este documento ya está firmado
+            </h2>
+            <p i18n="@@firmar.yaFirmada.texto">
+              El código ya se usó. No tienes que hacer nada más.
+            </p>
+          }
+          @case ('codigo-vencido') {
+            <h2 #tituloResultado tabindex="-1" i18n="@@firmar.codigoVencido.titulo">
+              Este código ya no es válido
+            </h2>
+            <p i18n="@@firmar.codigoVencido.texto">
+              Pide a tu asesor que te reenvíe el enlace: llegará con un código nuevo.
+            </p>
+          }
+          @case ('enlace-vencido') {
+            <h2 #tituloResultado tabindex="-1" i18n="@@firmar.enlaceVencido.titulo">
+              Este enlace venció
+            </h2>
+            <p i18n="@@firmar.enlaceVencido.texto">
+              Pasaron más de 72 horas desde que se pidió la firma. Tu póliza no se emite y te
+              devolvemos el pago de la primera prima.
+            </p>
+          }
+          @case ('documento-alterado') {
+            <h2 #tituloResultado tabindex="-1" i18n="@@firmar.documentoAlterado.titulo">
+              No podemos firmar este documento
+            </h2>
+            <p i18n="@@firmar.documentoAlterado.texto">
+              El documento cambió después de enviarse. Comunícate con tu asesor.
+            </p>
+          }
+        }
+      </section>
+    }
+  }
+</div>

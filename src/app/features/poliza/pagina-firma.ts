@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  LOCALE_ID,
   OnInit,
   computed,
   inject,
@@ -14,12 +13,12 @@ import {
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
-import { fechaBogota, fechaCalendario, horaBogota, montoCop } from '../../core/idioma/formatos';
-import { idiomaDe } from '../../core/idioma/idioma';
 import { Actor } from '../cotizacion/formulario-cotizacion';
 import { PasosContratacion } from '../cotizacion/pasos-contratacion';
 import { ErrorPoliza, MotivoNoEmitible, Poliza } from './modelos';
 import { PolizaApi } from './poliza-api';
+import { TarjetaFirma } from './tarjeta-firma';
+import { VistaPreviaPoliza } from './vista-previa-poliza';
 
 /** Por qué no hay póliza: los motivos de SOLICITUD_NO_EMITIBLE y SOLICITUD_SIN_CLIENTE. */
 export type MotivoSinPoliza = MotivoNoEmitible | 'SIN_CLIENTE';
@@ -85,10 +84,13 @@ function motivoDe(error: HttpErrorResponse): MotivoSinPoliza | null {
  * petición abierta (D4). Después de 30 consultas dice que el documento sigue generándose, como
  * estado. Si una consulta falla se conserva lo último que se vio. Un 409 de R2 se muestra con su
  * motivo, como estado y no como error genérico.
+ *
+ * Con el documento GENERADO, debajo de la vista previa va la tarjeta de la firma electrónica
+ * (`TarjetaFirma`, SOLVENTAG5-57, D14): enviar el enlace, el seguimiento y el certificado.
  */
 @Component({
   selector: 'app-pagina-firma',
-  imports: [PasosContratacion, RouterLink],
+  imports: [PasosContratacion, RouterLink, TarjetaFirma, VistaPreviaPoliza],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './pagina-firma.scss',
   templateUrl: './pagina-firma.html',
@@ -101,7 +103,6 @@ export class PaginaFirma implements OnInit {
 
   private readonly api = inject(PolizaApi);
   private readonly documento = inject(DOCUMENT);
-  private readonly idioma = idiomaDe(inject(LOCALE_ID));
   private peticion?: Subscription;
   private descargaEnCurso?: Subscription;
   private espera?: ReturnType<typeof setTimeout>;
@@ -126,7 +127,12 @@ export class PaginaFirma implements OnInit {
     return { motivo: carga.motivo, chip: CHIPS_MOTIVO[carga.motivo]() };
   });
 
-  /** La vista previa: los datos de la respuesta, formateados (D14, CA4). */
+  /** La página de pago de la SOLVENTAG5-74: «Ir al pago» de la firma sin pago aprobado (D14). */
+  protected readonly rutaPago = computed(
+    () => `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/pago`,
+  );
+
+  /** La póliza mostrada; la vista previa y la tarjeta de firma la formatean (D14). */
   protected readonly vista = computed(() => {
     const carga = this.carga();
     if (carga.tipo !== 'lista') {
@@ -134,24 +140,14 @@ export class PaginaFirma implements OnInit {
     }
     const p = carga.poliza;
     const generado = p.documento.estado === 'GENERADO';
-    const desde = fechaCalendario(p.vigenciaDesde, this.idioma);
-    const hasta = fechaCalendario(p.vigenciaHasta, this.idioma);
     return {
       p,
       generado,
       chip: generado
         ? $localize`:@@firma.chip.generado:Generado`
         : $localize`:@@firma.chip.generando:Generando`,
-      tomador: `${p.tomador.nombres} ${p.tomador.apellidos}`,
-      producto:
-        p.ramo === 'VIDA_HIPOTECARIO'
-          ? $localize`:@@oferta.vidaHipotecario:Vida hipotecario`
-          : p.ramo,
-      sumaAsegurada: montoCop(p.sumaAsegurada, this.idioma),
-      prima: montoCop(p.prima, this.idioma),
-      mensual: p.periodicidad === 'MENSUAL',
-      vigencia: $localize`:@@firma.vigencia.rango:Del ${desde}:desde: al ${hasta}:hasta:`,
-      generadoEl: p.documento.generadoEn ? this.fechaHora(p.documento.generadoEn) : null,
+      /** La tarjeta de firma aparece con el documento GENERADO (D14). */
+      generadoEn: generado ? p.documento.generadoEn : undefined,
     };
   });
 
@@ -260,11 +256,5 @@ export class PaginaFirma implements OnInit {
       clearTimeout(this.espera);
       this.espera = undefined;
     }
-  }
-
-  private fechaHora(iso: string): string {
-    const fecha = fechaBogota(iso, this.idioma);
-    const hora = horaBogota(iso, this.idioma);
-    return $localize`:@@suscripcion.fechaHora:${fecha}:fecha: a las ${hora}:hora:`;
   }
 }

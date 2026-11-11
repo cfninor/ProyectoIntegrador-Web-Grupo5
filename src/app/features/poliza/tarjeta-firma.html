@@ -1,0 +1,273 @@
+<section class="firma" aria-labelledby="firma-electronica-titulo">
+  <div class="encabezado">
+    <h3 id="firma-electronica-titulo" i18n="@@firma.electronica.titulo">Firma electrónica</h3>
+    @if (chip(); as c) {
+      <span class="chip {{ c.clase }}">{{ c.texto }}</span>
+    }
+  </div>
+
+  <div class="estado" aria-live="polite">
+    @switch (carga().tipo) {
+      @case ('consultando') {
+        <p class="texto-secundario" i18n="@@firma.electronica.consultando">Consultando la firma…</p>
+      }
+      @case ('error') {
+        <p i18n="@@firma.electronica.error">No pudimos consultar la firma.</p>
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="actualizar()"
+          i18n="@@firma.electronica.reintentar"
+        >
+          Reintentar
+        </button>
+      }
+      @case ('sin-firma') {
+        @if (actor() === 'asesor') {
+          <p i18n="@@firma.electronica.sinFirma.asesor">
+            El cliente recibirá por correo y por SMS un enlace y un código de un solo uso para
+            firmar. El enlace vence a las 72 horas.
+          </p>
+        } @else {
+          <p i18n="@@firma.electronica.sinFirma.cliente">
+            Te enviaremos por correo y por SMS un enlace y un código de un solo uso para firmar. El
+            enlace vence a las 72 horas.
+          </p>
+        }
+        <div class="acciones">
+          <button
+            type="button"
+            class="boton-primario"
+            [disabled]="accion() === 'enviando'"
+            [attr.aria-busy]="accion() === 'enviando'"
+            (click)="enviar()"
+            i18n="@@firma.electronica.enviar"
+          >
+            Enviar enlace de firma
+          </button>
+        </div>
+      }
+    }
+
+    @if (carga(); as c) {
+      @if (c.tipo === 'no-habilitada') {
+        @switch (c.codigo) {
+          @case ('PAGO_NO_APROBADO') {
+            <h4 i18n="@@firma.electronica.pagoNoAprobado.titulo">
+              Falta el pago de la primera prima
+            </h4>
+            @if (actor() === 'asesor') {
+              <p i18n="@@firma.electronica.pagoNoAprobado.texto.asesor">
+                La firma se habilita cuando el pago de la primera prima del cliente esté aprobado.
+              </p>
+            } @else {
+              <p i18n="@@firma.electronica.pagoNoAprobado.texto.cliente">
+                La firma se habilita cuando el pago de tu primera prima esté aprobado.
+              </p>
+            }
+            <div class="acciones">
+              <a
+                class="boton-primario"
+                [routerLink]="rutaPago()"
+                [queryParams]="{ solicitudId: solicitudId() }"
+                i18n="@@firma.electronica.irPago"
+                >Ir al pago</a
+              >
+            </div>
+          }
+          @case ('CLIENTE_SIN_CONTACTO') {
+            <h4 i18n="@@firma.electronica.sinContacto.titulo">No hay a dónde enviar el enlace</h4>
+            @if (actor() === 'asesor') {
+              <p i18n="@@firma.electronica.sinContacto.texto.asesor">
+                El cliente no tiene un correo ni un celular registrados para recibir el enlace.
+              </p>
+            } @else {
+              <p i18n="@@firma.electronica.sinContacto.texto.cliente">
+                No tienes un correo ni un celular registrados para recibir el enlace.
+              </p>
+            }
+          }
+          @case ('DOCUMENTO_EN_GENERACION') {
+            <h4 i18n="@@firma.electronica.documentoEnGeneracion.titulo">
+              El documento todavía se está generando
+            </h4>
+            <p i18n="@@firma.electronica.documentoEnGeneracion.texto">
+              La firma se puede pedir cuando el documento termine de generarse.
+            </p>
+            <div class="acciones">
+              <button
+                type="button"
+                class="boton-secundario"
+                (click)="enviar()"
+                i18n="@@firma.electronica.intentarDeNuevo"
+              >
+                Intentar de nuevo
+              </button>
+            </div>
+          }
+        }
+      }
+    }
+
+    @if (firma(); as f) {
+      @switch (f.estado) {
+        @case ('PENDIENTE_ENVIO') {
+          @if (actor() === 'asesor') {
+            <p i18n="@@firma.electronica.pendienteEnvio.asesor">
+              Se está enviando el enlace al cliente. Si el envío falla, se intenta de nuevo.
+            </p>
+          } @else {
+            <p i18n="@@firma.electronica.pendienteEnvio.cliente">
+              Estamos enviándote el enlace. Si el envío falla, lo intentaremos de nuevo.
+            </p>
+          }
+        }
+        @case ('ENVIADA') {
+          @if (actor() === 'asesor') {
+            <p i18n="@@firma.electronica.enviada.asesor">
+              El cliente recibió el enlace y el código por correo y por SMS.
+            </p>
+          } @else {
+            <p i18n="@@firma.electronica.enviada.cliente">
+              Te enviamos el enlace y el código por correo y por SMS.
+            </p>
+          }
+        }
+        @case ('ABIERTA') {
+          @if (actor() === 'asesor') {
+            <p i18n="@@firma.electronica.abierta.asesor">
+              El cliente abrió el enlace y todavía no firma.
+            </p>
+          } @else {
+            <p i18n="@@firma.electronica.abierta.cliente">
+              Abriste el enlace; falta firmar con el código.
+            </p>
+          }
+        }
+        @case ('FIRMADA') {
+          @if (actor() === 'asesor') {
+            <p i18n="@@firma.electronica.firmada.asesor">
+              El cliente firmó la póliza. Ya se puede emitir.
+            </p>
+          } @else {
+            <p i18n="@@firma.electronica.firmada.cliente">
+              Firmaste tu póliza. Ya se puede emitir.
+            </p>
+          }
+        }
+        @case ('VENCIDA') {
+          @if (actor() === 'asesor') {
+            <p i18n="@@firma.electronica.vencida.asesor">
+              El cliente no firmó en 72 horas: el enlace venció, la póliza no se emite y el cobro de
+              la primera prima se reversa.
+            </p>
+          } @else {
+            <p i18n="@@firma.electronica.vencida.cliente">
+              No firmaste en 72 horas: el enlace venció, tu póliza no se emite y te devolvemos el
+              pago de la primera prima.
+            </p>
+          }
+        }
+      }
+      @if (enCurso()) {
+        <p class="texto-secundario" i18n="@@firma.electronica.vence">
+          El enlace vence el {{ vence() }}.
+        </p>
+      }
+    }
+
+    @switch (accion()) {
+      @case ('error') {
+        <p role="alert" i18n="@@firma.electronica.errorAccion">
+          No pudimos enviar el enlace. Intenta de nuevo en unos minutos.
+        </p>
+      }
+      @case ('reenviada') {
+        <output class="aviso" i18n="@@firma.electronica.reenviada">
+          Enlace reenviado con un código nuevo. El anterior ya no sirve.
+        </output>
+      }
+      @case ('no-reenviable') {
+        <output class="aviso" i18n="@@firma.electronica.noReenviable">
+          El enlace ya no se puede reenviar. Actualizamos el seguimiento.
+        </output>
+      }
+    }
+  </div>
+
+  @if (reenviable()) {
+    <div class="acciones">
+      <button
+        type="button"
+        class="boton-secundario"
+        [disabled]="accion() === 'reenviando'"
+        [attr.aria-busy]="accion() === 'reenviando'"
+        (click)="reenviar()"
+        i18n="@@firma.electronica.reenviar"
+      >
+        Reenviar enlace
+      </button>
+    </div>
+  }
+
+  <div class="bloque">
+    <h4 id="firma-seguimiento" i18n="@@firma.seguimiento">Seguimiento de la firma</h4>
+    <ol class="linea-tiempo" aria-labelledby="firma-seguimiento">
+      @for (hito of hitos(); track hito.texto) {
+        @if (hito.hora; as hora) {
+          <li class="hecho">
+            <span>{{ hito.texto }}</span
+            >&ngsp;
+            <span class="texto-secundario">{{ hora }}</span>
+          </li>
+        } @else {
+          <li [attr.aria-current]="hito.actual ? 'step' : null">
+            <span>{{ hito.texto }}</span
+            >&ngsp;
+            <span class="texto-secundario" i18n="@@firma.electronica.hito.pendiente"
+              >Pendiente</span
+            >
+          </li>
+        }
+      }
+    </ol>
+    @if (huella(); as h) {
+      <dl class="resumen">
+        <dt i18n="@@firma.huella">Huella del documento</dt>
+        <dd class="huella">{{ h }}</dd>
+      </dl>
+    }
+  </div>
+
+  @if (detenido()) {
+    <output class="aviso" i18n="@@firma.electronica.detenido">
+      El seguimiento dejó de actualizarse solo.
+    </output>
+    <div class="acciones">
+      <button
+        type="button"
+        class="boton-secundario"
+        (click)="actualizar()"
+        i18n="@@firma.electronica.actualizar"
+      >
+        Actualizar seguimiento
+      </button>
+    </div>
+  }
+
+  @if (certificado(); as cert) {
+    <article class="certificado" aria-labelledby="firma-certificado">
+      <h4 id="firma-certificado" i18n="@@firma.electronica.certificado">
+        Certificado de firma electrónica
+      </h4>
+      <dl class="resumen">
+        <dt i18n="@@firma.electronica.certificado.fecha">Fecha y hora</dt>
+        <dd>{{ cert.fechaHora }}</dd>
+        <dt i18n="@@firma.electronica.certificado.ip">IP</dt>
+        <dd>{{ cert.ip }}</dd>
+        <dt i18n="@@firma.electronica.certificado.huella">Huella firmada</dt>
+        <dd class="huella">{{ cert.huella }}</dd>
+      </dl>
+    </article>
+  }
+</section>
