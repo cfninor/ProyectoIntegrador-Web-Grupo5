@@ -183,14 +183,14 @@
         </p>
       }
       @case ('reenviada') {
-        <p role="status" i18n="@@firma.electronica.reenviada">
+        <output class="aviso" i18n="@@firma.electronica.reenviada">
           Enlace reenviado con un código nuevo. El anterior ya no sirve.
-        </p>
+        </output>
       }
       @case ('no-reenviable') {
-        <p role="status" i18n="@@firma.electronica.noReenviable">
+        <output class="aviso" i18n="@@firma.electronica.noReenviable">
           El enlace ya no se puede reenviar. Actualizamos el seguimiento.
-        </p>
+        </output>
       }
     }
   </div>
@@ -240,9 +240,9 @@
   </div>
 
   @if (detenido()) {
-    <p role="status" i18n="@@firma.electronica.detenido">
+    <output class="aviso" i18n="@@firma.electronica.detenido">
       El seguimiento dejó de actualizarse solo.
-    </p>
+    </output>
     <div class="acciones">
       <button
         type="button"

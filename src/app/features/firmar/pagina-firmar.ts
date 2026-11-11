@@ -39,7 +39,7 @@ type ErrorCodigo =
   { tipo: 'formato' } | { tipo: 'invalido'; intentosRestantes: number } | { tipo: 'no-disponible' };
 
 /** El código: 6 dígitos, puede empezar por cero (`CodigoFirma` del contrato). */
-const PATRON_CODIGO = /^[0-9]{6}$/;
+const PATRON_CODIGO = /^\d{6}$/;
 
 /** Los 409 de R5 que terminan la página, con su resultado. CODIGO_INVALIDO se queda en el formulario. */
 const RESULTADOS: Record<Exclude<CodigoFirmaRechazada, 'CODIGO_INVALIDO'>, Resultado> = {

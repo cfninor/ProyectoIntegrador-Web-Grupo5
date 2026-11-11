@@ -246,7 +246,9 @@ describe('TarjetaFirma · SOLV-WEB-10 (SOLVENTAG5-57)', () => {
       tarjeta.enviar();
       tarjeta.enviar();
 
-      http.expectOne({ method: 'POST', url: URL_FIRMA }).flush(FIRMA_PENDIENTE_ENVIO);
+      const envios = http.match({ method: 'POST', url: URL_FIRMA });
+      expect(envios).toHaveLength(1);
+      envios[0].flush(FIRMA_PENDIENTE_ENVIO);
       http.match(URL_FIRMA);
     });
   });
@@ -511,7 +513,9 @@ describe('TarjetaFirma · SOLV-WEB-10 (SOLVENTAG5-57)', () => {
     tarjeta.reenviar();
     tarjeta.reenviar();
 
-    http.expectOne(URL_REENVIO).flush(FIRMA_ENVIADA);
+    const reenvios = http.match(URL_REENVIO);
+    expect(reenvios).toHaveLength(1);
+    reenvios[0].flush(FIRMA_ENVIADA);
     http.match(URL_FIRMA);
   });
 
@@ -521,7 +525,7 @@ describe('TarjetaFirma · SOLV-WEB-10 (SOLVENTAG5-57)', () => {
 
     fixture.destroy();
     jest.advanceTimersByTime(INTERVALO_SEGUIMIENTO_MS * 3);
-    http.expectNone(URL_FIRMA);
+    expect(http.match(URL_FIRMA)).toHaveLength(0);
   });
 
   it('el botón de enviar es accesible con el teclado', async () => {

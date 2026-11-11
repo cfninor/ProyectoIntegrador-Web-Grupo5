@@ -35,6 +35,12 @@ h4 {
   gap: 10px;
 }
 
+// Los avisos de reenvío y del seguimiento detenido: un <output>, que es en línea, con el aspecto
+// de un párrafo (como «El documento sigue generándose» de la 56).
+.aviso {
+  display: block;
+}
+
 .estado,
 .bloque {
   display: flex;

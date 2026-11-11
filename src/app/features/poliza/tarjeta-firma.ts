@@ -41,11 +41,12 @@ export const INTERVALO_SEGUIMIENTO_MS = 5000;
 /** Consultas antes de ofrecer «Actualizar seguimiento» (≈ 5 minutos). */
 export const MAXIMO_SEGUIMIENTO = 60;
 
-const NO_HABILITADA: readonly CodigoFirmaNoHabilitada[] = [
+/** Los 409 de R1. El código del cuerpo puede faltar: `has` lo recibe tal cual. */
+const NO_HABILITADA: ReadonlySet<string | undefined> = new Set<CodigoFirmaNoHabilitada>([
   'DOCUMENTO_EN_GENERACION',
   'PAGO_NO_APROBADO',
   'CLIENTE_SIN_CONTACTO',
-];
+]);
 
 /** El chip de cada estado (D14): ámbar en curso, verde firmado, gris vencido. */
 const CHIPS: Record<EstadoFirma, () => { clase: string; texto: string }> = {
@@ -227,7 +228,7 @@ export class TarjetaFirma implements OnInit {
       },
       error: (error: HttpErrorResponse) => {
         const codigo = codigoDe(error);
-        if (error.status === 409 && NO_HABILITADA.includes(codigo as CodigoFirmaNoHabilitada)) {
+        if (error.status === 409 && NO_HABILITADA.has(codigo)) {
           this.accion.set('inactiva');
           this.carga.set({ tipo: 'no-habilitada', codigo: codigo as CodigoFirmaNoHabilitada });
         } else {
