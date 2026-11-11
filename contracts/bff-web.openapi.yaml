@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.6.0
+  version: 1.7.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -65,7 +65,10 @@ tags:
       solicitud y sin recalcular nada. El documento se genera en segundo plano (ADR 0007): la
       petición responde de inmediato con el documento en GENERANDO y el canal consulta la póliza
       hasta ver GENERADO. Solo el asesor de la cartera y el cliente titular ven la póliza y su
-      documento.
+      documento. Con el cobro de la primera prima APROBADO y la firma FIRMADA, el canal emite la
+      póliza (SOLVENTAG5-58): pasa a VIGENTE con su número, su vigencia desde la fecha de
+      emisión y el registro de quién la emitió, y el cliente recibe la póliza, el certificado de
+      firma y el comprobante de pago.
   - name: pagos
     description: >
       Cobros de la prima sobre una póliza PENDIENTE_FIRMA (SOLVENTAG5-74, épica EW9). El PAN de
@@ -1020,15 +1023,18 @@ paths:
         Devuelve la póliza con el estado de su documento (SOLVENTAG5-56). El canal la consulta
         hasta que documento.estado es GENERADO; entonces trae la hora de generación y la huella
         que certifica la firma (SOLVENTAG5-57). El documento del tomador va enmascarado: el
-        completo solo va en el PDF. Con la sesión del cliente, una póliza que no es suya responde
-        404 POLIZA_NO_ENCONTRADA; igual con la del asesor si la solicitud de la póliza no está en
-        su cartera.
+        completo solo va en el PDF. Ya emitida (VIGENTE, SOLVENTAG5-58), trae además el número de
+        póliza, la hora de emisión, el próximo cobro y los documentos que recibió el cliente: el
+        certificado de firma y el comprobante de pago; antes de la emisión esos campos no vienen.
+        No llama a la pasarela ni al proveedor de firma. Con la sesión del cliente, una póliza que
+        no es suya responde 404 POLIZA_NO_ENCONTRADA; igual con la del asesor si la solicitud de
+        la póliza no está en su cartera.
       x-roles: [ASESOR, CLIENTE]
       parameters:
         - $ref: '#/components/parameters/PolizaId'
       responses:
         '200':
-          description: Póliza para firma.
+          description: Póliza para firma o ya emitida.
           content:
             application/json:
               schema:
@@ -1040,6 +1046,8 @@ paths:
                   $ref: '#/components/examples/PolizaGenerada'
                 ajustadaGenerada:
                   $ref: '#/components/examples/PolizaAjustadaGenerada'
+                emitida:
+                  $ref: '#/components/examples/PolizaEmitida'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -1376,6 +1384,58 @@ paths:
           description: >
             El BFF no alcanza al núcleo, o el proveedor de firma no respondió: no se gastó un
             intento y el cliente puede repetir el mismo código.
+  /v1/polizas/{polizaId}/emision:
+    post:
+      tags: [polizas]
+      operationId: emitirPoliza
+      summary: Emitir la póliza firmada
+      description: >
+        Emite la póliza (SOLVENTAG5-58, CA1): pasa de PENDIENTE_FIRMA a VIGENTE con su número
+        (SV-<código del ramo>-<año>-<consecutivo>), la vigencia desde la fecha de emisión en
+        Colombia por el plazo cotizado, y el registro de emisión con quién la emitió, cuándo, y
+        con qué firma y qué pago (CA6, ADR 0006). Solo se habilita con la firma FIRMADA y el
+        cobro de la primera prima APROBADO; se revisa en este orden: una póliza ya VIGENTE
+        responde 200 con ella, sin emitirla otra vez ni notificar de nuevo; CANCELADA, sin firma
+        FIRMADA o sin el cobro APROBADO responden 409 POLIZA_NO_EMITIBLE con su motivo. Emitir
+        dos veces, incluso a la vez, no crea dos pólizas ni dos números: no lleva
+        Idempotency-Key porque no mueve dinero. Después de emitir, el cliente recibe la póliza,
+        el certificado de firma y el comprobante de pago (CA3). Con la sesión del cliente, una
+        póliza que no es suya responde 404 POLIZA_NO_ENCONTRADA sin emitirse; igual con la del
+        asesor si la solicitud de la póliza no está en su cartera. No lleva cuerpo.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: La póliza ya estaba VIGENTE; es la misma, con el mismo número.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poliza'
+              examples:
+                yaEmitida:
+                  $ref: '#/components/examples/PolizaEmitida'
+        '201':
+          description: Póliza emitida, VIGENTE, con su número, su vigencia y sus documentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poliza'
+              examples:
+                emitida:
+                  $ref: '#/components/examples/PolizaEmitida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaNoEncontrada'
+        '409':
+          $ref: '#/components/responses/PolizaNoEmitible'
+        '422':
+          $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
 components:
   securitySchemes:
     tokenCognito:
@@ -2090,6 +2150,45 @@ components:
               - loc: [body, codigo]
                 msg: "String should match pattern '^[0-9]{6}$'"
                 type: string_pattern_mismatch
+    PolizaNoEmitible:
+      description: >
+        La póliza no se puede emitir (SOLVENTAG5-58, CA1). POLIZA_NO_EMITIBLE, con el motivo en
+        motivo: POLIZA_CANCELADA (el cliente no firmó a tiempo y la póliza quedó CANCELADA),
+        FIRMA_PENDIENTE (la firma no está FIRMADA o todavía no se pidió) o PAGO_NO_APROBADO (el
+        cobro de la primera prima no está APROBADO). Se revisan en ese orden. No se emite.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - required: [motivo]
+                properties:
+                  codigo:
+                    const: POLIZA_NO_EMITIBLE
+                  motivo:
+                    $ref: '#/components/schemas/MotivoPolizaNoEmitible'
+                    description: >
+                      Por qué no se emite, para mostrarlo traducido; detalle lo explica en
+                      español.
+          examples:
+            polizaCancelada:
+              summary: La póliza quedó CANCELADA
+              value:
+                codigo: POLIZA_NO_EMITIBLE
+                motivo: POLIZA_CANCELADA
+                detalle: La póliza fue cancelada y no se puede emitir.
+            firmaPendiente:
+              summary: La firma todavía no está FIRMADA
+              value:
+                codigo: POLIZA_NO_EMITIBLE
+                motivo: FIRMA_PENDIENTE
+                detalle: La póliza se emite cuando el cliente firma el documento.
+            pagoNoAprobado:
+              summary: Falta el pago aprobado de la primera prima
+              value:
+                codigo: POLIZA_NO_EMITIBLE
+                motivo: PAGO_NO_APROBADO
+                detalle: La póliza se emite cuando el pago de la primera prima está aprobado.
     NucleoNoDisponible:
       description: El BFF no alcanza al núcleo (5xx, tiempo de espera o conexión rechazada).
       content:
@@ -3051,9 +3150,9 @@ components:
       type: string
       description: >
         PENDIENTE_FIRMA al generarse (SOLVENTAG5-56). CANCELADA cuando el cliente no firma en 72
-        horas (SOLVENTAG5-57, CA5): no se emite y el cobro de la primera prima se reversa. La
-        emisión (SOLVENTAG5-58) suma su estado en una versión posterior.
-      enum: [PENDIENTE_FIRMA, CANCELADA]
+        horas (SOLVENTAG5-57, CA5): no se emite y el cobro de la primera prima se reversa.
+        VIGENTE al emitirse, con la firma FIRMADA y el cobro APROBADO (SOLVENTAG5-58, CA1).
+      enum: [PENDIENTE_FIRMA, CANCELADA, VIGENTE]
     EstadoDocumentoPoliza:
       type: string
       description: >
@@ -3116,8 +3215,9 @@ components:
     Poliza:
       type: object
       description: >
-        Póliza para firma (SOLVENTAG5-56). Los datos salen de la solicitud y su decisión, sin
-        recalcular.
+        Póliza para firma (SOLVENTAG5-56) o ya emitida (SOLVENTAG5-58). Los datos salen de la
+        solicitud y su decisión, sin recalcular. numeroPoliza, emitidaEn, proximoCobro y
+        documentos solo vienen en VIGENTE.
       required:
         - polizaId
         - solicitudId
@@ -3172,7 +3272,9 @@ components:
           type: string
           format: date
           description: >
-            Provisional: la fecha de generación. La emisión (SOLVENTAG5-58) la fija.
+            Provisional: la fecha de generación. La emisión (SOLVENTAG5-58) la fija en la fecha
+            de emisión en Colombia; si se emite otro día, cambia aquí y el documento firmado no
+            cambia.
         vigenciaHasta:
           type: string
           format: date
@@ -3183,6 +3285,22 @@ components:
           $ref: '#/components/schemas/CondicionesPoliza'
         documento:
           $ref: '#/components/schemas/DocumentoPoliza'
+        numeroPoliza:
+          type: string
+          pattern: '^SV-[A-Z]{2}-[0-9]{4}-[0-9]{6}$'
+          description: >
+            Solo en VIGENTE (SOLVENTAG5-58, D4). SV, el código del ramo (VH para
+            VIDA_HIPOTECARIO), el año de la emisión en Colombia y un consecutivo de 6 dígitos por
+            ramo y año. Es único.
+          examples: [SV-VH-2026-004821]
+        emitidaEn:
+          type: string
+          format: date-time
+          description: Solo en VIGENTE. Cuándo se emitió, en UTC.
+        proximoCobro:
+          $ref: '#/components/schemas/ProximoCobro'
+        documentos:
+          $ref: '#/components/schemas/DocumentosPoliza'
     MedioPago:
       type: string
       description: Único medio soportado por ahora (D2 de SOLVENTAG5-74).
@@ -3395,6 +3513,73 @@ components:
           pattern: '^[0-9]{6}$'
           description: Seis dígitos; puede empezar por cero.
           examples: ['042817']
+    MotivoPolizaNoEmitible:
+      type: string
+      description: >
+        Por qué una póliza no se emite (SOLVENTAG5-58, D3). POLIZA_CANCELADA la póliza quedó
+        CANCELADA; FIRMA_PENDIENTE la firma no está FIRMADA o todavía no se pidió;
+        PAGO_NO_APROBADO el cobro de la primera prima no está APROBADO.
+      enum: [POLIZA_CANCELADA, FIRMA_PENDIENTE, PAGO_NO_APROBADO]
+    ProximoCobro:
+      type: object
+      description: >
+        Solo en VIGENTE (SOLVENTAG5-58, D6). La primera prima cubre el primer periodo: el
+        próximo cobro es vigenciaDesde más un periodo de la periodicidad (para MENSUAL, un mes;
+        el último día del mes si ese día no existe), por la prima. Se calcula al consultar.
+      required: [fecha, valor, moneda]
+      properties:
+        fecha:
+          type: string
+          format: date
+        valor:
+          type: integer
+          minimum: 0
+          description: La prima de la póliza, en COP.
+        moneda:
+          type: string
+          enum: [COP]
+    ComprobantePago:
+      type: object
+      description: >
+        Comprobante del cobro APROBADO de la primera prima (SOLVENTAG5-58, D9; SOLVENTAG5-74).
+        Sale del pago guardado, sin llamar a la pasarela. Nunca trae el número de la tarjeta.
+      required: [pagoId, referencia, marca, ultimos4, monto, moneda, aprobadoEn]
+      properties:
+        pagoId:
+          type: string
+          format: uuid
+        referencia:
+          type: string
+          description: Referencia que asignó la pasarela al cobro; es referenciaPasarela del Pago.
+        marca:
+          type: string
+          description: Marca de la tarjeta (por ejemplo VISA).
+        ultimos4:
+          type: string
+          pattern: '^[0-9]{4}$'
+        monto:
+          type: integer
+          minimum: 0
+          description: Valor cobrado, en COP.
+        moneda:
+          type: string
+          enum: [COP]
+        aprobadoEn:
+          type: string
+          format: date-time
+          description: Cuándo quedó APROBADO; es actualizadoEn del Pago.
+    DocumentosPoliza:
+      type: object
+      description: >
+        Solo en VIGENTE (SOLVENTAG5-58, CA3, D9). Los documentos que el cliente recibió al
+        emitirse la póliza, además del PDF firmado de descargarDocumentoPoliza: el certificado
+        de la firma y el comprobante del pago. Se entregan como datos, sin PDF propio.
+      required: [certificadoFirma, comprobantePago]
+      properties:
+        certificadoFirma:
+          $ref: '#/components/schemas/CertificadoFirma'
+        comprobantePago:
+          $ref: '#/components/schemas/ComprobantePago'
     Rol:
       type: string
       description: 'Rol del usuario: el nombre exacto de su grupo de Cognito.'
@@ -3632,8 +3817,9 @@ components:
             DOCUMENTO_EN_GENERACION, CLAVE_IDEMPOTENCIA_EN_CURSO,
             CLAVE_IDEMPOTENCIA_REUTILIZADA, POLIZA_NO_PAGABLE, PAGO_NO_APROBADO,
             CLIENTE_SIN_CONTACTO, FIRMA_NO_ENCONTRADA, FIRMA_NO_REENVIABLE, ENLACE_VENCIDO,
-            CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO y CODIGO_INVALIDO. CODIGO_INVALIDO
-            lleva además intentosRestantes (respuesta FirmaRechazada).
+            CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO, CODIGO_INVALIDO y
+            POLIZA_NO_EMITIBLE. CODIGO_INVALIDO lleva además intentosRestantes (respuesta
+            FirmaRechazada) y POLIZA_NO_EMITIBLE, motivo (respuesta PolizaNoEmitible).
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -5057,6 +5243,61 @@ components:
             - Enfermedades o lesiones preexistentes no declaradas
             - Lesiones causadas intencionalmente por el asegurado
             - Actos de guerra o terrorismo
+    PolizaEmitida:
+      summary: >-
+        Póliza emitida y VIGENTE, con su número, el próximo cobro y los documentos enviados al
+        cliente
+      value:
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        solicitudId: 7a1c3e5f-2b4d-4c6e-8f1a-3b5d7f9a1c3e
+        cotizacionId: 6f2e4d8c-1a3b-4d5e-9f7a-2c4e6a8b0d1f
+        clienteId: 9b1d4e2a-7c3f-4a8b-8e6d-2f1a3b5c7d9e
+        estado: VIGENTE
+        ramo: VIDA_HIPOTECARIO
+        sumaAsegurada: 200000000
+        prima: 70000
+        moneda: COP
+        periodicidad: MENSUAL
+        vigenciaDesde: '2026-11-06'
+        vigenciaHasta: '2046-11-06'
+        tomador:
+          nombres: María Fernanda
+          apellidos: Pérez Gómez
+          documentoEnmascarado: CC ••••5678
+        condiciones:
+          version: VH-2026.1
+          coberturas:
+            - Fallecimiento del deudor
+            - Incapacidad total y permanente del deudor
+          exclusiones:
+            - Suicidio durante el primer año de vigencia
+            - Enfermedades o lesiones preexistentes no declaradas
+            - Lesiones causadas intencionalmente por el asegurado
+            - Actos de guerra o terrorismo
+        documento:
+          estado: GENERADO
+          generadoEn: '2026-10-14T16:32:10.850Z'
+          huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+        numeroPoliza: SV-VH-2026-004821
+        emitidaEn: '2026-11-06T15:24:02.310Z'
+        proximoCobro:
+          fecha: '2026-12-06'
+          valor: 70000
+          moneda: COP
+        documentos:
+          certificadoFirma:
+            firmadaEn: '2026-11-06T15:23:45.120Z'
+            ip: 203.0.113.24
+            huella: 2a08aa0f806720e8212242213f88a6f604b5b0f3c9ccad2ddaa5e35ac4c40e3d
+            referencia: 4d6f8a1c-3e5b-4c7d-9f1a-2b4c6d8e0f1a
+          comprobantePago:
+            pagoId: 1f3a5c7e-9b1d-4e3f-8a5c-7e9b1d3f5a7c
+            referencia: pasarela-sim-00f4c8a2
+            marca: VISA
+            ultimos4: '4242'
+            monto: 70000
+            moneda: COP
+            aprobadoEn: '2026-11-06T15:00:01.200Z'
     PerfilRiesgoConPerfil:
       summary: Cotizada con el perfil MEDIO versión 3 del cliente
       value:

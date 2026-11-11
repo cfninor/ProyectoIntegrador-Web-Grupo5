@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { APP_CONFIG } from '../../core/config/app-config';
 import { PolizaApi } from './poliza-api';
 
-describe('PolizaApi · SOLVENTAG5-56', () => {
+describe('PolizaApi · SOLVENTAG5-56 y SOLVENTAG5-58', () => {
   let api: PolizaApi;
   let http: HttpTestingController;
 
@@ -55,5 +55,17 @@ describe('PolizaApi · SOLVENTAG5-56', () => {
     peticion.flush(pdf);
 
     await expect(respuesta).resolves.toBe(pdf);
+  });
+
+  it('emite la póliza por POST /v1/polizas/{polizaId}/emision sin cuerpo (SOLVENTAG5-58)', async () => {
+    const respuesta = firstValueFrom(api.emitir('p/1'));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/polizas/p%2F1/emision');
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toBeNull();
+    expect(peticion.request.headers.has('Idempotency-Key')).toBe(false);
+    peticion.flush({ polizaId: 'p/1', estado: 'VIGENTE' });
+
+    await expect(respuesta).resolves.toEqual({ polizaId: 'p/1', estado: 'VIGENTE' });
   });
 });

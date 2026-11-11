@@ -152,7 +152,7 @@
 
     <dl class="resumen">
       <dt i18n="@@firma.numeroPoliza">Número de póliza</dt>
-      <dd>{{ v.p.polizaId }}</dd>
+      <dd>{{ v.p.numeroPoliza ?? v.p.polizaId }}</dd>
       <dt i18n="@@firma.documento">Documento</dt>
       <dd>
         <span class="chip chip-verde-azulado">{{ v.chip }}</span>
@@ -207,6 +207,8 @@
         [huella]="v.p.documento.huella"
         [rutaPago]="rutaPago()"
         [solicitudId]="solicitudId()"
+        [estadoPoliza]="v.p.estado"
+        [rutaEmision]="rutaEmision()"
       />
     } @else {
       <div class="bloque">

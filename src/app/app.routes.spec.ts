@@ -206,6 +206,23 @@ describe('routes', () => {
     ).toBeInTheDocument();
   });
 
+  it.each<[Rol, string]>([
+    ['ASESOR', '/asesor'],
+    ['CLIENTE', '/cliente'],
+  ])(
+    'con el rol %s, la confirmación de la emisión se abre por su ruta (SOLVENTAG5-58, D12)',
+    async (rol, portal) => {
+      const { url, vista } = await navegar(`${portal}/cotizar/oferta/c-1/emision`, sesionDe(rol));
+
+      expect(url).toBe(`${portal}/cotizar/oferta/c-1/emision`);
+      expect(document.title).toBe('Emisión · Solventa');
+      expect(vista.getByRole('heading', { level: 1, name: 'Emisión' })).toBeInTheDocument();
+      expect(
+        vista.getByRole('heading', { level: 2, name: 'No hay una solicitud para confirmar' }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('el analista de riesgo abre la bandeja de suscripción asistida (SOLVENTAG5-52)', async () => {
     const { url, vista } = await navegar('/riesgo/bandeja', sesionDe('ANALISTA_RIESGO'));
 

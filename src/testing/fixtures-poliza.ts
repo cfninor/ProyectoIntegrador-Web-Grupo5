@@ -71,3 +71,56 @@ export const NO_EMITIBLE = {
     detalle: 'La solicitud no tiene un cliente para la póliza.',
   },
 } as const;
+
+// --- Emisión (SOLVENTAG5-58) -------------------------------------------------------------------
+
+/**
+ * La póliza emitida, como el ejemplo PolizaEmitida del contrato 1.7.0: emitida el 06/11/2026 a las
+ * 10:24 en Bogotá, vigente desde ese día y con el próximo cobro un mes después. El certificado es
+ * el de FIRMA_FIRMADA y el comprobante, el del pago aprobado de los ejemplos de la SOLVENTAG5-74.
+ */
+export const POLIZA_EMITIDA: Poliza = {
+  ...POLIZA_GENERADA,
+  estado: 'VIGENTE',
+  vigenciaDesde: '2026-11-06',
+  vigenciaHasta: '2046-11-06',
+  numeroPoliza: 'SV-VH-2026-004821',
+  emitidaEn: '2026-11-06T15:24:02.310Z',
+  proximoCobro: { fecha: '2026-12-06', valor: 70_000, moneda: 'COP' },
+  documentos: {
+    certificadoFirma: {
+      firmadaEn: '2026-11-06T15:23:45.120Z',
+      ip: '203.0.113.24',
+      huella: HUELLA,
+      referencia: '4d6f8a1c-3e5b-4c7d-9f1a-2b4c6d8e0f1a',
+    },
+    comprobantePago: {
+      pagoId: '1f3a5c7e-9b1d-4e3f-8a5c-7e9b1d3f5a7c',
+      referencia: 'pasarela-sim-00f4c8a2',
+      marca: 'VISA',
+      ultimos4: '4242',
+      monto: 70_000,
+      moneda: 'COP',
+      aprobadoEn: '2026-11-06T15:00:01.200Z',
+    },
+  },
+};
+
+/** El cuerpo de cada 409 POLIZA_NO_EMITIBLE de `emitirPoliza` (D3, R9), como en el contrato. */
+export const POLIZA_NO_EMITIBLE = {
+  POLIZA_CANCELADA: {
+    codigo: 'POLIZA_NO_EMITIBLE',
+    motivo: 'POLIZA_CANCELADA',
+    detalle: 'La póliza fue cancelada y no se puede emitir.',
+  },
+  FIRMA_PENDIENTE: {
+    codigo: 'POLIZA_NO_EMITIBLE',
+    motivo: 'FIRMA_PENDIENTE',
+    detalle: 'La póliza se emite cuando el cliente firma el documento.',
+  },
+  PAGO_NO_APROBADO: {
+    codigo: 'POLIZA_NO_EMITIBLE',
+    motivo: 'PAGO_NO_APROBADO',
+    detalle: 'La póliza se emite cuando el pago de la primera prima está aprobado.',
+  },
+} as const;

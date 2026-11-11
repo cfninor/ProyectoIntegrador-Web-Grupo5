@@ -145,7 +145,15 @@
           }
         }
         @case ('FIRMADA') {
-          @if (actor() === 'asesor') {
+          @if (estadoPoliza() === 'VIGENTE') {
+            @if (actor() === 'asesor') {
+              <p i18n="@@emision.tarjeta.emitida.asesor">
+                El cliente firmó la póliza y ya está emitida.
+              </p>
+            } @else {
+              <p i18n="@@emision.tarjeta.emitida.cliente">Firmaste tu póliza y ya está emitida.</p>
+            }
+          } @else if (actor() === 'asesor') {
             <p i18n="@@firma.electronica.firmada.asesor">
               El cliente firmó la póliza. Ya se puede emitir.
             </p>
@@ -176,6 +184,37 @@
       }
     }
 
+    @if (emision(); as e) {
+      @if (e.tipo === 'no-emitible') {
+        @switch (e.motivo) {
+          @case ('POLIZA_CANCELADA') {
+            <h4 i18n="@@emision.noEmitible.cancelada.titulo">La póliza fue cancelada</h4>
+            <p i18n="@@emision.noEmitible.cancelada.texto">
+              La póliza no se puede emitir porque quedó cancelada.
+            </p>
+          }
+          @case ('FIRMA_PENDIENTE') {
+            <h4 i18n="@@emision.noEmitible.firmaPendiente.titulo">Falta la firma del documento</h4>
+            <p i18n="@@emision.noEmitible.firmaPendiente.texto">
+              La póliza se emite cuando el documento esté firmado.
+            </p>
+          }
+          @case ('PAGO_NO_APROBADO') {
+            <h4 i18n="@@emision.noEmitible.pagoNoAprobado.titulo">
+              Falta el pago aprobado de la primera prima
+            </h4>
+            <p i18n="@@emision.noEmitible.pagoNoAprobado.texto">
+              La póliza se emite cuando el pago de la primera prima esté aprobado.
+            </p>
+          }
+        }
+      } @else if (e.tipo === 'error') {
+        <p role="alert" i18n="@@emision.error">
+          No pudimos emitir la póliza. Intenta de nuevo en unos minutos.
+        </p>
+      }
+    }
+
     @switch (accion()) {
       @case ('error') {
         <p role="alert" i18n="@@firma.electronica.errorAccion">
@@ -194,6 +233,33 @@
       }
     }
   </div>
+
+  @if (emitible()) {
+    <div class="acciones">
+      <button
+        type="button"
+        class="boton-primario"
+        [disabled]="emision().tipo === 'emitiendo'"
+        [attr.aria-busy]="emision().tipo === 'emitiendo'"
+        (click)="emitir()"
+        i18n="@@emision.emitir"
+      >
+        Emitir póliza
+      </button>
+    </div>
+  }
+
+  @if (confirmacion(); as ruta) {
+    <div class="acciones">
+      <a
+        class="boton-primario"
+        [routerLink]="ruta"
+        [queryParams]="{ solicitudId: solicitudId() }"
+        i18n="@@emision.verConfirmacion"
+        >Ver confirmación</a
+      >
+    </div>
+  }
 
   @if (reenviable()) {
     <div class="acciones">

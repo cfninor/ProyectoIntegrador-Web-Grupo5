@@ -5,7 +5,8 @@ export type PasoContratacion = 1 | 2 | 3 | 4 | 5;
 
 /**
  * Pasos de la contratación, como en los marcos «Cotizar / Oferta» y «Cotizar / Suscripción» del
- * Figma: los anteriores al actual, completados; el actual, resaltado (SOLVENTAG5-49).
+ * Figma: los anteriores al actual, completados; el actual, resaltado (SOLVENTAG5-49). Con
+ * `completo`, los cinco hechos y ninguno actual: la póliza ya se emitió (SOLV-WEB-11, SOLVENTAG5-58).
  */
 @Component({
   selector: 'app-pasos-contratacion',
@@ -16,9 +17,9 @@ export type PasoContratacion = 1 | 2 | 3 | 4 | 5;
       @for (paso of pasos; track paso.numero; let ultimo = $last) {
         <li
           class="paso"
-          [class.actual]="paso.numero === actual()"
-          [class.hecho]="paso.numero < actual()"
-          [attr.aria-current]="paso.numero === actual() ? 'step' : null"
+          [class.actual]="!completo() && paso.numero === actual()"
+          [class.hecho]="completo() || paso.numero < actual()"
+          [attr.aria-current]="!completo() && paso.numero === actual() ? 'step' : null"
         >
           <span class="numero">{{ paso.numero }}</span
           ><span>{{ paso.nombre }}</span>
@@ -32,6 +33,8 @@ export type PasoContratacion = 1 | 2 | 3 | 4 | 5;
 })
 export class PasosContratacion {
   readonly actual = input.required<PasoContratacion>();
+  /** Todos los pasos completados (SOLVENTAG5-58). */
+  readonly completo = input(false);
 
   protected readonly pasos: readonly { numero: PasoContratacion; nombre: string }[] = [
     { numero: 1, nombre: $localize`:@@oferta.paso.cotizacion:Cotización` },
