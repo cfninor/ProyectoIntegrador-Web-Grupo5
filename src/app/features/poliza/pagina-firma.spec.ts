@@ -5,9 +5,11 @@ import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
+import { FIRMA_FIRMADA } from '../../../testing/fixtures-firma';
 import {
   HUELLA,
   NO_EMITIBLE,
+  POLIZA_EMITIDA,
   POLIZA_GENERADA,
   POLIZA_GENERANDO,
   POLIZA_ID,
@@ -409,5 +411,20 @@ describe('PaginaFirma · lo que no genera póliza (R2)', () => {
 
     expect(titulo()).toHaveTextContent('No hay una solicitud para firmar');
     http.expectNone(URL_GENERAR);
+  });
+
+  it('con la póliza emitida muestra su número y la tarjeta lleva a la confirmación (SOLVENTAG5-58)', async () => {
+    const { http, detectChanges } = await renderizar('cliente');
+    http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA);
+    detectChanges();
+    http.expectOne(URL_FIRMA).flush(FIRMA_FIRMADA);
+    detectChanges();
+
+    expect(dato('Número de póliza')).toHaveTextContent('SV-VH-2026-004821');
+    expect(screen.getByRole('link', { name: 'Ver confirmación' })).toHaveAttribute(
+      'href',
+      `/cliente/cotizar/oferta/c-1/emision?solicitudId=${SOLICITUD_ID_POLIZA}`,
+    );
+    expect(screen.queryByRole('button', { name: 'Emitir póliza' })).not.toBeInTheDocument();
   });
 });

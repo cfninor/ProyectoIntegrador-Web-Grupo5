@@ -15,6 +15,7 @@ import { Subscription } from 'rxjs';
 
 import { Actor } from '../cotizacion/formulario-cotizacion';
 import { PasosContratacion } from '../cotizacion/pasos-contratacion';
+import { entregarPdf } from './descarga-pdf';
 import { ErrorPoliza, MotivoNoEmitible, Poliza } from './modelos';
 import { PolizaApi } from './poliza-api';
 import { TarjetaFirma } from './tarjeta-firma';
@@ -86,7 +87,8 @@ function motivoDe(error: HttpErrorResponse): MotivoSinPoliza | null {
  * motivo, como estado y no como error genérico.
  *
  * Con el documento GENERADO, debajo de la vista previa va la tarjeta de la firma electrónica
- * (`TarjetaFirma`, SOLVENTAG5-57, D14): enviar el enlace, el seguimiento y el certificado.
+ * (`TarjetaFirma`, SOLVENTAG5-57, D14): enviar el enlace, el seguimiento y el certificado. Con la
+ * firma FIRMADA, la tarjeta emite la póliza o lleva a su confirmación (SOLVENTAG5-58, D12).
  */
 @Component({
   selector: 'app-pagina-firma',
@@ -126,6 +128,11 @@ export class PaginaFirma implements OnInit {
     }
     return { motivo: carga.motivo, chip: CHIPS_MOTIVO[carga.motivo]() };
   });
+
+  /** SOLV-WEB-11 (SOLVENTAG5-58): la confirmación de la emisión, desde la tarjeta de firma. */
+  protected readonly rutaEmision = computed(
+    () => `/${this.actor()}/cotizar/oferta/${this.cotizacionId()}/emision`,
+  );
 
   /** La página de pago de la SOLVENTAG5-74: «Ir al pago» de la firma sin pago aprobado (D14). */
   protected readonly rutaPago = computed(
@@ -202,13 +209,7 @@ export class PaginaFirma implements OnInit {
     this.descargaEnCurso?.unsubscribe();
     this.descargaEnCurso = this.api.descargarDocumento(polizaId).subscribe({
       next: (pdf) => {
-        const url = URL.createObjectURL(pdf);
-        const enlace = this.documento.createElement('a');
-        enlace.href = url;
-        enlace.download = `poliza-${polizaId}.pdf`;
-        enlace.click();
-        // El navegador ya tomó el blob: se libera en el siguiente ciclo.
-        setTimeout(() => URL.revokeObjectURL(url));
+        entregarPdf(this.documento, pdf, polizaId);
         this.descarga.set('inactiva');
       },
       error: () => this.descarga.set('error'),

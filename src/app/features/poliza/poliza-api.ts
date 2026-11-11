@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { APP_CONFIG } from '../../core/config/app-config';
 import { Poliza } from './modelos';
 
-/** Las operaciones de la póliza para firma del BFF web (SOLVENTAG5-56). */
+/** Las operaciones de la póliza para firma (SOLVENTAG5-56) y de su emisión (SOLVENTAG5-58). */
 @Injectable({ providedIn: 'root' })
 export class PolizaApi {
   private readonly http = inject(HttpClient);
@@ -28,6 +28,18 @@ export class PolizaApi {
   obtener(polizaId: string): Observable<Poliza> {
     return this.http.get<Poliza>(
       `${this.config.apiBaseUrl}/v1/polizas/${encodeURIComponent(polizaId)}`,
+    );
+  }
+
+  /**
+   * Emite la póliza firmada (`emitirPoliza`, SOLVENTAG5-58): 201 emitida o 200 la misma si ya estaba
+   * VIGENTE, con su número. Sin cuerpo ni Idempotency-Key. 409 POLIZA_NO_EMITIBLE con su `motivo`
+   * llega como error.
+   */
+  emitir(polizaId: string): Observable<Poliza> {
+    return this.http.post<Poliza>(
+      `${this.config.apiBaseUrl}/v1/polizas/${encodeURIComponent(polizaId)}/emision`,
+      null,
     );
   }
 

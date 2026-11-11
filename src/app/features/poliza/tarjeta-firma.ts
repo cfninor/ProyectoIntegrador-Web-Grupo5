@@ -10,7 +10,7 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { fechaBogota, horaBogota } from '../../core/idioma/formatos';
@@ -19,12 +19,16 @@ import { Actor } from '../cotizacion/formulario-cotizacion';
 import { FirmaApi } from './firma-api';
 import {
   CodigoFirmaNoHabilitada,
+  ErrorEmision,
   ErrorFirma,
   FIRMA_EN_CURSO,
   FIRMA_REENVIABLE,
   EstadoFirma,
+  EstadoPoliza,
   Firma,
+  MotivoPolizaNoEmitible,
 } from './modelos';
+import { PolizaApi } from './poliza-api';
 
 type Carga =
   | { tipo: 'consultando' }
@@ -35,6 +39,30 @@ type Carga =
 
 /** El resultado del último envío o reenvío, que se anuncia debajo de los botones. */
 type Accion = 'inactiva' | 'enviando' | 'reenviando' | 'reenviada' | 'error' | 'no-reenviable';
+
+/** «Emitir póliza» (SOLVENTAG5-58, D12): en curso, rechazada con un 409 de D3 o fallida. */
+type Emision =
+  | { tipo: 'inactiva' }
+  | { tipo: 'emitiendo' }
+  | { tipo: 'no-emitible'; motivo: MotivoPolizaNoEmitible }
+  | { tipo: 'error' };
+
+/** Los motivos del 409 POLIZA_NO_EMITIBLE (D3). */
+const MOTIVOS_NO_EMITIBLE: ReadonlySet<string | undefined> = new Set<MotivoPolizaNoEmitible>([
+  'POLIZA_CANCELADA',
+  'FIRMA_PENDIENTE',
+  'PAGO_NO_APROBADO',
+]);
+
+/** El motivo del 409 POLIZA_NO_EMITIBLE de `emitirPoliza`, o null si es otro error. */
+function motivoNoEmitible(error: HttpErrorResponse): MotivoPolizaNoEmitible | null {
+  const cuerpo = error.error as Partial<ErrorEmision> | null;
+  return error.status === 409 &&
+    cuerpo?.codigo === 'POLIZA_NO_EMITIBLE' &&
+    MOTIVOS_NO_EMITIBLE.has(cuerpo.motivo)
+    ? (cuerpo.motivo as MotivoPolizaNoEmitible)
+    : null;
+}
 
 /** Cada cuánto se vuelve a consultar una firma en curso (D14). */
 export const INTERVALO_SEGUIMIENTO_MS = 5000;
@@ -88,6 +116,11 @@ function codigoDe(error: HttpErrorResponse): string | undefined {
  * y el certificado en FIRMADA. Mientras la firma está en curso la consulta cada 5 segundos, sin
  * dejar una petición abierta, hasta 60 veces; luego ofrece «Actualizar seguimiento», como la página
  * de suscripción. Si una consulta falla, conserva el último estado y sigue consultando.
+ *
+ * Emisión (SOLVENTAG5-58, D12): con la firma FIRMADA y la póliza PENDIENTE_FIRMA ofrece «Emitir
+ * póliza»; al emitir (201 o 200) lleva a SOLV-WEB-11 (`rutaEmision`). Con la póliza VIGENTE ofrece
+ * «Ver confirmación». El 409 POLIZA_NO_EMITIBLE se muestra como estado, con su motivo. Mientras se
+ * emite, el botón queda deshabilitado: un doble clic emite una sola vez.
  */
 @Component({
   selector: 'app-tarjeta-firma',
@@ -105,8 +138,15 @@ export class TarjetaFirma implements OnInit {
   /** La página de pago de la SOLVENTAG5-74, para «Ir al pago». */
   readonly rutaPago = input.required<string>();
   readonly solicitudId = input<string>();
+  /** El estado de la póliza (SOLVENTAG5-58): PENDIENTE_FIRMA ofrece emitirla y VIGENTE, verla. */
+  readonly estadoPoliza = input<EstadoPoliza>('PENDIENTE_FIRMA');
+  /** SOLV-WEB-11, la confirmación de la emisión. Sin ella, la tarjeta no ofrece la emisión. */
+  readonly rutaEmision = input<string>();
 
   private readonly api = inject(FirmaApi);
+  private readonly polizas = inject(PolizaApi);
+  private readonly router = inject(Router);
+  private emisionEnCurso?: Subscription;
   private readonly idioma = idiomaDe(inject(LOCALE_ID));
   private consulta?: Subscription;
   private accionEnCurso?: Subscription;
@@ -118,6 +158,23 @@ export class TarjetaFirma implements OnInit {
   protected readonly detenido = signal(false);
   /** Cuándo vence el enlace, en hora de Bogotá, de la última firma mostrada. */
   protected readonly vence = signal('');
+  protected readonly emision = signal<Emision>({ tipo: 'inactiva' });
+
+  /** «Emitir póliza»: firma FIRMADA, póliza PENDIENTE_FIRMA y no cancelada por un 409 (D12). */
+  protected readonly emitible = computed(() => {
+    const emision = this.emision();
+    return (
+      this.rutaEmision() !== undefined &&
+      this.estadoPoliza() === 'PENDIENTE_FIRMA' &&
+      this.firma()?.estado === 'FIRMADA' &&
+      !(emision.tipo === 'no-emitible' && emision.motivo === 'POLIZA_CANCELADA')
+    );
+  });
+
+  /** «Ver confirmación»: la póliza ya está VIGENTE (D12). */
+  protected readonly confirmacion = computed(() =>
+    this.estadoPoliza() === 'VIGENTE' ? (this.rutaEmision() ?? null) : null,
+  );
 
   protected readonly firma = computed(() => {
     const carga = this.carga();
@@ -196,6 +253,7 @@ export class TarjetaFirma implements OnInit {
     inject(DestroyRef).onDestroy(() => {
       this.detener();
       this.accionEnCurso?.unsubscribe();
+      this.emisionEnCurso?.unsubscribe();
     });
   }
 
@@ -258,6 +316,25 @@ export class TarjetaFirma implements OnInit {
         } else {
           this.accion.set('error');
         }
+      },
+    });
+  }
+
+  /** «Emitir póliza» (SOLVENTAG5-58): emite y lleva a la confirmación de SOLV-WEB-11. */
+  protected emitir(): void {
+    const ruta = this.rutaEmision();
+    if (ruta === undefined || this.emision().tipo === 'emitiendo') {
+      return;
+    }
+    this.emision.set({ tipo: 'emitiendo' });
+    this.emisionEnCurso?.unsubscribe();
+    this.emisionEnCurso = this.polizas.emitir(this.polizaId()).subscribe({
+      next: () => {
+        void this.router.navigate([ruta], { queryParams: { solicitudId: this.solicitudId() } });
+      },
+      error: (error: HttpErrorResponse) => {
+        const motivo = motivoNoEmitible(error);
+        this.emision.set(motivo ? { tipo: 'no-emitible', motivo } : { tipo: 'error' });
       },
     });
   }

@@ -1,0 +1,169 @@
+<app-pasos-contratacion [actual]="5" [completo]="carga().tipo === 'emitida'" />
+
+<section class="tarjeta" aria-labelledby="emision-titulo" aria-live="polite">
+  @switch (carga().tipo) {
+    @case ('cargando') {
+      <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.cargando">Consultando la póliza…</h2>
+    }
+    @case ('sin-solicitud') {
+      <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.sinSolicitud.titulo">
+        No hay una solicitud para confirmar
+      </h2>
+      <p i18n="@@emision.sinSolicitud.texto">
+        La confirmación se abre al emitir la póliza desde la firma.
+      </p>
+    }
+    @case ('no-encontrada') {
+      <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.noEncontrada">
+        No encontramos esta solicitud de suscripción
+      </h2>
+    }
+    @case ('error') {
+      <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.errorCarga">
+        No pudimos consultar la póliza
+      </h2>
+      <div class="acciones">
+        <button
+          type="button"
+          class="boton-secundario"
+          (click)="cargar()"
+          i18n="@@emision.reintentar"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+    @case ('no-vigente') {
+      <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.noVigente.titulo">
+        La póliza todavía no está emitida
+      </h2>
+      <p i18n="@@emision.noVigente.texto">
+        La póliza se emite desde la firma, cuando el documento está firmado y el pago aprobado.
+      </p>
+      <div class="acciones">
+        <a
+          class="boton-primario"
+          [routerLink]="rutaFirma()"
+          [queryParams]="{ solicitudId: solicitudId() }"
+          i18n="@@emision.irFirma"
+          >Ir a la firma</a
+        >
+      </div>
+    }
+  }
+
+  @if (vista(); as v) {
+    <div class="encabezado">
+      <svg
+        class="icono-emitida"
+        role="img"
+        [attr.aria-label]="textoIcono"
+        viewBox="0 0 48 48"
+        width="48"
+        height="48"
+      >
+        <circle cx="24" cy="24" r="24" />
+        <path d="M14 24.5l7 7 13-14" />
+      </svg>
+      @if (actor() === 'asesor') {
+        <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.titulo.asesor">
+          La póliza del cliente fue emitida
+        </h2>
+      } @else {
+        <h2 id="emision-titulo" tabindex="-1" i18n="@@emision.titulo.cliente">
+          ¡Tu póliza fue emitida!
+        </h2>
+      }
+    </div>
+    @if (actor() === 'asesor') {
+      <p i18n="@@emision.mensaje.asesor">
+        La póliza quedó formalizada y vigente. El cliente ya la tiene disponible en su portal y en
+        la app.
+      </p>
+    } @else {
+      <p i18n="@@emision.mensaje.cliente">
+        Tu póliza quedó formalizada y vigente. Ya la tienes disponible en tu portal y en la app.
+      </p>
+    }
+
+    <dl class="resumen">
+      <dt i18n="@@emision.numero">Número de póliza</dt>
+      <dd class="numero">{{ v.numero }}</dd>
+      <dt i18n="@@emision.tomador">Tomador</dt>
+      <dd>{{ v.tomador }} · {{ v.documentoEnmascarado }}</dd>
+      <dt i18n="@@emision.inicio">Fecha de inicio</dt>
+      <dd>{{ v.inicio }}</dd>
+      @if (v.proximo; as proximo) {
+        <dt i18n="@@emision.proximoCobro">Próximo cobro</dt>
+        <dd>{{ proximo }}</dd>
+      }
+    </dl>
+
+    @if (v.certificado || v.comprobante) {
+      <div class="bloque">
+        <h3 id="emision-documentos" i18n="@@emision.documentos">Documentos</h3>
+        <div class="documentos">
+          @if (v.certificado; as cert) {
+            <article class="documento" aria-labelledby="emision-certificado">
+              <h4 id="emision-certificado" i18n="@@emision.certificado">
+                Certificado de firma electrónica
+              </h4>
+              <dl class="resumen">
+                <dt i18n="@@emision.certificado.fecha">Fecha y hora</dt>
+                <dd>{{ cert.fechaHora }}</dd>
+                <dt i18n="@@emision.certificado.huella">Huella firmada</dt>
+                <dd class="huella">{{ cert.huella }}</dd>
+              </dl>
+            </article>
+          }
+          @if (v.comprobante; as comp) {
+            <article class="documento" aria-labelledby="emision-comprobante">
+              <h4 id="emision-comprobante" i18n="@@emision.comprobante">Comprobante de pago</h4>
+              <dl class="resumen">
+                <dt i18n="@@emision.comprobante.tarjeta">Tarjeta</dt>
+                <dd>{{ comp.tarjeta }}</dd>
+                <dt i18n="@@emision.comprobante.valor">Valor</dt>
+                <dd>{{ comp.valor }}</dd>
+                <dt i18n="@@emision.comprobante.fecha">Fecha</dt>
+                <dd>{{ comp.fechaHora }}</dd>
+              </dl>
+            </article>
+          }
+        </div>
+        @if (actor() === 'asesor') {
+          <p class="texto-secundario" i18n="@@emision.enviados.asesor">
+            Enviamos al cliente la póliza, el certificado de firma y el comprobante de pago.
+          </p>
+        } @else {
+          <p class="texto-secundario" i18n="@@emision.enviados.cliente">
+            Te enviamos la póliza, el certificado de firma y el comprobante de pago.
+          </p>
+        }
+      </div>
+    }
+
+    <div class="acciones">
+      <button
+        type="button"
+        class="boton-primario"
+        [disabled]="descarga() === 'descargando'"
+        [attr.aria-busy]="descarga() === 'descargando'"
+        (click)="verPoliza()"
+        i18n="@@emision.verPoliza"
+      >
+        Ver póliza
+      </button>
+      <a class="boton-secundario" [routerLink]="rutaCotizar()" i18n="@@emision.nuevaCotizacion"
+        >Nueva cotización</a
+      >
+      <a class="boton-secundario" [routerLink]="rutaTablero()" i18n="@@emision.irTablero"
+        >Ir al tablero</a
+      >
+    </div>
+    @if (descarga() === 'error') {
+      <p role="alert" i18n="@@emision.verPoliza.error">
+        No pudimos abrir la póliza. Intenta de nuevo.
+      </p>
+    }
+  }
+</section>

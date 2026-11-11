@@ -1,0 +1,112 @@
+// SOLV-WEB-11: la confirmación de la emisión (SOLVENTAG5-58). Medidas y colores de SOLV-WEB-10.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 860px;
+}
+
+h2,
+h3,
+h4,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h3,
+h4 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+// El ícono de verificación verde del marco «Confirmación de Póliza».
+.icono-emitida {
+  flex: none;
+
+  circle {
+    fill: var(--chip-verde-texto);
+  }
+
+  path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+
+  dt {
+    color: var(--on-surface-variant);
+  }
+
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
+.numero {
+  font-weight: 600;
+}
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.documentos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.documento {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radio-control);
+}
+
+.huella {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  a {
+    text-decoration: none;
+  }
+}

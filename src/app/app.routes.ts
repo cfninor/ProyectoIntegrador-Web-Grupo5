@@ -113,6 +113,25 @@ function firma(actor: Actor): Route {
   };
 }
 
+/**
+ * SOLV-WEB-11, paso 5: la confirmación de la emisión (SOLVENTAG5-58, D12). Se abre por su ruta con
+ * `?solicitudId=`: se llega desde «Emitir póliza» o «Ver confirmación» de la tarjeta de firma.
+ */
+function emision(actor: Actor): Route {
+  return {
+    path: 'cotizar/oferta/:cotizacionId/emision',
+    title: $localize`:@@emision.tituloPestana:Emisión · Solventa`,
+    data: {
+      ...datosPagina(
+        $localize`:@@emision.miga:Cotizar / Emisión`,
+        $localize`:@@emision.tituloPagina:Emisión`,
+      ),
+      actor,
+    },
+    loadComponent: () => import('./features/poliza/pagina-emision').then((m) => m.PaginaEmision),
+  };
+}
+
 const DATOS_PERFIL_RIESGO = datosPagina(
   $localize`:@@perfilRiesgo.miga:Suscripción / Perfil de riesgo`,
   $localize`:@@perfilRiesgo.titulo:Perfil de riesgo de la solicitud`,
@@ -187,6 +206,7 @@ export const routes: Routes = [
     suscripcion('asesor'),
     pago('asesor'),
     firma('asesor'),
+    emision('asesor'),
   ]),
   portal('CLIENTE', [
     tablero,
@@ -195,6 +215,7 @@ export const routes: Routes = [
     suscripcion('cliente'),
     pago('cliente'),
     firma('cliente'),
+    emision('cliente'),
     misAutorizaciones,
   ]),
   portal('ANALISTA_RIESGO', [

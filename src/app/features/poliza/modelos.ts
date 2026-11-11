@@ -1,8 +1,9 @@
 /**
- * `EstadoPoliza` del contrato del BFF web 1.6.0: PENDIENTE_FIRMA al generarse (SOLVENTAG5-56) y
- * CANCELADA si el cliente no firma en 72 horas (SOLVENTAG5-57, CA5).
+ * `EstadoPoliza` del contrato del BFF web 1.7.0: PENDIENTE_FIRMA al generarse (SOLVENTAG5-56),
+ * CANCELADA si el cliente no firma en 72 horas (SOLVENTAG5-57, CA5) y VIGENTE al emitirse
+ * (SOLVENTAG5-58, CA1).
  */
-export type EstadoPoliza = 'PENDIENTE_FIRMA' | 'CANCELADA';
+export type EstadoPoliza = 'PENDIENTE_FIRMA' | 'CANCELADA' | 'VIGENTE';
 
 /** GENERANDO desde que se crea la póliza hasta que el PDF queda guardado; GENERADO después. */
 export type EstadoDocumentoPoliza = 'GENERANDO' | 'GENERADO';
@@ -42,6 +43,14 @@ export interface Poliza extends DatosVistaPrevia {
     /** Solo en GENERADO: certifica la firma (SOLVENTAG5-57). */
     huella?: string;
   };
+  /** Solo en VIGENTE (SOLVENTAG5-58, D4): `SV-VH-2026-004821`. */
+  numeroPoliza?: string;
+  /** Solo en VIGENTE: cuándo se emitió, en UTC. */
+  emitidaEn?: string;
+  /** Solo en VIGENTE (D6). */
+  proximoCobro?: ProximoCobro;
+  /** Solo en VIGENTE (D9): los documentos que recibió el cliente al emitirse la póliza. */
+  documentos?: DocumentosPoliza;
 }
 
 /** El cuerpo `Error` del 409 de `generarPolizaParaFirma`. */
@@ -157,4 +166,41 @@ export interface ErrorFirma {
   codigo: string;
   detalle: string;
   intentosRestantes?: number;
+}
+
+// --- Emisión (SOLVENTAG5-58) -------------------------------------------------------------------
+
+/** `ProximoCobro` del contrato: un periodo después de `vigenciaDesde`, por la prima (D6). */
+export interface ProximoCobro {
+  /** Fecha de calendario (`2026-12-06`). */
+  fecha: string;
+  valor: number;
+  moneda: string;
+}
+
+/** `ComprobantePago` del contrato: el cobro aprobado de la primera prima, sin el número completo. */
+export interface ComprobantePago {
+  pagoId: string;
+  referencia: string;
+  marca: string;
+  ultimos4: string;
+  monto: number;
+  moneda: string;
+  aprobadoEn: string;
+}
+
+/** `DocumentosPoliza` del contrato (D9): el certificado de la firma y el comprobante del pago. */
+export interface DocumentosPoliza {
+  certificadoFirma: CertificadoFirma;
+  comprobantePago: ComprobantePago;
+}
+
+/** Por qué una póliza no se emite (`MotivoPolizaNoEmitible`, D3). */
+export type MotivoPolizaNoEmitible = 'POLIZA_CANCELADA' | 'FIRMA_PENDIENTE' | 'PAGO_NO_APROBADO';
+
+/** El cuerpo `Error` del 409 POLIZA_NO_EMITIBLE de `emitirPoliza` (R9). */
+export interface ErrorEmision {
+  codigo: string;
+  detalle: string;
+  motivo?: MotivoPolizaNoEmitible;
 }
