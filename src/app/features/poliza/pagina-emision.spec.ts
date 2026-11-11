@@ -209,25 +209,31 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
     });
 
     it('un doble clic en «Ver póliza» pide el PDF una sola vez', async () => {
-      simularDescarga();
+      const { clic } = simularDescarga();
       const { http, detectChanges } = await conPoliza(POLIZA_EMITIDA);
       const usuario = userEvent.setup();
 
       await usuario.dblClick(screen.getByRole('button', { name: 'Ver póliza' }));
       detectChanges();
 
-      http.expectOne(URL_DOCUMENTO).flush(new Blob(['%PDF-']));
+      const peticiones = http.match(URL_DOCUMENTO);
+      expect(peticiones).toHaveLength(1);
+      peticiones[0].flush(new Blob(['%PDF-']));
+      expect(clic).toHaveBeenCalledTimes(1);
     });
 
     it('dos clics seguidos en «Ver póliza», antes de volver a pintar, piden el PDF una vez', async () => {
-      simularDescarga();
+      const { clic } = simularDescarga();
       const { http } = await conPoliza(POLIZA_EMITIDA);
       const boton = screen.getByRole('button', { name: 'Ver póliza' });
 
       boton.click();
       boton.click();
 
-      http.expectOne(URL_DOCUMENTO).flush(new Blob(['%PDF-']));
+      const peticiones = http.match(URL_DOCUMENTO);
+      expect(peticiones).toHaveLength(1);
+      peticiones[0].flush(new Blob(['%PDF-']));
+      expect(clic).toHaveBeenCalledTimes(1);
     });
 
     it('si el PDF no llega lo dice y se puede intentar de nuevo', async () => {

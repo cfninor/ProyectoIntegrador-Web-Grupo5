@@ -101,13 +101,16 @@ describe('TarjetaFirma · emisión (SOLVENTAG5-58)', () => {
   });
 
   it('dos clics seguidos, antes de volver a pintar, también emiten una sola vez', async () => {
-    const { http } = await renderizar(FIRMA_FIRMADA);
+    const { http, navegar } = await renderizar(FIRMA_FIRMADA);
     const boton = emitir()!;
 
     boton.click();
     boton.click();
 
-    http.expectOne(URL_EMISION).flush(POLIZA_EMITIDA, { status: 201, statusText: 'Created' });
+    const peticiones = http.match(URL_EMISION);
+    expect(peticiones).toHaveLength(1);
+    peticiones[0].flush(POLIZA_EMITIDA, { status: 201, statusText: 'Created' });
+    expect(navegar).toHaveBeenCalledTimes(1);
   });
 
   it('con la firma en curso no ofrece emitir', async () => {
@@ -207,13 +210,16 @@ describe('TarjetaFirma · emisión (SOLVENTAG5-58)', () => {
   });
 
   it('se puede emitir con el teclado', async () => {
-    const { http } = await renderizar(FIRMA_FIRMADA);
+    const { http, navegar } = await renderizar(FIRMA_FIRMADA);
     const usuario = userEvent.setup();
 
     emitir()!.focus();
     await usuario.keyboard('{Enter}');
 
     http.expectOne(URL_EMISION).flush(POLIZA_EMITIDA, { status: 201, statusText: 'Created' });
+    expect(navegar).toHaveBeenCalledWith([RUTA_EMISION], {
+      queryParams: { solicitudId: SOLICITUD_ID_POLIZA },
+    });
   });
 
   it('al destruirse cancela la emisión en curso', async () => {
