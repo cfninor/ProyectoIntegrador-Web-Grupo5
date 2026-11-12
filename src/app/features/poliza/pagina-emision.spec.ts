@@ -9,6 +9,7 @@ import {
   HUELLA,
   NO_EMITIBLE,
   POLIZA_EMITIDA,
+  POLIZA_EMITIDA_SIN_DETALLE,
   POLIZA_GENERADA,
   POLIZA_ID,
   SOLICITUD_ID_POLIZA,
@@ -19,10 +20,13 @@ import { Poliza } from './modelos';
 import { PaginaEmision } from './pagina-emision';
 
 // SOLV-WEB-11, la confirmación de la emisión (SOLVENTAG5-58, D12): cada estado, la voz del asesor
-// y del cliente, los datos y los documentos de la póliza emitida, «Ver póliza» y el foco.
+// y del cliente, los datos y los documentos de la póliza emitida, «Ver póliza» y el foco. Como en
+// el núcleo, `generarPolizaParaFirma` devuelve la póliza VIGENTE sin el próximo cobro ni los
+// documentos, y `obtenerPoliza` la devuelve completa (D9 del contrato 1.7.0).
 
 const BFF = 'http://bff.prueba';
 const URL_GENERAR = `${BFF}/v1/solicitudes-suscripcion/${SOLICITUD_ID_POLIZA}/poliza`;
+const URL_POLIZA = `${BFF}/v1/polizas/${POLIZA_ID}`;
 const URL_DOCUMENTO = `${BFF}/v1/polizas/${POLIZA_ID}/documento`;
 
 let http: HttpTestingController | undefined;
@@ -51,10 +55,11 @@ async function renderizar(
   return { ...vista, http };
 }
 
-/** Renderiza con la póliza ya consultada. */
+/** Renderiza con la póliza VIGENTE del POST y la `poliza` completa del GET. */
 async function conPoliza(poliza: Poliza, actor: Actor = 'cliente') {
   const vista = await renderizar(actor);
-  vista.http.expectOne(URL_GENERAR).flush(poliza);
+  vista.http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+  vista.http.expectOne({ method: 'GET', url: URL_POLIZA }).flush(poliza);
   vista.detectChanges();
   await vista.fixture.whenStable();
   return vista;
@@ -84,7 +89,21 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
     expect(peticion.request.method).toBe('POST');
     expect(peticion.request.body).toBeNull();
     expect(titulo()).toHaveTextContent('Consultando la póliza…');
-    peticion.flush(POLIZA_EMITIDA);
+    peticion.flush(POLIZA_GENERADA);
+  });
+
+  it('con la póliza VIGENTE la consulta por GET y sigue cargando hasta tenerla', async () => {
+    const { http, detectChanges } = await renderizar();
+    http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+    detectChanges();
+
+    const consulta = http.expectOne(URL_POLIZA);
+    expect(consulta.request.method).toBe('GET');
+    expect(titulo()).toHaveTextContent('Consultando la póliza…');
+    consulta.flush(POLIZA_EMITIDA);
+    detectChanges();
+
+    expect(titulo()).toHaveTextContent('¡Tu póliza fue emitida!');
   });
 
   describe('con la póliza emitida', () => {
@@ -94,6 +113,11 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
       expect(screen.getByRole('img', { name: 'Póliza emitida' })).toBeInTheDocument();
       expect(titulo()).toHaveTextContent('¡Tu póliza fue emitida!');
       expect(titulo()).toHaveFocus();
+      expect(dato('Próximo cobro')).toHaveTextContent('06/12/2026 por $ 70.000');
+      expect(
+        screen.getByRole('article', { name: 'Certificado de firma electrónica' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('article', { name: 'Comprobante de pago' })).toBeInTheDocument();
       expect(screen.getByText(/Tu póliza quedó formalizada y vigente/)).toBeInTheDocument();
       expect(
         screen.getByText(
@@ -107,6 +131,11 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
 
       expect(titulo()).toHaveTextContent('La póliza del cliente fue emitida');
       expect(titulo()).toHaveFocus();
+      expect(dato('Próximo cobro')).toHaveTextContent('06/12/2026 por $ 70.000');
+      expect(
+        screen.getByRole('article', { name: 'Certificado de firma electrónica' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('article', { name: 'Comprobante de pago' })).toBeInTheDocument();
       expect(screen.getByText(/El cliente ya la tiene disponible/)).toBeInTheDocument();
       expect(
         screen.getByText(
@@ -262,6 +291,7 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
       detectChanges();
       await fixture.whenStable();
 
+      http.expectNone(URL_POLIZA);
       expect(titulo()).toHaveTextContent('La póliza todavía no está emitida');
       expect(titulo()).toHaveFocus();
       expect(screen.getByRole('link', { name: 'Ir a la firma' })).toHaveAttribute(
@@ -294,10 +324,44 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
       expect(titulo()).toHaveTextContent('No pudimos consultar la póliza');
 
       screen.getByRole('button', { name: 'Reintentar' }).click();
-      http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA);
+      http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+      http.expectOne(URL_POLIZA).flush(POLIZA_EMITIDA);
       detectChanges();
 
       expect(titulo()).toHaveTextContent('¡Tu póliza fue emitida!');
+    });
+  });
+
+  describe('si falla la consulta de la póliza VIGENTE', () => {
+    async function conConsultaFallida(status: number) {
+      const vista = await renderizar();
+      vista.http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+      vista.http.expectOne(URL_POLIZA).flush(null, { status, statusText: 'x' });
+      vista.detectChanges();
+      await vista.fixture.whenStable();
+      return vista;
+    }
+
+    it('un error lo dice y «Reintentar» la vuelve a pedir hasta la confirmación', async () => {
+      const { http, detectChanges } = await conConsultaFallida(503);
+      expect(titulo()).toHaveTextContent('No pudimos consultar la póliza');
+      expect(titulo()).toHaveFocus();
+      expect(screen.queryByRole('img', { name: 'Póliza emitida' })).not.toBeInTheDocument();
+
+      screen.getByRole('button', { name: 'Reintentar' }).click();
+      http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+      http.expectOne(URL_POLIZA).flush(POLIZA_EMITIDA);
+      detectChanges();
+
+      expect(titulo()).toHaveTextContent('¡Tu póliza fue emitida!');
+      expect(dato('Próximo cobro')).toHaveTextContent('06/12/2026 por $ 70.000');
+    });
+
+    it('si la póliza no existe (404) lo dice', async () => {
+      await conConsultaFallida(404);
+
+      expect(titulo()).toHaveTextContent('No encontramos esta solicitud de suscripción');
+      expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument();
     });
   });
 
@@ -308,5 +372,15 @@ describe('PaginaEmision · SOLV-WEB-11', () => {
     fixture.destroy();
 
     expect(peticion.cancelled).toBe(true);
+  });
+
+  it('al destruirse cancela la consulta de la póliza VIGENTE en curso', async () => {
+    const { http, fixture } = await renderizar();
+    http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+    const consulta = http.expectOne(URL_POLIZA);
+
+    fixture.destroy();
+
+    expect(consulta.cancelled).toBe(true);
   });
 });

@@ -2,7 +2,9 @@ import { expect, Page, Route, test } from '@playwright/test';
 
 import { FIRMA_FIRMADA } from '../src/testing/fixtures-firma';
 import {
+  HUELLA,
   POLIZA_EMITIDA,
+  POLIZA_EMITIDA_SIN_DETALLE,
   POLIZA_GENERADA,
   POLIZA_ID,
   SOLICITUD_ID_POLIZA,
@@ -36,9 +38,11 @@ const rutaEmision = (actor: Actor) =>
   `/${actor}/cotizar/oferta/${COTIZACION_ID}/emision?solicitudId=${SOLICITUD_ID_POLIZA}`;
 
 /**
- * El BFF de la póliza firmada: generar y consultar responden la póliza PENDIENTE_FIRMA hasta que se
- * emite y la VIGENTE después; la firma está FIRMADA; emitir responde 201 la primera vez y 200
- * después. Anota cada petición como «MÉTODO ruta».
+ * El BFF de la póliza firmada, como el núcleo: generar y consultar responden la póliza
+ * PENDIENTE_FIRMA hasta que se emite y la VIGENTE después. Generar la devuelve VIGENTE sin el
+ * próximo cobro ni los documentos (D9 del contrato 1.7.0); consultar y emitir, completa. La firma
+ * está FIRMADA; emitir responde 201 la primera vez y 200 después. Anota cada petición como
+ * «MÉTODO ruta».
  */
 async function simularBff(page: Page, actor: Actor, emitida = false): Promise<string[]> {
   const peticiones: string[] = [];
@@ -57,10 +61,11 @@ async function simularBff(page: Page, actor: Actor, emitida = false): Promise<st
     peticiones.push(clave);
     const responder = (status: number, json: unknown) =>
       route.fulfill({ status, headers: CORS, json });
-    const poliza = () => (vigente ? POLIZA_EMITIDA : POLIZA_GENERADA);
     switch (clave) {
       case `POST /v1/solicitudes-suscripcion/${SOLICITUD_ID_POLIZA}/poliza`:
-        return responder(200, poliza());
+        return responder(200, vigente ? POLIZA_EMITIDA_SIN_DETALLE : POLIZA_GENERADA);
+      case `GET /v1/polizas/${POLIZA_ID}`:
+        return responder(200, vigente ? POLIZA_EMITIDA : POLIZA_GENERADA);
       case `GET /v1/polizas/${POLIZA_ID}/firma`:
         return responder(200, FIRMA_FIRMADA);
       case `POST /v1/polizas/${POLIZA_ID}/emision`: {
@@ -106,9 +111,18 @@ test.describe('en español', () => {
     await expect(page.getByRole('img', { name: 'Póliza emitida' })).toBeVisible();
     await expect(page.getByText('SV-VH-2026-004821')).toBeVisible();
     await expect(page.getByText('06/12/2026 por $ 70.000')).toBeVisible();
+    await expect(
+      page.getByRole('article', { name: 'Certificado de firma electrónica' }),
+    ).toContainText(HUELLA);
     await expect(page.getByRole('article', { name: 'Comprobante de pago' })).toContainText(
       'VISA •••• 4242',
     );
+    await expect(
+      page.getByText(
+        'Enviamos al cliente la póliza, el certificado de firma y el comprobante de pago.',
+      ),
+    ).toBeVisible();
+    expect(peticiones).toContain(`GET /v1/polizas/${POLIZA_ID}`);
 
     // «Ver póliza» entrega el PDF firmado.
     const descarga = page.waitForEvent('download');
@@ -130,6 +144,13 @@ test.describe('en español', () => {
     await expect(
       page.getByRole('heading', { level: 2, name: '¡Tu póliza fue emitida!' }),
     ).toBeFocused();
+    await expect(page.getByText('06/12/2026 por $ 70.000')).toBeVisible();
+    await expect(
+      page.getByRole('article', { name: 'Certificado de firma electrónica' }),
+    ).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Comprobante de pago' })).toContainText(
+      'VISA •••• 4242',
+    );
     await expect(
       page.getByText('Te enviamos la póliza, el certificado de firma y el comprobante de pago.'),
     ).toBeVisible();
@@ -162,5 +183,11 @@ test.describe('en inglés', () => {
       page.getByRole('heading', { level: 2, name: "The client's policy was issued" }),
     ).toBeFocused();
     await expect(page.getByText('Dec 6, 2026 for $70,000')).toBeVisible();
+    await expect(
+      page.getByRole('article', { name: 'Electronic signature certificate' }),
+    ).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Payment receipt' })).toContainText(
+      'VISA •••• 4242',
+    );
   });
 });

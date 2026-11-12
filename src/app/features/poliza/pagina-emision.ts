@@ -42,12 +42,14 @@ type Descarga = 'inactiva' | 'descargando' | 'error';
  * de firma lleva aquí.
  *
  * Al abrir pide la póliza de la solicitud (`generarPolizaParaFirma`, que devuelve la misma si ya
- * existe). Si todavía no está VIGENTE, un estado que lleva a la firma. Emitida, muestra el indicador
- * de pasos completo, el ícono verde y el mensaje en la voz del actor (tercera persona para el asesor
- * y segunda para el cliente), el número de póliza, el tomador con el documento enmascarado, la fecha
- * de inicio y el próximo cobro, y los documentos que recibió el cliente: el certificado de firma y el
- * comprobante de pago. «Ver póliza» entrega el PDF firmado (`descargarDocumentoPoliza`, como la
- * descarga de SOLV-WEB-10). Al cargar, el foco va al título (WCAG 2.1 AA).
+ * existe). Si todavía no está VIGENTE, un estado que lleva a la firma. Si está VIGENTE, la vuelve a
+ * pedir con `obtenerPoliza`, que trae el próximo cobro y los documentos. Emitida, muestra el
+ * indicador de pasos completo, el ícono verde y el mensaje en la voz del actor (tercera persona
+ * para el asesor y segunda para el cliente), el número de póliza, el tomador con el documento
+ * enmascarado, la fecha de inicio y el próximo cobro, y los documentos que recibió el cliente: el
+ * certificado de firma y el comprobante de pago. «Ver póliza» entrega el PDF firmado
+ * (`descargarDocumentoPoliza`, como la descarga de SOLV-WEB-10). Al cargar, el foco va al título
+ * (WCAG 2.1 AA).
  */
 @Component({
   selector: 'app-pagina-emision',
@@ -132,15 +134,21 @@ export class PaginaEmision implements OnInit {
     this.cargar();
   }
 
-  /** Pide la póliza de la solicitud; emitida, la confirmación; si no, el estado que corresponde. */
+  /**
+   * Pide la póliza de la solicitud; si está VIGENTE, la consulta completa; si no, el estado que
+   * corresponde.
+   */
   protected cargar(): void {
     this.peticion?.unsubscribe();
     this.carga.set({ tipo: 'cargando' });
     this.peticion = this.api.generar(this.idSolicitud).subscribe({
-      next: (poliza) =>
-        this.mostrar(
-          poliza.estado === 'VIGENTE' ? { tipo: 'emitida', poliza } : { tipo: 'no-vigente' },
-        ),
+      next: (poliza) => {
+        if (poliza.estado === 'VIGENTE') {
+          this.consultarEmitida(poliza.polizaId);
+        } else {
+          this.mostrar({ tipo: 'no-vigente' });
+        }
+      },
       error: (error: HttpErrorResponse) => {
         if (error.status === 404) {
           this.mostrar({ tipo: 'no-encontrada' });
@@ -151,6 +159,18 @@ export class PaginaEmision implements OnInit {
           this.mostrar({ tipo: 'error' });
         }
       },
+    });
+  }
+
+  /**
+   * La póliza emitida con el próximo cobro y los documentos, que el núcleo solo agrega en
+   * `obtenerPoliza` (D9 del contrato 1.7.0): `generarPolizaParaFirma` no los trae.
+   */
+  private consultarEmitida(polizaId: string): void {
+    this.peticion = this.api.obtener(polizaId).subscribe({
+      next: (poliza) => this.mostrar({ tipo: 'emitida', poliza }),
+      error: (error: HttpErrorResponse) =>
+        this.mostrar(error.status === 404 ? { tipo: 'no-encontrada' } : { tipo: 'error' }),
     });
   }
 
