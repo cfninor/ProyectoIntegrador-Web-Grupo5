@@ -8,6 +8,7 @@ import { render, screen, within } from '@testing-library/angular';
 
 import {
   POLIZA_EMITIDA,
+  POLIZA_EMITIDA_SIN_DETALLE,
   POLIZA_GENERADA,
   SOLICITUD_ID_POLIZA,
 } from '../../../testing/fixtures-poliza';
@@ -21,6 +22,7 @@ import { PaginaEmision } from './pagina-emision';
 
 const BFF = 'http://bff.prueba';
 const URL_GENERAR = `${BFF}/v1/solicitudes-suscripcion/${SOLICITUD_ID_POLIZA}/poliza`;
+const URL_POLIZA = `${BFF}/v1/polizas/${POLIZA_EMITIDA.polizaId}`;
 
 let http: HttpTestingController | undefined;
 
@@ -41,7 +43,13 @@ async function conPoliza(poliza: Poliza, actor: Actor) {
     ],
   });
   http = TestBed.inject(HttpTestingController);
-  http.expectOne(URL_GENERAR).flush(poliza);
+  // Como el núcleo: el POST trae la póliza VIGENTE sin el detalle y el GET, completa.
+  if (poliza.estado === 'VIGENTE') {
+    http.expectOne(URL_GENERAR).flush(POLIZA_EMITIDA_SIN_DETALLE);
+    http.expectOne(URL_POLIZA).flush(poliza);
+  } else {
+    http.expectOne(URL_GENERAR).flush(poliza);
+  }
   vista.detectChanges();
   return vista;
 }
@@ -82,6 +90,11 @@ describe('PaginaEmision · SOLV-WEB-11 en inglés', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
       "The client's policy was issued",
     );
+    expect(dato('Next charge')).toHaveTextContent('Dec 6, 2026 for $70,000');
+    expect(
+      screen.getByRole('article', { name: 'Electronic signature certificate' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Payment receipt' })).toBeInTheDocument();
     expect(
       screen.getByText(
         'We sent the client the policy, the signature certificate and the payment receipt.',

@@ -106,6 +106,16 @@ export const POLIZA_EMITIDA: Poliza = {
   },
 };
 
+/**
+ * La póliza VIGENTE como la devuelve `generarPolizaParaFirma` del núcleo: con el número y la fecha
+ * de emisión, sin el próximo cobro ni los documentos (D9 del contrato 1.7.0).
+ */
+export const POLIZA_EMITIDA_SIN_DETALLE: Poliza = {
+  ...POLIZA_EMITIDA,
+  proximoCobro: undefined,
+  documentos: undefined,
+};
+
 /** El cuerpo de cada 409 POLIZA_NO_EMITIBLE de `emitirPoliza` (D3, R9), como en el contrato. */
 export const POLIZA_NO_EMITIBLE = {
   POLIZA_CANCELADA: {
