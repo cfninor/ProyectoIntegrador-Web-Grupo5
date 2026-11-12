@@ -34,7 +34,7 @@
     "@angular/compiler-cli": "^22.2.4",
     "@angular/localize": "^22.2.4",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@testing-library/angular": "^19.6.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
