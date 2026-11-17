@@ -78,14 +78,41 @@
       <dd>{{ prima() }}</dd>
     </dl>
 
-    @if (resultadoPago(); as pago) {
-      @switch (pago.estado) {
-        @case ('APROBADO') {
-          <p role="status" i18n="@@pago.aprobado">Tu pago quedó aprobado.</p>
-          <dl class="resumen">
+    @if (estadoCobro().tipo === 'consultando') {
+      <p role="status" i18n="@@pago.consultando">Consultando si la póliza ya tiene un pago…</p>
+    } @else if (estadoCobro().tipo === 'error-consulta') {
+      <p role="alert" i18n="@@pago.errorConsulta">
+        No pudimos consultar el pago de la póliza. Intenta de nuevo en unos segundos.
+      </p>
+      <button
+        type="button"
+        class="boton-secundario"
+        (click)="consultar(p.polizaId)"
+        i18n="@@pago.reintentar"
+      >
+        Reintentar
+      </button>
+    } @else if (resultado(); as r) {
+      @if (r.existente) {
+        <p role="status" i18n="@@pago.existente">Esta póliza ya tiene un pago.</p>
+        <dl class="resumen">
+          <dt i18n="@@pago.estado">Estado</dt>
+          <dd>{{ nombresEstado[r.pago.estado] }}</dd>
+          @if (r.pago.marca) {
             <dt i18n="@@pago.marca">Tarjeta</dt>
-            <dd>{{ pago.marca }} •••• {{ pago.ultimos4 }}</dd>
-          </dl>
+            <dd>{{ r.pago.marca }} •••• {{ r.pago.ultimos4 }}</dd>
+          }
+        </dl>
+      }
+      @switch (r.pago.estado) {
+        @case ('APROBADO') {
+          @if (!r.existente) {
+            <p role="status" i18n="@@pago.aprobado">Tu pago quedó aprobado.</p>
+            <dl class="resumen">
+              <dt i18n="@@pago.marca">Tarjeta</dt>
+              <dd>{{ r.pago.marca }} •••• {{ r.pago.ultimos4 }}</dd>
+            </dl>
+          }
           <div class="acciones">
             <a
               class="boton-primario"
@@ -116,11 +143,21 @@
           <button
             type="button"
             class="boton-secundario"
-            (click)="volverAIntentar()"
-            i18n="@@pago.volverAConsultar"
+            (click)="consultar(p.polizaId)"
+            i18n="@@pago.consultarDeNuevo"
           >
-            Volver a consultar
+            Consultar de nuevo
           </button>
+        }
+        @case ('REVERSADO') {
+          <p role="status" i18n="@@pago.reversado">
+            El pago se devolvió porque la póliza no se firmó a tiempo.
+          </p>
+          <div class="acciones">
+            <a class="boton-secundario" [routerLink]="rutaTablero()" i18n="@@pago.irTablero"
+              >Ir al tablero</a
+            >
+          </div>
         }
       }
     } @else if (estadoCobro().tipo === 'en-curso') {
@@ -149,6 +186,11 @@
       </button>
     } @else {
       <form class="formulario-tarjeta" [formGroup]="formulario" (ngSubmit)="pagar()">
+        @if (rechazoAnterior()) {
+          <p role="alert" i18n="@@pago.rechazoAnterior">
+            El pago anterior de esta póliza fue rechazado. Intenta de nuevo con otra tarjeta.
+          </p>
+        }
         @if (estadoCobro().tipo === 'error-tokenizacion') {
           <p role="alert" i18n="@@pago.errorTokenizacion">
             No pudimos procesar la tarjeta. Revisa los datos e intenta de nuevo.

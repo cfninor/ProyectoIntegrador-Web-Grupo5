@@ -67,8 +67,12 @@ export interface ErrorPoliza {
 /** Único medio soportado por ahora (D2 de la SOLVENTAG5-74). */
 export type MedioPago = 'TARJETA';
 
-/** `EstadoPago` del contrato: PROCESANDO mientras la pasarela no responde a tiempo (R3). */
-export type EstadoPago = 'PROCESANDO' | 'APROBADO' | 'RECHAZADO';
+/**
+ * `EstadoPago` del contrato: PROCESANDO mientras la pasarela no responde a tiempo (R3), y se sigue
+ * con la consulta del cobro (SOLVENTAG5-75). REVERSADO es un APROBADO que se devolvió cuando la
+ * firma venció (SOLVENTAG5-57, CA5): solo llega en la consulta de una póliza CANCELADA.
+ */
+export type EstadoPago = 'PROCESANDO' | 'APROBADO' | 'RECHAZADO' | 'REVERSADO';
 
 /** El token que entrega `POST /tokenizaciones` del simulador de la pasarela (nunca el PAN). */
 export interface TokenTarjeta {
@@ -94,17 +98,54 @@ export interface Pago {
   medio: MedioPago;
   creadoEn: string;
   actualizadoEn?: string;
-  /** Solo cuando la pasarela ya respondió (APROBADO o RECHAZADO); en PROCESANDO, ausente. */
+  /**
+   * Cuando la pasarela decidió el cobro (APROBADO o RECHAZADO) y en REVERSADO. Ausentes en
+   * PROCESANDO y en un RECHAZADO porque la pasarela nunca recibió el cobro (SOLVENTAG5-75, R4).
+   */
   referenciaPasarela?: string;
   marca?: string;
   ultimos4?: string;
   vencimiento?: string;
 }
 
-/** El cuerpo `Error` de los 409/422 del cobro (SOLVENTAG5-121: clave de idempotencia). */
+/**
+ * El resultado de `cobrarPrimaPoliza`: el pago y si ya existía. Con `existente` (200), la póliza
+ * ya tenía un pago APROBADO o PROCESANDO y no se cobró otra vez (D2 de la SOLVENTAG5-75); sin él
+ * (201), es un intento nuevo.
+ */
+export interface ResultadoCobro {
+  pago: Pago;
+  existente: boolean;
+}
+
+/** `IntentoCobro` del contrato (SOLVENTAG5-75): un intento de cobro de la póliza. */
+export interface IntentoCobro {
+  pagoId: string;
+  estado: EstadoPago;
+  canal: 'web' | 'movil';
+  creadoEn: string;
+}
+
+/**
+ * `CobroPoliza` del contrato (SOLVENTAG5-75, D6): el pago vigente (APROBADO o PROCESANDO) o, si no
+ * hay, el intento más reciente, y los intentos del más antiguo al más reciente.
+ */
+export interface CobroPoliza {
+  pago: Pago;
+  intentos: IntentoCobro[];
+}
+
+/**
+ * El cuerpo `Error` de los 409/422 del cobro (SOLVENTAG5-121: clave de idempotencia) y del 404 de
+ * la consulta del cobro (COBRO_NO_ENCONTRADO, SOLVENTAG5-75).
+ */
 export interface ErrorPago {
   codigo:
-    'POLIZA_NO_PAGABLE' | 'CLAVE_IDEMPOTENCIA_EN_CURSO' | 'CLAVE_IDEMPOTENCIA_REUTILIZADA' | string;
+    | 'POLIZA_NO_PAGABLE'
+    | 'CLAVE_IDEMPOTENCIA_EN_CURSO'
+    | 'CLAVE_IDEMPOTENCIA_REUTILIZADA'
+    | 'COBRO_NO_ENCONTRADO'
+    | string;
   detalle: string;
 }
 

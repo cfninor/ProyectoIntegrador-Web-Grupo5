@@ -54,12 +54,64 @@ describe('PagoApi · SOLVENTAG5-74', () => {
     expect(peticion.request.method).toBe('POST');
     expect(peticion.request.body).toEqual({ medioPago: 'TARJETA', token: 'tok-1' });
     expect(peticion.request.headers.get('Idempotency-Key')).toBe('clave-1');
-    peticion.flush({ pagoId: 'pg-1', polizaId: 'p/1', estado: 'APROBADO' });
+    peticion.flush(
+      { pagoId: 'pg-1', polizaId: 'p/1', estado: 'APROBADO' },
+      { status: 201, statusText: 'Created' },
+    );
 
     await expect(respuesta).resolves.toEqual({
-      pagoId: 'pg-1',
-      polizaId: 'p/1',
-      estado: 'APROBADO',
+      pago: { pagoId: 'pg-1', polizaId: 'p/1', estado: 'APROBADO' },
+      existente: false,
     });
+  });
+
+  it('un 200 del cobro es el pago que la póliza ya tenía (SOLVENTAG5-75, D2)', async () => {
+    const respuesta = firstValueFrom(
+      api.cobrar('p-1', { medioPago: 'TARJETA', token: 'tok-2' }, 'clave-2'),
+    );
+
+    http
+      .expectOne('http://bff.prueba/v1/polizas/p-1/cobro')
+      .flush({ pagoId: 'pg-1', polizaId: 'p-1', estado: 'PROCESANDO' });
+
+    await expect(respuesta).resolves.toEqual({
+      pago: { pagoId: 'pg-1', polizaId: 'p-1', estado: 'PROCESANDO' },
+      existente: true,
+    });
+  });
+});
+
+describe('PagoApi · consulta del cobro (SOLVENTAG5-75)', () => {
+  let api: PagoApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: APP_CONFIG, useValue: { apiBaseUrl: 'http://bff.prueba', pasarelaUrl: '' } },
+      ],
+    });
+    api = TestBed.inject(PagoApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('consulta por GET /v1/polizas/{polizaId}/cobro, sin Idempotency-Key ni cuerpo', async () => {
+    const cobro = {
+      pago: { pagoId: 'pg-1', polizaId: 'p/1', estado: 'APROBADO' },
+      intentos: [{ pagoId: 'pg-1', estado: 'APROBADO', canal: 'web', creadoEn: 'x' }],
+    };
+    const respuesta = firstValueFrom(api.obtenerCobro('p/1'));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/polizas/p%2F1/cobro');
+    expect(peticion.request.method).toBe('GET');
+    expect(peticion.request.headers.has('Idempotency-Key')).toBe(false);
+    expect(peticion.request.body).toBeNull();
+    peticion.flush(cobro);
+
+    await expect(respuesta).resolves.toEqual(cobro);
   });
 });
