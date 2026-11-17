@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.9.0
+  version: 1.10.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -57,7 +57,9 @@ tags:
       prima antes de continuar a cobro y emisión (SOLVENTAG5-56). El analista de riesgo ve en su
       bandeja las solicitudes que la decisión automática dejó EN_REVISION (SOLVENTAG5-52) y abre
       cada una para revisarla con sus reglas, su perfil y la verificación de sus registros
-      (SOLVENTAG5-53).
+      (SOLVENTAG5-53). Allí registra su decisión: aceptar, ajustar con un recargo o rechazar,
+      con su justificación (SOLVENTAG5-54); la consulta de la solicitud, la póliza, el cobro y
+      el canal móvil la leen de la misma fuente, con decididaPor en ANALISTA.
   - name: polizas
     description: >
       Póliza preparada para firma electrónica (SOLVENTAG5-56). Se genera desde una solicitud de
@@ -787,7 +789,10 @@ paths:
         SOLICITUD_SUSCRIPCION_NO_ENCONTRADA, para no revelar que existe; igual con la sesión del
         asesor si la solicitud no está en su cartera. El analista de riesgo consulta cualquier
         solicitud. Con una solicitud AJUSTADA, primaAjustadaAceptadaEn dice cuándo aceptó el
-        cliente la nueva prima (SOLVENTAG5-56).
+        cliente la nueva prima (SOLVENTAG5-56). Si la solicitud pasó por revisión y la decidió un
+        analista de riesgo (SOLVENTAG5-54), decision trae su resultado y su prima, con
+        decididaPor en ANALISTA; la justificación solo la ve el analista, en
+        obtenerRevisionSolicitud.
       x-roles: [ASESOR, CLIENTE, ANALISTA_RIESGO]
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
@@ -815,6 +820,8 @@ paths:
                   $ref: '#/components/examples/SolicitudSuscripcionRechazada'
                 enRevision:
                   $ref: '#/components/examples/SolicitudSuscripcionEnRevision'
+                ajustadaPorAnalista:
+                  $ref: '#/components/examples/SolicitudSuscripcionAjustadaPorAnalista'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -886,7 +893,9 @@ paths:
         la foto del perfil no coincide con la que guardó la solicitud, perfilRiesgo.coincide llega
         en false, sin el perfil, en lugar del 409 de obtenerPerfilRiesgoSolicitud. Solo lee: no
         cambia el estado. Una solicitud que ya no está EN_REVISION llega con su estado y su
-        resultado, y ninguna regla queda sin resolver. Solo para el analista de riesgo.
+        resultado, y ninguna regla queda sin resolver; si la decidió un analista
+        (registrarDecisionAnalista), trae además decisionAnalista. Solo para el analista de
+        riesgo.
       x-roles: [ANALISTA_RIESGO]
       parameters:
         - $ref: '#/components/parameters/SolicitudSuscripcionId'
@@ -906,6 +915,8 @@ paths:
                   $ref: '#/components/examples/RevisionConAvisos'
                 yaDecidida:
                   $ref: '#/components/examples/RevisionYaDecidida'
+                ajustadaPorAnalista:
+                  $ref: '#/components/examples/RevisionAjustadaPorAnalista'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -914,6 +925,90 @@ paths:
           $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
         '422':
           $ref: '#/components/responses/Validacion'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+  /v1/solicitudes-suscripcion/{solicitudId}/decision:
+    post:
+      tags: [suscripcion]
+      operationId: registrarDecisionAnalista
+      summary: Registrar la decisión del analista sobre una solicitud en revisión
+      description: >
+        Suscripción asistida (SOLVENTAG5-54). Sobre una solicitud EN_REVISION, el analista de
+        riesgo registra una de tres decisiones, siempre con su justificación: ACEPTADA, sin
+        cambios y con la prima cotizada; AJUSTADA, con un recargo sobre la prima cotizada
+        (recargoPorcentaje), o RECHAZADA. La decisión queda en un registro que solo admite
+        inserciones, con las reglas y las señales de la evaluación, la justificación, el usuario
+        del analista y la hora, encadenado por su huella con el registro de la decisión
+        automática que mandó la solicitud a revisión (ADR 0006). La solicitud pasa a ACEPTADA,
+        AJUSTADA o RECHAZADA en la misma transacción que el registro, y la decisión no se puede
+        editar ni revertir. Es la misma fuente para la consulta del resultado
+        (obtenerSolicitudSuscripcion, con decision.decididaPor en ANALISTA), la póliza para firma,
+        el cobro y el canal móvil; con AJUSTADA, el cliente acepta la nueva prima con
+        aceptarPrimaAjustada. La solicitud decidida sale de la bandeja (listarSolicitudesEnRevision).
+        Una solicitud solo se decide una vez: repetir la misma petición responde 200 con la
+        decisión ya registrada, y una decisión distinta o una sobre una solicitud que no está
+        EN_REVISION responde 409 SOLICITUD_NO_EN_REVISION. Responde el detalle de revisión
+        (obtenerRevisionSolicitud) con el estado decidido y decisionAnalista. La justificación no
+        se escribe en los logs. Solo para el analista de riesgo.
+      x-roles: [ANALISTA_RIESGO]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudSuscripcionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionAnalistaPeticion'
+            examples:
+              aceptar:
+                summary: Aceptar sin cambios, con la prima cotizada
+                value:
+                  resultado: ACEPTADA
+                  justificacion: >-
+                    El crédito tiene codeudor y el perfil es MEDIO: el monto por encima del
+                    máximo no cambia el riesgo.
+              ajustar:
+                summary: Ajustar con un recargo del 15 % sobre la prima cotizada
+                value:
+                  resultado: AJUSTADA
+                  recargoPorcentaje: 15
+                  justificacion: >-
+                    El monto del crédito supera el máximo de la regla, pero el perfil es MEDIO y
+                    el comportamiento de pago es bueno: se acepta con un recargo del 15 %.
+              rechazar:
+                summary: Rechazar
+                value:
+                  resultado: RECHAZADA
+                  justificacion: >-
+                    El monto del crédito supera en más de un 50 % el máximo de la regla y el
+                    endeudamiento es alto.
+      responses:
+        '200':
+          description: >
+            La decisión quedó registrada, ahora o en una petición anterior igual: es el detalle de
+            revisión con el estado decidido, la decisión del analista en decision y
+            decisionAnalista.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionSolicitud'
+              examples:
+                ajustadaPorAnalista:
+                  $ref: '#/components/examples/RevisionAjustadaPorAnalista'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/SolicitudSuscripcionNoEncontrada'
+        '409':
+          $ref: '#/components/responses/SolicitudNoEnRevision'
+        '422':
+          $ref: '#/components/responses/Validacion'
+          description: >
+            El cuerpo no cumple el contrato: un resultado que no es ACEPTADA, AJUSTADA ni
+            RECHAZADA, una justificación vacía o de más de 1.000 caracteres, AJUSTADA sin
+            recargoPorcentaje, o ACEPTADA o RECHAZADA con él.
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
   /v1/solicitudes-suscripcion/{solicitudId}/aceptacion-prima:
@@ -1916,6 +2011,21 @@ components:
           example:
             codigo: AJUSTE_NO_APLICA
             detalle: La solicitud no tiene una nueva prima que aceptar.
+    SolicitudNoEnRevision:
+      description: >
+        La solicitud no está EN_REVISION: la decisión automática no la mandó a revisión, o un
+        analista ya la decidió con otra decisión. Una solicitud solo se decide una vez.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    const: SOLICITUD_NO_EN_REVISION
+          example:
+            codigo: SOLICITUD_NO_EN_REVISION
+            detalle: La solicitud no está en revisión o ya tiene la decisión de un analista.
     SolicitudNoEmitible:
       description: >
         La solicitud no puede generar su póliza. SOLICITUD_NO_EMITIBLE, con el motivo en motivo
@@ -2931,7 +3041,13 @@ components:
           description: Si la regla determinó la decisión. Solo con decisión.
     DecisionSuscripcion:
       type: object
-      description: La decisión automática tal como quedó en su registro (ADR 0006).
+      description: >
+        La decisión vigente de la solicitud, tal como quedó en su registro (ADR 0006): la
+        automática (SOLVENTAG5-51) o, si la solicitud pasó por revisión y ya la decidió un
+        analista de riesgo (SOLVENTAG5-54), la del analista. En la del analista, motivo,
+        reglaAplicada y versionPolitica son los de la decisión automática que la mandó a
+        revisión; resultado, continuaAEmision, primaFinal, recargoPorcentaje,
+        tiempoDecisionMs y trazaId son los del analista.
       required:
         - resultado
         - continuaAEmision
@@ -2981,6 +3097,61 @@ components:
           type: string
           pattern: '^[0-9a-f]{64}$'
           description: Huella SHA-256 del registro de la decisión; con ella se audita y se reconstruye.
+        decididaPor:
+          $ref: '#/components/schemas/DecididaPorSuscripcion'
+          description: Quién tomó la decisión. Si falta, es AUTOMATICA.
+    DecididaPorSuscripcion:
+      type: string
+      description: >
+        AUTOMATICA si la decidió la política del ramo (SOLVENTAG5-51); ANALISTA si la decidió un
+        analista de riesgo sobre una solicitud EN_REVISION (SOLVENTAG5-54).
+      enum: [AUTOMATICA, ANALISTA]
+    ResultadoDecisionAnalista:
+      type: string
+      description: >
+        ACEPTADA sin cambios, con la prima cotizada; AJUSTADA con un recargo sobre la prima
+        cotizada; RECHAZADA no continúa a cobro ni a emisión.
+      enum: [ACEPTADA, AJUSTADA, RECHAZADA]
+    DecisionAnalistaPeticion:
+      type: object
+      description: La decisión del analista de riesgo sobre una solicitud EN_REVISION (SOLVENTAG5-54).
+      required: [resultado, justificacion]
+      properties:
+        resultado:
+          $ref: '#/components/schemas/ResultadoDecisionAnalista'
+        recargoPorcentaje:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: >
+            Recargo sobre la prima cotizada. Obligatorio con AJUSTADA y solo con ella. La nueva
+            prima es la cotizada × (100 + recargoPorcentaje) / 100, redondeada al peso, igual que
+            el ajuste de la decisión automática.
+        justificacion:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          pattern: '\S'
+          description: >
+            Por qué decide así. Obligatoria. Se guarda en el registro de la decisión, sin los
+            espacios del inicio y del final, y no se escribe en los logs.
+    DecisionAnalista:
+      type: object
+      description: >
+        Lo que el analista de riesgo registró con su decisión (SOLVENTAG5-54), tal como quedó en
+        su registro. El resultado, la nueva prima y el recargo están en decision.
+      required: [justificacion, analista, registradaEn]
+      properties:
+        justificacion:
+          type: string
+        analista:
+          $ref: '#/components/schemas/Solicitante'
+          description: >
+            El analista que decidió: su usuario en Cognito (sub) y su rol, ANALISTA_RIESGO. El
+            nombre no se registra.
+        registradaEn:
+          type: string
+          format: date-time
     BandejaRevision:
       type: object
       description: Una página de la bandeja de suscripción asistida (SOLVENTAG5-52).
@@ -3136,7 +3307,9 @@ components:
           $ref: '#/components/schemas/DecisionSuscripcion'
           description: >
             La decisión automática (SOLVENTAG5-51), con el motivo y la regla que la mandó a
-            revisión. Ausente sin decisión o si su registro no se puede leer.
+            revisión, o, si ya la decidió un analista (SOLVENTAG5-54), la suya, con decididaPor
+            en ANALISTA y el mismo motivo. Ausente sin decisión o si su registro no se puede
+            leer.
         versionReglas:
           type: string
           description: >
@@ -3155,9 +3328,15 @@ components:
         registrosVerificables:
           type: boolean
           description: >
-            Solo cuando la solicitud ya se evaluó. false si el registro de la evaluación o el de
-            la decisión falta o no se pudo verificar al consultar (su huella no coincide); los
-            datos son los guardados, sin corregirlos.
+            Solo cuando la solicitud ya se evaluó. false si el registro de la evaluación, el de
+            la decisión automática o el de la decisión del analista falta o no se pudo
+            verificar al consultar (su huella no coincide o no está encadenado); los datos son
+            los guardados, sin corregirlos.
+        decisionAnalista:
+          $ref: '#/components/schemas/DecisionAnalista'
+          description: >
+            Solo si la decidió un analista (SOLVENTAG5-54) y su registro se puede leer: la
+            justificación, quién decidió y cuándo.
     ReglaRevisionSuscripcion:
       type: object
       description: Una regla evaluada (ReglaEvaluadaSuscripcion) y si quedó sin resolver.
@@ -3945,9 +4124,9 @@ components:
             CLAVE_IDEMPOTENCIA_REUTILIZADA, POLIZA_NO_PAGABLE, PAGO_NO_APROBADO,
             CLIENTE_SIN_CONTACTO, FIRMA_NO_ENCONTRADA, FIRMA_NO_REENVIABLE, ENLACE_VENCIDO,
             CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO, CODIGO_INVALIDO,
-            POLIZA_NO_EMITIBLE y COBRO_NO_ENCONTRADO. CODIGO_INVALIDO lleva además
-            intentosRestantes (respuesta FirmaRechazada) y POLIZA_NO_EMITIBLE, motivo (respuesta
-            PolizaNoEmitible).
+            POLIZA_NO_EMITIBLE, COBRO_NO_ENCONTRADO y SOLICITUD_NO_EN_REVISION. CODIGO_INVALIDO
+            lleva además intentosRestantes (respuesta FirmaRechazada) y POLIZA_NO_EMITIBLE,
+            motivo (respuesta PolizaNoEmitible).
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -4615,6 +4794,87 @@ components:
           primaCotizada: 70000
           tiempoDecisionMs: 1090
           trazaId: 3e3b227afb28e75f0b3fb02a61f8dc178f6128acbb354ed27310dc4638738677
+    SolicitudSuscripcionAjustadaPorAnalista:
+      summary: Ajustada por un analista con recargo del 15 % después de la revisión
+      value:
+        solicitudId: 4c6e8a0b-2d4f-4e6a-9c8e-3f5a7b9c1d3e
+        cotizacionId: 7e9a1c3e-5b7d-4f9b-8d1f-6a8c0e2a4b6c
+        clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+        estado: AJUSTADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 950000000
+            plazoAnios: 20
+            ciudadInmueble: Medellín
+            entidadAcreedora: Banco de Ejemplo
+        prima: 231900
+        moneda: COP
+        periodicidad: MENSUAL
+        perfilRiesgo:
+          perfilId: 6b8d0f2a-4c6e-4a8b-9d0f-1a3c5e7a9b1d
+          version: 2
+        canal: web
+        aceptadaEn: '2026-10-15T14:05:00Z'
+        decidida: true
+        actualizadaEn: '2026-10-16T09:12:30Z'
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 684 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 72 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 41 }
+            resultado: CUMPLE
+            determinante: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 950000000 }
+            resultado: NO_CUMPLE
+            determinante: true
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        registrosVerificables: true
+        decision:
+          resultado: AJUSTADA
+          continuaAEmision: true
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 231900
+          primaFinal: 266685
+          recargoPorcentaje: 15
+          tiempoDecisionMs: 68850000
+          trazaId: 72f986a56e484e48182d2a00d453c4acae0c6478c025e8b8b0307c211d2d0148
+          decididaPor: ANALISTA
     BandejaRevisionConSolicitudes:
       summary: Dos solicitudes en revisión, de la más antigua a la más reciente
       value:
@@ -5092,6 +5352,120 @@ components:
             vigenteHasta: '2026-10-22T10:02:00Z'
           desactualizado: false
         registrosVerificables: true
+    RevisionAjustadaPorAnalista:
+      summary: Ajustada por el analista con un recargo del 15 %; ya no está en revisión
+      value:
+        solicitudId: 4c6e8a0b-2d4f-4e6a-9c8e-3f5a7b9c1d3e
+        cotizacionId: 7e9a1c3e-5b7d-4f9b-8d1f-6a8c0e2a4b6c
+        clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+        cliente:
+          clienteId: 2d4f6a8c-0e2a-4c4e-9a6c-8e0a2c4e6a8c
+          nombres: Carlos Andrés
+          apellidos: Peña Ruiz
+          documentoEnmascarado: CC ••••5120
+        estado: AJUSTADA
+        cobertura:
+          ramo: VIDA_HIPOTECARIO
+          datosBien:
+            montoCredito: 950000000
+            plazoAnios: 20
+            ciudadInmueble: Medellín
+            entidadAcreedora: Banco de Ejemplo
+        prima: 231900
+        moneda: COP
+        periodicidad: MENSUAL
+        canal: web
+        aceptadaEn: '2026-10-15T14:05:00Z'
+        cotizadaPor:
+          id: 3f6a9c2e-8b1d-4e7a-9c5f-2d8e1a4b7c0f
+          rol: ASESOR
+        decision:
+          resultado: AJUSTADA
+          continuaAEmision: true
+          motivo: REGLA_DE_REVISION
+          reglaAplicada: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+          versionPolitica: VIDA_HIPOTECARIO.DECISION.v1
+          primaCotizada: 231900
+          primaFinal: 266685
+          recargoPorcentaje: 15
+          tiempoDecisionMs: 68850000
+          trazaId: 72f986a56e484e48182d2a00d453c4acae0c6478c025e8b8b0307c211d2d0148
+          decididaPor: ANALISTA
+        versionReglas: VIDA_HIPOTECARIO.SUSCRIPCION.v1
+        reglasEvaluadas:
+          - codigo: VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1
+            tipo: PERFIL_REQUERIDO
+            efecto: REVISAR
+            parametros: {}
+            senales: { origen: PERFIL, motivoSinPerfil: null, perfilConsistente: true }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SCORE_MINIMO.v1
+            tipo: SCORE_MINIMO
+            efecto: RECHAZAR
+            parametros: { minimo: 450 }
+            senales: { score: 684 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.NIVEL_PERMITIDO.v1
+            tipo: NIVEL_PERMITIDO
+            efecto: AJUSTAR
+            parametros: { permitidos: [BAJO, MEDIO] }
+            senales: { nivel: MEDIO }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.COMPORTAMIENTO_PAGO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: comportamientoPago, minimo: 40 }
+            senales: { comportamientoPago: 72 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.ENDEUDAMIENTO.v1
+            tipo: SENAL_MINIMA
+            efecto: REVISAR
+            parametros: { senal: endeudamiento, minimo: 30 }
+            senales: { endeudamiento: 41 }
+            resultado: CUMPLE
+            determinante: false
+            sinResolver: false
+          - codigo: VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1
+            tipo: DATO_BIEN_MAXIMO
+            efecto: REVISAR
+            parametros: { campo: montoCredito, maximo: 800000000 }
+            senales: { montoCredito: 950000000 }
+            resultado: NO_CUMPLE
+            determinante: true
+            sinResolver: false
+        perfilRiesgo:
+          origen: PERFIL
+          coincide: true
+          perfil:
+            perfilId: 6b8d0f2a-4c6e-4a8b-9d0f-1a3c5e7a9b1d
+            version: 2
+            score: 684
+            nivel: MEDIO
+            senales:
+              comportamientoPago: 72
+              estabilidadIngresos: 80
+              ubicacion: 66
+              endeudamiento: 41
+            calculadoEn: '2026-10-15T13:14:00Z'
+            vigenteHasta: '2026-10-16T13:14:00Z'
+          desactualizado: false
+        registrosVerificables: true
+        decisionAnalista:
+          justificacion: >-
+            El monto del crédito supera el máximo de la regla, pero el perfil es MEDIO y el
+            comportamiento de pago es bueno: se acepta con un recargo del 15 %.
+          analista:
+            id: c154347a-8c3e-4386-b5d0-6f21daef5e27
+            rol: ANALISTA_RIESGO
+          registradaEn: '2026-10-16T09:12:30Z'
     PolizaGenerando:
       summary: Solicitud aceptada, con el documento todavía generándose
       value:

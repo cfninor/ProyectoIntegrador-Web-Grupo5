@@ -10,9 +10,13 @@ Con esta copia el portal puede:
 - generar el cliente TypeScript de la API, y
 - trabajar contra un mock del contrato mientras el backend se construye.
 
-Versión de la copia: 1.9.0, tomada de la rama `feature/SOLVENTAG5-75-cobro-unico` del repositorio
-principal (commit `0810ef1`, de la SOLVENTAG5-277, la última que cambió el contrato en esa rama),
-antes de que se integre a `main`. La 1.9.0 agrega la consulta del cobro de la primera prima
+Versión de la copia: 1.10.0, tomada de la rama `feature/SOLVENTAG5-54-registrar-decision-riesgo`
+del repositorio principal (commit `34c76a1`, de la SOLVENTAG5-317), antes de que se integre a
+`main`. La 1.10.0 agrega la decisión del analista de riesgo sobre una solicitud en revisión
+(SOLVENTAG5-54): `registrarDecisionAnalista` (`POST .../{solicitudId}/decision`) con
+`DecisionAnalistaPeticion`, que responde el detalle de revisión con `decisionAnalista`; el 409
+`SOLICITUD_NO_EN_REVISION`; y `decididaPor` en `DecisionSuscripcion`. La 1.9.0 agregó la consulta
+del cobro de la primera prima
 (SOLVENTAG5-75): `obtenerCobroPoliza`, con el pago vigente de la póliza y sus intentos
 (`CobroPoliza` e `IntentoCobro`) y el 404 `COBRO_NO_ENCONTRADO`; el 200 de `cobrarPrimaPoliza`
 con un pago existente `APROBADO` o `PROCESANDO`; y `EstadoPago` suma `REVERSADO`. Incluye también
@@ -25,4 +29,4 @@ consulta de los consentimientos del cliente (SOLVENTAG5-84), la aceptación de l
 generación y consulta de la póliza y la descarga de su PDF (SOLVENTAG5-56), la bandeja de
 suscripción asistida (SOLVENTAG5-52), el cobro de la primera prima (SOLVENTAG5-74), el detalle de
 revisión de una solicitud (SOLVENTAG5-53), la firma electrónica (SOLVENTAG5-57) y la emisión de la
-póliza (SOLVENTAG5-58). 28 operaciones.
+póliza (SOLVENTAG5-58). 29 operaciones.

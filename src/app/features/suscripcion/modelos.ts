@@ -94,7 +94,17 @@ export interface ReglaEvaluadaSuscripcion {
   determinante?: boolean;
 }
 
-/** `DecisionSuscripcion` del contrato: la decisión automática como quedó en su registro. */
+/**
+ * `DecididaPorSuscripcion` del contrato: AUTOMATICA si la decidió la política del ramo y ANALISTA
+ * si la decidió un analista de riesgo sobre una solicitud EN_REVISION (SOLVENTAG5-54).
+ */
+export type DecididaPorSuscripcion = 'AUTOMATICA' | 'ANALISTA';
+
+/**
+ * `DecisionSuscripcion` del contrato: la decisión vigente como quedó en su registro. Si la decidió
+ * un analista (SOLVENTAG5-54), el resultado, la prima, el tiempo y la traza son los suyos, y el
+ * motivo y la regla, los de la decisión automática que la mandó a revisión.
+ */
 export interface DecisionSuscripcion {
   resultado: ResultadoSuscripcion;
   continuaAEmision: boolean;
@@ -108,6 +118,8 @@ export interface DecisionSuscripcion {
   recargoPorcentaje?: number;
   tiempoDecisionMs: number;
   trazaId: string;
+  /** Quién la decidió. Si falta, es AUTOMATICA. */
+  decididaPor?: DecididaPorSuscripcion;
 }
 
 /**
@@ -208,4 +220,30 @@ export interface RevisionSolicitud {
   perfilRiesgo: PerfilRiesgoRevision;
   /** Solo con evaluación. False si un registro falta o no se pudo verificar al consultar. */
   registrosVerificables?: boolean;
+  /** Solo si la decidió un analista (SOLVENTAG5-54) y su registro se puede leer. */
+  decisionAnalista?: DecisionAnalista;
+}
+
+/** `ResultadoDecisionAnalista` del contrato: lo que puede decidir el analista (SOLVENTAG5-54). */
+export type ResultadoDecisionAnalista = 'ACEPTADA' | 'AJUSTADA' | 'RECHAZADA';
+
+/**
+ * `DecisionAnalistaPeticion` del contrato: la decisión del analista sobre una solicitud
+ * EN_REVISION. `recargoPorcentaje` (1 a 100) va con AJUSTADA y solo con ella.
+ */
+export interface DecisionAnalistaPeticion {
+  resultado: ResultadoDecisionAnalista;
+  recargoPorcentaje?: number;
+  justificacion: string;
+}
+
+/**
+ * `DecisionAnalista` del contrato: lo que registró el analista con su decisión, tal como quedó en
+ * su registro. El resultado, la nueva prima y el recargo están en `decision`.
+ */
+export interface DecisionAnalista {
+  justificacion: string;
+  /** Su usuario de Cognito y su rol. El nombre no se registra. */
+  analista: Cotizante;
+  registradaEn: string;
 }

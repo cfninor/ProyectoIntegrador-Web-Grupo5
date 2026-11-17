@@ -1,7 +1,8 @@
 import { expect, Page, Route, test } from '@playwright/test';
 
-// El detalle de revisión de una solicitud (SOLVENTAG5-53), con el BFF simulado por page.route y
-// los ejemplos del contrato 1.5.0. Los clientes son ficticios.
+// El detalle de revisión de una solicitud (SOLVENTAG5-53) y la decisión del analista
+// (SOLVENTAG5-54), con el BFF simulado por page.route y los ejemplos del contrato 1.5.0 y 1.10.0.
+// Los clientes son ficticios.
 
 const SESION_ANALISTA = {
   usuario: { id: 'analista-004', nombre: 'Martín Ospina' },
@@ -309,4 +310,80 @@ test('el detalle en inglés', async ({ page }) => {
     'Unresolved',
   );
   await expect(page.getByText('Valid profile · Oct 15, 2026 8:14 AM')).toBeVisible();
+});
+
+// --- La decisión del analista (SOLVENTAG5-54) ---------------------------------------------------
+
+const CORS_POST = { ...CORS, 'access-control-allow-methods': 'POST' };
+const JUSTIFICACION = 'Con codeudor y buen hábito de pago: se acepta con recargo.';
+const AJUSTADA_POR_ANALISTA = {
+  ...EN_REVISION,
+  estado: 'AJUSTADA',
+  decision: {
+    ...EN_REVISION.decision,
+    resultado: 'AJUSTADA',
+    continuaAEmision: true,
+    primaFinal: 266685,
+    recargoPorcentaje: 15,
+    tiempoDecisionMs: 68850000,
+    trazaId: '72f986a56e484e48182d2a00d453c4acae0c6478c025e8b8b0307c211d2d0148',
+    decididaPor: 'ANALISTA',
+  },
+  reglasEvaluadas: EN_REVISION.reglasEvaluadas.map((r) => ({ ...r, sinResolver: false })),
+  decisionAnalista: {
+    justificacion: JUSTIFICACION,
+    analista: { id: 'analista-004', rol: 'ANALISTA_RIESGO' },
+    registradaEn: '2026-10-16T09:12:30Z',
+  },
+};
+
+async function simularDecision(page: Page): Promise<unknown[]> {
+  const decisiones: unknown[] = [];
+  await page.route('**/v1/solicitudes-suscripcion/*/decision', async (route: Route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: CORS_POST });
+      return;
+    }
+    decisiones.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, headers: CORS_POST, json: AJUSTADA_POR_ANALISTA });
+  });
+  return decisiones;
+}
+
+test('el analista ajusta la solicitud con un recargo y ve la decisión registrada', async ({
+  page,
+}) => {
+  await simularBff(page, EN_REVISION);
+  const decisiones = await simularDecision(page);
+
+  await page.goto(`/riesgo/bandeja/revision/${EN_REVISION.solicitudId}`);
+  await page.getByRole('radio', { name: 'Ajustar condiciones del riesgo' }).check();
+  await page.getByLabel('Recargo de prima (%)').fill('15');
+  await expect(page.getByLabel('Nueva prima')).toHaveText('$ 266.685 / mes');
+  await page.getByLabel('Justificación (obligatoria)').fill(JUSTIFICACION);
+  await page.getByRole('button', { name: 'Registrar decisión' }).click();
+
+  await expect(page.getByRole('status')).toHaveText(
+    'Registraste la decisión: la solicitud quedó Ajustada.',
+  );
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Decisión del analista' }),
+  ).toBeVisible();
+  await expect(page.getByText(JUSTIFICACION)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Registrar decisión' })).toHaveCount(0);
+  expect(decisiones).toEqual([
+    { resultado: 'AJUSTADA', recargoPorcentaje: 15, justificacion: JUSTIFICACION },
+  ]);
+});
+
+test('sin justificación no se registra la decisión', async ({ page }) => {
+  await simularBff(page, EN_REVISION);
+  const decisiones = await simularDecision(page);
+
+  await page.goto(`/riesgo/bandeja/revision/${EN_REVISION.solicitudId}`);
+  await page.getByRole('radio', { name: 'Aceptar sin cambios' }).check();
+  await page.getByRole('button', { name: 'Registrar decisión' }).click();
+
+  await expect(page.getByText('Escribe la justificación.')).toBeVisible();
+  expect(decisiones).toEqual([]);
 });

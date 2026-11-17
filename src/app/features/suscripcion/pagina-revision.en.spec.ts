@@ -6,7 +6,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 
-import { CON_AVISOS, EN_REVISION, YA_DECIDIDA } from '../../../testing/fixtures-revision';
+import {
+  AJUSTADA_POR_ANALISTA,
+  CON_AVISOS,
+  EN_REVISION,
+  YA_DECIDIDA,
+} from '../../../testing/fixtures-revision';
 import { APP_CONFIG } from '../../core/config/app-config';
 import { RevisionSolicitud } from './modelos';
 import { PaginaRevision } from './pagina-revision';
@@ -82,5 +87,33 @@ describe('PaginaRevision en inglés · SOLVENTAG5-53', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText('Result of the automatic decision')).toBeInTheDocument();
+  });
+});
+
+describe('PaginaRevision en inglés · decisión del analista (SOLVENTAG5-54)', () => {
+  it('traduce el panel para registrar la decisión', async () => {
+    await cargar(EN_REVISION);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Record decision' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Accept with no changes' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Adjust the risk terms' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Reject the application' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Justification (required)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Record decision' })).toBeInTheDocument();
+  });
+
+  it('traduce la decisión del analista, con los formatos de Estados Unidos', async () => {
+    await cargar(AJUSTADA_POR_ANALISTA);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: "Analyst's decision" }),
+    ).toBeInTheDocument();
+    expect(dato('Surcharge')).toHaveTextContent('15%');
+    expect(dato('Final premium')).toHaveTextContent('$266,685 / month');
+    expect(dato('Decided by')).toHaveTextContent('Risk analyst');
+    expect(dato('Recorded')).toHaveTextContent('Oct 16, 2026');
+    expect(dato('Recorded')).toHaveTextContent('4:12 AM');
+    expect(screen.getByText('Justification')).toBeInTheDocument();
+    expect(screen.getByText('Reason for review')).toBeInTheDocument();
   });
 });

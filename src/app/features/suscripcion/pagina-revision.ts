@@ -28,11 +28,13 @@ import {
 } from '../cotizacion/senales';
 import {
   Cotizante,
+  DecisionAnalista,
   EstadoSolicitudSuscripcion,
   PerfilRiesgoRevision,
   ReglaRevisionSuscripcion,
   RevisionSolicitud,
 } from './modelos';
+import { PanelDecision } from './panel-decision';
 import { reglaLegible, textoMotivo } from './reglas-legibles';
 import { RUTA_BANDEJA } from './rutas';
 import { SuscripcionApi } from './suscripcion-api';
@@ -84,6 +86,14 @@ type PerfilVista =
     }
   | { tipo: 'sin-perfil'; motivo: PerfilRiesgoRevision['motivoSinPerfil'] }
   | { tipo: 'no-coincide' };
+
+/** La decisión que registró un analista (SOLVENTAG5-54), lista para mostrar. */
+interface DecisionAnalistaVista {
+  estado: string;
+  claseEstado: string;
+  datos: Dato[];
+  justificacion: string;
+}
 
 /** Qué se muestra en lugar de la tabla cuando no llegan las reglas. */
 type SinReglas = 'sin-evaluar' | 'ilegibles' | null;
@@ -177,6 +187,55 @@ function datos(r: RevisionSolicitud, idioma: Idioma): Dato[] {
   ];
 }
 
+function primaVista(prima: number, r: RevisionSolicitud, idioma: Idioma): string {
+  const monto = montoCop(prima, idioma);
+  return r.periodicidad === 'MENSUAL'
+    ? $localize`:@@revision.dato.primaMensual:${monto}:prima: / mes`
+    : monto;
+}
+
+/** Lo que decidió el analista, con las condiciones de `decision` y su registro. */
+function decisionAnalista(
+  r: RevisionSolicitud,
+  registrada: DecisionAnalista,
+  idioma: Idioma,
+): DecisionAnalistaVista {
+  const d = r.decision;
+  const datos: Dato[] = [];
+  if (d?.recargoPorcentaje !== undefined) {
+    const recargo = d.recargoPorcentaje;
+    datos.push({
+      etiqueta: $localize`:@@revision.analista.recargo:Recargo`,
+      valor: $localize`:@@revision.analista.recargoValor:${recargo}:recargo: %`,
+    });
+  }
+  if (d?.primaFinal !== undefined) {
+    datos.push({
+      etiqueta: $localize`:@@revision.analista.primaFinal:Prima final`,
+      valor: primaVista(d.primaFinal, r, idioma),
+    });
+  }
+  const usuario = registrada.analista.id.slice(0, 8);
+  datos.push(
+    {
+      etiqueta: $localize`:@@revision.analista.quien:Decidida por`,
+      valor: $localize`:@@revision.analista.rol:Analista de riesgo`,
+      detalle: $localize`:@@revision.cotizada.usuario:Usuario ${usuario}:usuario:`,
+    },
+    {
+      etiqueta: $localize`:@@revision.analista.registrada:Registrada`,
+      valor: fechaBogota(registrada.registradaEn, idioma),
+      detalle: horaBogota(registrada.registradaEn, idioma),
+    },
+  );
+  return {
+    estado: ESTADOS[r.estado](),
+    claseEstado: CLASE_ESTADO[r.estado],
+    datos,
+    justificacion: registrada.justificacion,
+  };
+}
+
 function regla(r: ReglaRevisionSuscripcion, idioma: Idioma): ReglaVista {
   const legible = reglaLegible(r, idioma);
   return {
@@ -229,13 +288,16 @@ function perfil(p: PerfilRiesgoRevision, idioma: Idioma): PerfilVista {
  * decidir una solicitud que la decisión automática dejó en revisión. Se abre con «Revisar» desde la
  * bandeja (SOLVENTAG5-52). Muestra los datos de la solicitud y quién la cotizó, las reglas evaluadas
  * con las que quedaron sin resolver, y las señales del perfil con que se cotizó, todo tal como quedó
- * registrado. Solo lee: registrar la decisión es de la SOLVENTAG5-54. Un registro que no se puede
- * verificar, un perfil desactualizado o que no coincide, y una solicitud que ya no está en revisión
- * se indican en vez de ocultarse.
+ * registrado. Un registro que no se puede verificar, un perfil desactualizado o que no coincide, y
+ * una solicitud que ya no está en revisión se indican en vez de ocultarse.
+ *
+ * Mientras la solicitud está EN_REVISION, el panel «Registrar decisión» (SOLVENTAG5-54) permite
+ * aceptarla, ajustarla o rechazarla; al registrarla, la página muestra el detalle ya decidido con
+ * la decisión del analista en lugar del panel.
  */
 @Component({
   selector: 'app-pagina-revision',
-  imports: [RouterLink],
+  imports: [PanelDecision, RouterLink],
   templateUrl: './pagina-revision.html',
   styleUrl: './pagina-revision.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -249,6 +311,8 @@ export class PaginaRevision {
 
   protected readonly rutaBandeja = RUTA_BANDEJA;
   protected readonly carga = signal<Carga>({ tipo: 'cargando' });
+  /** La decisión se registró en esta visita: se confirma en la página (SOLVENTAG5-54). */
+  protected readonly registrada = signal(false);
 
   protected readonly vista = computed(() => {
     const carga = this.carga();
@@ -257,6 +321,7 @@ export class PaginaRevision {
     }
     const r = carga.revision;
     const enRevision = r.estado === 'EN_REVISION';
+    const porAnalista = r.decision?.decididaPor === 'ANALISTA';
     const reglas = (r.reglasEvaluadas ?? []).map((x) => regla(x, this.idioma));
     const sinResolver = reglas.filter((x) => x.sinResolver).map((x) => x.nombre);
     const determinantes = (r.reglasEvaluadas ?? [])
@@ -267,6 +332,7 @@ export class PaginaRevision {
       sinReglas = r.estado === 'PENDIENTE_EVALUACION' ? 'sin-evaluar' : 'ilegibles';
     }
     return {
+      revision: r,
       codigo: r.solicitudId.slice(0, 8),
       solicitudId: r.solicitudId,
       cliente: r.cliente ? `${r.cliente.nombres} ${r.cliente.apellidos}` : null,
@@ -278,6 +344,11 @@ export class PaginaRevision {
       noVerificable: r.registrosVerificables === false,
       motivo: r.decision
         ? textoMotivo(r.decision.motivo, enRevision ? sinResolver : determinantes)
+        : null,
+      // Con la decisión del analista, el motivo es el de la revisión que resolvió.
+      motivoDeRevision: enRevision || porAnalista,
+      decisionAnalista: r.decisionAnalista
+        ? decisionAnalista(r, r.decisionAnalista, this.idioma)
         : null,
       versionReglas: r.versionReglas ?? null,
       reglas,
@@ -296,6 +367,12 @@ export class PaginaRevision {
 
   protected reintentar(): void {
     this.cargar(this.solicitudId());
+  }
+
+  /** El panel registró la decisión: el detalle ya decidido reemplaza al que estaba. */
+  protected alDecidir(revision: RevisionSolicitud): void {
+    this.registrada.set(true);
+    this.carga.set({ tipo: 'lista', revision });
   }
 
   private cargar(id: string): void {

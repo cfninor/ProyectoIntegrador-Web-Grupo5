@@ -4,12 +4,14 @@ import { render, screen, within } from '@testing-library/angular';
 import {
   ACEPTADA,
   AJUSTADA,
+  AJUSTADA_POR_ANALISTA,
   EN_REVISION,
   EVALUADA,
   ILEGIBLE,
   NO_VERIFICABLE,
   PENDIENTE,
   RECHAZADA,
+  RECHAZADA_POR_ANALISTA,
   SOLICITUD_ID,
 } from '../../../testing/fixtures-resultado';
 import { SolicitudSuscripcion } from './modelos';
@@ -340,5 +342,43 @@ describe('TarjetaResultado · aceptar la nueva prima', () => {
       'href',
       `/asesor/cotizar/oferta/${ACEPTADA_LA_PRIMA.cotizacionId}/pago?solicitudId=${SOLICITUD_ID}`,
     );
+  });
+});
+
+describe('TarjetaResultado · decidida por un analista (SOLVENTAG5-54)', () => {
+  it('al cliente le dice que la decidió un analista, con su prima y su recargo', async () => {
+    await renderizar(AJUSTADA_POR_ANALISTA);
+
+    expect(
+      screen.getByText('Un analista de riesgo revisó tu solicitud y tomó esta decisión.'),
+    ).toBeInTheDocument();
+    expect(dato('Decidida por')).toHaveTextContent('Un analista de riesgo');
+    expect(dato('Tiempo de decisión')).toHaveTextContent('19 h 7 min');
+    expect(dato('Prima final')).toHaveTextContent('$ 80.500');
+    expect(dato('Ajuste')).toHaveTextContent('Recargo del 15 %');
+    expect(screen.getByRole('button', { name: 'Aceptar nueva prima' })).toBeInTheDocument();
+  });
+
+  it('al asesor le dice que la decidió un analista', async () => {
+    await renderizar(AJUSTADA_POR_ANALISTA, 'asesor');
+
+    expect(
+      screen.getByText('Un analista de riesgo revisó la solicitud y tomó esta decisión.'),
+    ).toBeInTheDocument();
+  });
+
+  it('rechazada por un analista: el motivo es el de la revisión', async () => {
+    await renderizar(RECHAZADA_POR_ANALISTA);
+
+    expect(screen.getByRole('heading', { name: 'Motivo de la revisión' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Motivo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continuar al pago' })).not.toBeInTheDocument();
+  });
+
+  it('una decisión automática no dice quién la decidió', async () => {
+    await renderizar(ACEPTADA);
+
+    expect(screen.queryByText('Decidida por', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Un analista de riesgo revisó/)).not.toBeInTheDocument();
   });
 });

@@ -205,11 +205,26 @@ export function textoMotivo(motivo: MotivoDecisionSuscripcion, reglas: readonly 
   }
 }
 
-/** La duración de la decisión: «8 ms» o «1,2 s» («1.2 s» en inglés). */
+/**
+ * La duración de la decisión: «8 ms» o «1,2 s» («1.2 s» en inglés) en la automática, y «45 min»,
+ * «19 h 7 min» o «2 d 3 h» en la de un analista (SOLVENTAG5-54).
+ */
 export function duracion(ms: number, idioma: Idioma): string {
   if (ms < 1000) {
     return `${ms} ms`;
   }
-  const segundos = (ms / 1000).toFixed(1);
-  return `${idioma === 'es-CO' ? segundos.replace('.', ',') : segundos} s`;
+  if (ms < 60_000) {
+    const segundos = (ms / 1000).toFixed(1);
+    return `${idioma === 'es-CO' ? segundos.replace('.', ',') : segundos} s`;
+  }
+  // La decisión de un analista (SOLVENTAG5-54) puede tardar horas o días.
+  const minutos = Math.floor(ms / 60_000);
+  if (minutos < 60) {
+    return `${minutos} min`;
+  }
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) {
+    return `${horas} h ${minutos % 60} min`;
+  }
+  return `${Math.floor(horas / 24)} d ${horas % 24} h`;
 }

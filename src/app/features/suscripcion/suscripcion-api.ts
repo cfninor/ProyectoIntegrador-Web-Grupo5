@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { APP_CONFIG } from '../../core/config/app-config';
 import {
   BandejaRevision,
+  DecisionAnalistaPeticion,
   PerfilRiesgoSolicitud,
   RevisionSolicitud,
   SolicitudSuscripcion,
@@ -75,6 +76,22 @@ export class SuscripcionApi {
     const id = encodeURIComponent(solicitudId);
     return this.http.get<RevisionSolicitud>(
       `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/${id}/revision`,
+    );
+  }
+
+  /**
+   * Registra la decisión del analista sobre una solicitud EN_REVISION (`registrarDecisionAnalista`,
+   * SOLVENTAG5-54): 200 con el detalle de revisión ya decidido, también si se repite la misma
+   * petición. 409 SOLICITUD_NO_EN_REVISION, 404 y 422 llegan como error.
+   */
+  registrarDecision(
+    solicitudId: string,
+    decision: DecisionAnalistaPeticion,
+  ): Observable<RevisionSolicitud> {
+    const id = encodeURIComponent(solicitudId);
+    return this.http.post<RevisionSolicitud>(
+      `${this.config.apiBaseUrl}/v1/solicitudes-suscripcion/${id}/decision`,
+      decision,
     );
   }
 }

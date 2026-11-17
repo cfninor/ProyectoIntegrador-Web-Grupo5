@@ -199,3 +199,36 @@ export const POR_RESULTADO: Record<ResultadoSuscripcion, SolicitudSuscripcion> =
   RECHAZADA,
   EN_REVISION,
 };
+
+/**
+ * Ajustada por un analista de riesgo después de la revisión (SOLVENTAG5-54): el motivo es el de la
+ * revisión y `decididaPor` es ANALISTA.
+ */
+export const AJUSTADA_POR_ANALISTA = decidida(
+  'AJUSTADA',
+  reglas(null, null, null, null, true),
+  70_000,
+  {
+    motivo: 'REGLA_DE_REVISION',
+    reglaAplicada: 'VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1',
+    primaFinal: 80_500,
+    recargoPorcentaje: 15,
+    tiempoDecisionMs: 68_850_000,
+    decididaPor: 'ANALISTA',
+  },
+  'VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1',
+);
+
+/** Rechazada por un analista de riesgo después de la revisión (SOLVENTAG5-54). */
+export const RECHAZADA_POR_ANALISTA = decidida(
+  'RECHAZADA',
+  reglas(null, null, null, null, true),
+  70_000,
+  {
+    motivo: 'REGLA_DE_REVISION',
+    reglaAplicada: 'VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1',
+    tiempoDecisionMs: 68_850_000,
+    decididaPor: 'ANALISTA',
+  },
+  'VIDA_HIPOTECARIO.PERFIL_REQUERIDO.v1',
+);

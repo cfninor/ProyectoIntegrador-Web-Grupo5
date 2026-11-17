@@ -255,6 +255,12 @@ describe('duracion', () => {
     [999, 'es-CO', '999 ms'],
     [1240, 'es-CO', '1,2 s'],
     [1240, 'en-US', '1.2 s'],
+    // La decisión de un analista (SOLVENTAG5-54).
+    [60_000, 'es-CO', '1 min'],
+    [2_700_000, 'es-CO', '45 min'],
+    [3_600_000, 'es-CO', '1 h 0 min'],
+    [68_850_000, 'en-US', '19 h 7 min'],
+    [183_600_000, 'es-CO', '2 d 3 h'],
   ] as const)('%d ms en %s', (ms, idioma, texto) => {
     expect(duracion(ms, idioma)).toBe(texto);
   });
