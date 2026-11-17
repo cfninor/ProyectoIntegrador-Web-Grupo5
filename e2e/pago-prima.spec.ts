@@ -5,7 +5,9 @@ import { ACEPTADA, SOLICITUD_ID } from '../src/testing/fixtures-resultado';
 
 // SOLV-WEB-09, el pago de la primera prima (SOLVENTAG5-74): se llega desde «Continuar al pago»
 // de la suscripción aceptada, la tarjeta se tokeniza directo contra la pasarela simulada (ADR
-// 0004 D8, nunca por el BFF) y un pago APROBADO continúa a la firma (D17).
+// 0004 D8, nunca por el BFF) y un pago APROBADO continúa a la firma (D17). Desde la SOLVENTAG5-75,
+// la pantalla consulta el cobro de la póliza antes del formulario (CA2), sigue un PROCESANDO con
+// esa consulta y nunca cobra dos veces: doble clic, recarga o la póliza ya pagada (CA3, CA6).
 
 const COTIZACION_ID = 'c-1';
 const RUTA_SUSCRIPCION = `/cliente/cotizar/oferta/${COTIZACION_ID}/suscripcion?solicitudId=${SOLICITUD_ID}`;
@@ -29,17 +31,45 @@ const CORS = {
 interface Respuesta {
   status?: number;
   json?: unknown;
+  /** El BFF no responde: la conexión se corta. */
+  sinRespuesta?: boolean;
 }
 
-/** El BFF y la pasarela simulada del pago. `cobros`: cada POST de cobro recibe la siguiente. */
+const SIN_INTENTOS: Respuesta = {
+  status: 404,
+  json: { codigo: 'COBRO_NO_ENCONTRADO', detalle: 'La póliza todavía no tiene intentos de cobro.' },
+};
+
+/** La respuesta de la consulta del cobro con un solo intento, del pago dado. */
+function cobroCon(pago: { estado: string; marca?: string; ultimos4?: string }): Respuesta {
+  const completo = { pagoId: 'p-1', polizaId: POLIZA_ID, ...pago };
+  return {
+    json: {
+      pago: completo,
+      intentos: [{ pagoId: 'p-1', estado: pago.estado, canal: 'web', creadoEn: 'x' }],
+    },
+  };
+}
+
+const APROBADO = { estado: 'APROBADO', marca: 'VISA', ultimos4: '4242' };
+
+/**
+ * El BFF y la pasarela simulada del pago. `cobros`: cada POST de cobro recibe la siguiente;
+ * `consultas`: cada GET del cobro, la siguiente (por defecto, sin intentos).
+ */
 async function simularBackend(
   page: Page,
   actor: 'asesor' | 'cliente',
-  opciones: { generar: Respuesta; cobros?: readonly Respuesta[] },
-): Promise<{ claves: (string | null)[]; cuerpos: unknown[] }> {
+  opciones: {
+    generar: Respuesta;
+    cobros?: readonly Respuesta[];
+    consultas?: readonly Respuesta[];
+  },
+): Promise<{ claves: (string | null)[]; cuerpos: unknown[]; consultas: () => number }> {
   const claves: (string | null)[] = [];
   const cuerpos: unknown[] = [];
   let cobros = 0;
+  let consultas = 0;
   await page.route('**/config.json', (route) =>
     route.fulfill({
       json: {
@@ -60,13 +90,19 @@ async function simularBackend(
     if (ruta === `/v1/solicitudes-suscripcion/${SOLICITUD_ID}/poliza`) {
       return responder(opciones.generar);
     }
+    if (ruta === `/v1/polizas/${POLIZA_ID}/cobro` && peticion.method() === 'GET') {
+      const lista = opciones.consultas ?? [SIN_INTENTOS];
+      const respuesta = lista[Math.min(consultas, lista.length - 1)];
+      consultas += 1;
+      return responder(respuesta);
+    }
     if (ruta === `/v1/polizas/${POLIZA_ID}/cobro`) {
       claves.push(peticion.headers()['idempotency-key'] ?? null);
       cuerpos.push(JSON.parse(peticion.postData() ?? '{}'));
       const lista = opciones.cobros ?? [{ status: 201, json: { estado: 'APROBADO' } }];
       const respuesta = lista[Math.min(cobros, lista.length - 1)];
       cobros += 1;
-      return responder(respuesta);
+      return respuesta.sinRespuesta ? route.abort('connectionreset') : responder(respuesta);
     }
     if (ruta === `/v1/solicitudes-suscripcion/${SOLICITUD_ID}`) {
       return responder({ json: ACEPTADA });
@@ -83,7 +119,7 @@ async function simularBackend(
       json: { token: 'tok-1', marca: 'VISA', ultimos4: '4242', vencimiento: '09/28' },
     });
   });
-  return { claves, cuerpos };
+  return { claves, cuerpos, consultas: () => consultas };
 }
 
 async function pagarConTarjeta(page: Page) {
@@ -145,26 +181,69 @@ test.describe('en español', () => {
     expect(backend.claves[0]).not.toBe(backend.claves[1]);
   });
 
-  test('procesando: vuelve a consultar con la misma clave hasta ver la decisión', async ({
-    page,
-  }) => {
+  test('procesando: la consulta lo resuelve APROBADO, sin reenviar el cobro', async ({ page }) => {
     const backend = await simularBackend(page, 'cliente', {
       generar: { json: POLIZA_GENERADA },
-      cobros: [
-        { status: 201, json: { estado: 'PROCESANDO' } },
-        { status: 201, json: { estado: 'APROBADO', marca: 'VISA', ultimos4: '4242' } },
-      ],
+      cobros: [{ status: 201, json: { estado: 'PROCESANDO' } }],
+      consultas: [SIN_INTENTOS, cobroCon(APROBADO)],
     });
 
     await page.goto(RUTA_PAGO('cliente'));
     await pagarConTarjeta(page);
 
     await expect(page.getByText(/Tu pago se está procesando/)).toBeVisible();
-    await page.getByRole('button', { name: 'Volver a consultar' }).click();
+    await page.getByRole('button', { name: 'Consultar de nuevo' }).click();
 
     await expect(page.getByText('Tu pago quedó aprobado.')).toBeVisible();
-    expect(backend.claves[0]).toBe(backend.claves[1]);
-    expect(backend.cuerpos[0]).toEqual(backend.cuerpos[1]);
+    expect(backend.claves).toHaveLength(1);
+    expect(backend.consultas()).toBe(2);
+  });
+
+  test('doble clic en «Pagar»: un solo cobro', async ({ page }) => {
+    const backend = await simularBackend(page, 'cliente', {
+      generar: { json: POLIZA_GENERADA },
+      cobros: [{ status: 201, json: APROBADO }],
+    });
+    await page.goto(RUTA_PAGO('cliente'));
+    await page.getByLabel('Número de tarjeta').fill('4111111111111111');
+    await page.getByLabel('Vencimiento (MM/AA)').fill('09/28');
+
+    await page.getByRole('button', { name: /^Pagar/ }).dblclick();
+
+    await expect(page.getByText('Tu pago quedó aprobado.')).toBeVisible();
+    expect(backend.claves).toHaveLength(1);
+  });
+
+  test('la póliza ya pagada por el otro canal: al entrar no hay formulario', async ({ page }) => {
+    const backend = await simularBackend(page, 'asesor', {
+      generar: { json: POLIZA_GENERADA },
+      consultas: [cobroCon(APROBADO)],
+    });
+
+    await page.goto(RUTA_PAGO('asesor'));
+
+    await expect(page.getByText('Tu pago quedó aprobado.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Continuar a la firma' })).toBeVisible();
+    await expect(page.getByLabel('Número de tarjeta')).toHaveCount(0);
+    expect(backend.claves).toHaveLength(0);
+  });
+
+  test('si el otro canal paga mientras tanto, el 200 del cobro muestra el pago existente', async ({
+    page,
+  }) => {
+    const backend = await simularBackend(page, 'asesor', {
+      generar: { json: POLIZA_GENERADA },
+      cobros: [{ status: 200, json: APROBADO }],
+    });
+    await page.goto(RUTA_PAGO('asesor'));
+
+    await pagarConTarjeta(page);
+
+    await expect(page.getByText('Esta póliza ya tiene un pago.')).toBeVisible();
+    await expect(page.getByText('Aprobado', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tu pago quedó aprobado.')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Continuar a la firma' })).toBeVisible();
+    expect(backend.claves).toHaveLength(1);
   });
 
   test('una solicitud en revisión no deja pagar', async ({ page }) => {
@@ -179,15 +258,13 @@ test.describe('en español', () => {
     await expect(page).toHaveURL(RUTA_SUSCRIPCION);
   });
 
-  test('al recargar con un pago en curso, lo reanuda sin pedir la tarjeta otra vez', async ({
+  test('al recargar durante el pago, muestra el resultado del intento original sin la tarjeta', async ({
     page,
   }) => {
     const backend = await simularBackend(page, 'cliente', {
       generar: { json: POLIZA_GENERADA },
-      cobros: [
-        { status: 201, json: { estado: 'PROCESANDO' } },
-        { status: 201, json: { estado: 'APROBADO', marca: 'VISA', ultimos4: '4242' } },
-      ],
+      cobros: [{ status: 201, json: { estado: 'PROCESANDO' } }],
+      consultas: [SIN_INTENTOS, cobroCon(APROBADO)],
     });
     await page.goto(RUTA_PAGO('cliente'));
     await pagarConTarjeta(page);
@@ -196,7 +273,25 @@ test.describe('en español', () => {
     await page.reload();
 
     await expect(page.getByText('Tu pago quedó aprobado.')).toBeVisible();
+    await expect(page.getByLabel('Número de tarjeta')).toHaveCount(0);
+    expect(backend.claves).toHaveLength(1); // la consulta lo resolvió: no se reenvió el cobro
+  });
+
+  test('si el cobro no llegó y se recarga, lo reenvía con la misma clave', async ({ page }) => {
+    const backend = await simularBackend(page, 'cliente', {
+      generar: { json: POLIZA_GENERADA },
+      cobros: [{ sinRespuesta: true }, { status: 201, json: APROBADO }],
+    });
+    await page.goto(RUTA_PAGO('cliente'));
+    await pagarConTarjeta(page);
+    await expect(page.getByText(/No pudimos conectarnos para procesar el pago/)).toBeVisible();
+
+    await page.reload();
+
+    await expect(page.getByText('Tu pago quedó aprobado.')).toBeVisible();
+    expect(backend.claves).toHaveLength(2);
     expect(backend.claves[0]).toBe(backend.claves[1]);
+    expect(backend.cuerpos[0]).toEqual(backend.cuerpos[1]);
   });
 });
 
