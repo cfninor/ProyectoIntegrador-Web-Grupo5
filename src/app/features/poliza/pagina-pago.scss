@@ -25,6 +25,12 @@ h2 {
   font-weight: 600;
 }
 
+// Los avisos de consulta, pago existente y reverso: un <output>, que es en línea, con el aspecto
+// de un párrafo (como en pagina-firma y tarjeta-firma).
+.aviso {
+  display: block;
+}
+
 .resumen {
   display: grid;
   grid-template-columns: max-content 1fr;

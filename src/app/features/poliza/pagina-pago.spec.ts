@@ -297,6 +297,11 @@ describe('PaginaPago · tokenizar y cobrar', () => {
     http.expectOne(URL_TOKENIZAR).flush(TOKEN_TARJETA);
     detectChanges();
     http.expectOne(POST_COBRO).flush(PAGO_APROBADO, { status: 201, statusText: 'Created' });
+    detectChanges();
+
+    expect(screen.getByText('Tu pago quedó aprobado.')).toBeVisible();
+    expect(http.match(URL_TOKENIZAR)).toHaveLength(0);
+    expect(http.match(POST_COBRO)).toHaveLength(0);
   });
 
   it('rechazado: deja intentar con otro medio, con una clave nueva', async () => {

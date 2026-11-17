@@ -79,7 +79,9 @@
     </dl>
 
     @if (estadoCobro().tipo === 'consultando') {
-      <p role="status" i18n="@@pago.consultando">Consultando si la póliza ya tiene un pago…</p>
+      <output class="aviso" i18n="@@pago.consultando"
+        >Consultando si la póliza ya tiene un pago…</output
+      >
     } @else if (estadoCobro().tipo === 'error-consulta') {
       <p role="alert" i18n="@@pago.errorConsulta">
         No pudimos consultar el pago de la póliza. Intenta de nuevo en unos segundos.
@@ -94,7 +96,7 @@
       </button>
     } @else if (resultado(); as r) {
       @if (r.existente) {
-        <p role="status" i18n="@@pago.existente">Esta póliza ya tiene un pago.</p>
+        <output class="aviso" i18n="@@pago.existente">Esta póliza ya tiene un pago.</output>
         <dl class="resumen">
           <dt i18n="@@pago.estado">Estado</dt>
           <dd>{{ nombresEstado[r.pago.estado] }}</dd>
@@ -150,9 +152,9 @@
           </button>
         }
         @case ('REVERSADO') {
-          <p role="status" i18n="@@pago.reversado">
+          <output class="aviso" i18n="@@pago.reversado">
             El pago se devolvió porque la póliza no se firmó a tiempo.
-          </p>
+          </output>
           <div class="acciones">
             <a class="boton-secundario" [routerLink]="rutaTablero()" i18n="@@pago.irTablero"
               >Ir al tablero</a

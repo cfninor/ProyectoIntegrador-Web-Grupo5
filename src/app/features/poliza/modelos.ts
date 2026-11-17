@@ -140,12 +140,11 @@ export interface CobroPoliza {
  * la consulta del cobro (COBRO_NO_ENCONTRADO, SOLVENTAG5-75).
  */
 export interface ErrorPago {
-  codigo:
-    | 'POLIZA_NO_PAGABLE'
-    | 'CLAVE_IDEMPOTENCIA_EN_CURSO'
-    | 'CLAVE_IDEMPOTENCIA_REUTILIZADA'
-    | 'COBRO_NO_ENCONTRADO'
-    | string;
+  /**
+   * Códigos conocidos: POLIZA_NO_PAGABLE, CLAVE_IDEMPOTENCIA_EN_CURSO,
+   * CLAVE_IDEMPOTENCIA_REUTILIZADA y COBRO_NO_ENCONTRADO. Puede llegar otro.
+   */
+  codigo: string;
   detalle: string;
 }
 
