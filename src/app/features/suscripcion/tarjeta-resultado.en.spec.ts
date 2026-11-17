@@ -6,6 +6,7 @@ import { render, screen, within } from '@testing-library/angular';
 import {
   ACEPTADA,
   AJUSTADA,
+  AJUSTADA_POR_ANALISTA,
   EN_REVISION,
   EVALUADA,
   ILEGIBLE,
@@ -139,5 +140,16 @@ describe('TarjetaResultado en inglés', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(AVISO);
     expect(screen.queryAllByRole('table')).toHaveLength(conDatos ? 1 : 0);
+  });
+});
+
+describe('TarjetaResultado en inglés · decidida por un analista (SOLVENTAG5-54)', () => {
+  it('dice que la decidió un analista', async () => {
+    await renderizar(AJUSTADA_POR_ANALISTA);
+
+    expect(
+      screen.getByText('A risk analyst reviewed your application and made this decision.'),
+    ).toBeInTheDocument();
+    expect(dato('Decided by')).toHaveTextContent('A risk analyst');
   });
 });

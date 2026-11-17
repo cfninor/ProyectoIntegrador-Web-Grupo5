@@ -106,3 +106,35 @@ describe('SuscripcionApi', () => {
     http.expectOne('http://bff.prueba/v1/solicitudes-suscripcion/a%2Fb/perfil-riesgo').flush({});
   });
 });
+
+describe('SuscripcionApi · decisión del analista (SOLVENTAG5-54)', () => {
+  let api: SuscripcionApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: APP_CONFIG, useValue: { apiBaseUrl: 'http://bff.prueba' } },
+      ],
+    });
+    api = TestBed.inject(SuscripcionApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('registra la decisión por POST .../{solicitudId}/decision con el cuerpo tal cual', async () => {
+    const decision = { resultado: 'AJUSTADA' as const, recargoPorcentaje: 15, justificacion: 'x' };
+    const revision = { solicitudId: 's-1', estado: 'AJUSTADA' };
+    const respuesta = firstValueFrom(api.registrarDecision('a/b', decision));
+
+    const peticion = http.expectOne('http://bff.prueba/v1/solicitudes-suscripcion/a%2Fb/decision');
+    expect(peticion.request.method).toBe('POST');
+    expect(peticion.request.body).toEqual(decision);
+    peticion.flush(revision);
+
+    await expect(respuesta).resolves.toEqual(revision);
+  });
+});

@@ -1,0 +1,129 @@
+<section class="tarjeta panel" aria-labelledby="decision-titulo">
+  <h2 id="decision-titulo" i18n="@@decisionAnalista.titulo">Registrar decisión</h2>
+
+  <form [formGroup]="formulario" (ngSubmit)="registrar()" novalidate>
+    <fieldset
+      class="opciones"
+      [attr.aria-invalid]="errorCampo('resultado') !== null"
+      aria-describedby="decision-resultado-error"
+    >
+      <legend class="visualmente-oculto" i18n="@@decisionAnalista.leyenda">Decisión</legend>
+      <label class="opcion">
+        <input type="radio" formControlName="resultado" value="ACEPTADA" />
+        <span i18n="@@decisionAnalista.opcion.aceptar"><strong>Aceptar</strong> sin cambios</span>
+      </label>
+      <label class="opcion">
+        <input type="radio" formControlName="resultado" value="AJUSTADA" />
+        <span i18n="@@decisionAnalista.opcion.ajustar"
+          ><strong>Ajustar</strong> condiciones del riesgo</span
+        >
+      </label>
+      <label class="opcion">
+        <input type="radio" formControlName="resultado" value="RECHAZADA" />
+        <span i18n="@@decisionAnalista.opcion.rechazar"
+          ><strong>Rechazar</strong> la solicitud</span
+        >
+      </label>
+    </fieldset>
+    <div id="decision-resultado-error">
+      @if (errorCampo('resultado'); as mensaje) {
+        <p class="error-campo">{{ mensaje }}</p>
+      }
+    </div>
+
+    @if (ajustar()) {
+      <div class="ajuste">
+        <div>
+          <label class="etiqueta-campo" for="decision-recargo" i18n="@@decisionAnalista.recargo"
+            >Recargo de prima (%)</label
+          >
+          <input
+            id="decision-recargo"
+            class="campo"
+            type="text"
+            inputmode="numeric"
+            formControlName="recargo"
+            [attr.aria-invalid]="errorCampo('recargo') !== null"
+            aria-describedby="decision-recargo-error"
+          />
+          <div id="decision-recargo-error">
+            @if (errorCampo('recargo'); as mensaje) {
+              <p class="error-campo">{{ mensaje }}</p>
+            }
+          </div>
+        </div>
+        <div>
+          <label
+            class="etiqueta-campo"
+            for="decision-nueva-prima"
+            i18n="@@decisionAnalista.nuevaPrima"
+            >Nueva prima</label
+          >
+          <output id="decision-nueva-prima" class="campo nueva-prima" aria-live="polite">{{
+            nuevaPrima()
+          }}</output>
+        </div>
+      </div>
+    }
+
+    <div>
+      <label
+        class="etiqueta-campo"
+        for="decision-justificacion"
+        i18n="@@decisionAnalista.justificacion"
+        >Justificación (obligatoria)</label
+      >
+      <textarea
+        id="decision-justificacion"
+        class="campo justificacion"
+        rows="4"
+        [attr.maxlength]="justificacionMaxima"
+        formControlName="justificacion"
+        [attr.aria-invalid]="errorCampo('justificacion') !== null"
+        aria-describedby="decision-justificacion-error"
+      ></textarea>
+      <div id="decision-justificacion-error">
+        @if (errorCampo('justificacion'); as mensaje) {
+          <p class="error-campo">{{ mensaje }}</p>
+        }
+      </div>
+    </div>
+
+    @switch (envio()) {
+      @case ('ya-decidida') {
+        <div class="aviso" role="alert">
+          <p i18n="@@decisionAnalista.yaDecidida">
+            Esta solicitud ya no está en revisión: otra persona registró una decisión.
+          </p>
+          <button
+            type="button"
+            class="boton-secundario"
+            (click)="recargar.emit()"
+            i18n="@@decisionAnalista.verDecision"
+          >
+            Ver la decisión
+          </button>
+        </div>
+      }
+      @case ('error') {
+        <p class="mensaje-error" role="alert" i18n="@@decisionAnalista.error">
+          No pudimos registrar la decisión. Intenta de nuevo.
+        </p>
+      }
+    }
+
+    <button
+      type="submit"
+      class="boton-primario registrar"
+      [disabled]="envio() === 'enviando' || envio() === 'ya-decidida'"
+      [attr.aria-busy]="envio() === 'enviando'"
+      i18n="@@decisionAnalista.registrar"
+    >
+      Registrar decisión
+    </button>
+    <p class="texto-secundario nota" i18n="@@decisionAnalista.nota">
+      La decisión se guarda con las reglas, las señales, tu usuario y la hora, y no se puede editar
+      ni revertir.
+    </p>
+  </form>
+</section>

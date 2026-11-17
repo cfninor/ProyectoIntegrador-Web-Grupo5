@@ -116,6 +116,18 @@
   }
 }
 
+@if (v.porAnalista) {
+  @if (actor() === 'asesor') {
+    <p class="por-analista" i18n="@@suscripcion.tarjeta.porAnalista.asesor">
+      Un analista de riesgo revisó la solicitud y tomó esta decisión.
+    </p>
+  } @else {
+    <p class="por-analista" i18n="@@suscripcion.tarjeta.porAnalista.cliente">
+      Un analista de riesgo revisó tu solicitud y tomó esta decisión.
+    </p>
+  }
+}
+
 @if (v.sinDecision) {
   <p i18n="@@suscripcion.tarjeta.ultimoEstado">
     Este es el último estado conocido, del {{ v.actualizadaEl }}. La decisión todavía no está lista.
@@ -134,6 +146,10 @@
     <dd>
       <span class="chip {{ chip.clase }}">{{ chip.texto }}</span>
     </dd>
+  }
+  @if (v.porAnalista) {
+    <dt i18n="@@suscripcion.tarjeta.decididaPor">Decidida por</dt>
+    <dd i18n="@@suscripcion.tarjeta.decididaPor.analista">Un analista de riesgo</dd>
   }
   @if (v.ilegible) {
     <dt i18n="@@suscripcion.tarjeta.actualizada">Última actualización</dt>
@@ -197,7 +213,11 @@
   } @else {
     @if (d.resultado === 'RECHAZADA') {
       <div class="bloque">
-        <h3 i18n="@@suscripcion.tarjeta.motivo">Motivo</h3>
+        @if (v.porAnalista) {
+          <h3 i18n="@@suscripcion.tarjeta.motivoRevision">Motivo de la revisión</h3>
+        } @else {
+          <h3 i18n="@@suscripcion.tarjeta.motivo">Motivo</h3>
+        }
         <p>{{ v.motivo }}</p>
       </div>
     }

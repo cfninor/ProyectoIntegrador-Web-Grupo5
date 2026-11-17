@@ -1,0 +1,88 @@
+// Panel «Registrar decisión» del detalle de revisión (SOLVENTAG5-54), como el Figma «Solventa /
+// Suscripción / SOL-2026-01529»: tres opciones, el recargo con la nueva prima y la justificación.
+
+h2,
+p {
+  margin: 0;
+}
+
+.panel,
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--alto-control);
+  padding: 8px 14px;
+  border: 1px solid var(--outline-campo);
+  border-radius: var(--radio-control);
+  font-size: 14px;
+  cursor: pointer;
+
+  input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+
+  &:has(input:checked) {
+    border-color: var(--primary);
+    background: var(--info-container);
+  }
+}
+
+.ajuste {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nueva-prima {
+  display: flex;
+  align-items: center;
+  background: var(--background);
+}
+
+.justificacion {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.aviso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--chip-ambar-fondo);
+  color: var(--chip-ambar-texto);
+  font-size: 13px;
+}
+
+.registrar {
+  width: 100%;
+}
+
+.nota {
+  font-size: 12px;
+}

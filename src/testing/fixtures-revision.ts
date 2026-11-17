@@ -614,3 +614,49 @@ export const PENDIENTE: RevisionSolicitud = {
   estado: 'PENDIENTE_EVALUACION',
   registrosVerificables: undefined,
 };
+
+/**
+ * Ajustada por el analista con un recargo del 15 % (SOLVENTAG5-54, ejemplo
+ * RevisionAjustadaPorAnalista del contrato 1.10.0): ya no está en revisión.
+ */
+export const AJUSTADA_POR_ANALISTA: RevisionSolicitud = {
+  ...EN_REVISION,
+  estado: 'AJUSTADA',
+  decision: {
+    resultado: 'AJUSTADA',
+    continuaAEmision: true,
+    motivo: 'REGLA_DE_REVISION',
+    reglaAplicada: 'VIDA_HIPOTECARIO.SUMA_ASEGURADA_MAXIMA.v1',
+    versionPolitica: 'VIDA_HIPOTECARIO.DECISION.v1',
+    primaCotizada: 231900,
+    primaFinal: 266685,
+    recargoPorcentaje: 15,
+    tiempoDecisionMs: 68850000,
+    trazaId: '72f986a56e484e48182d2a00d453c4acae0c6478c025e8b8b0307c211d2d0148',
+    decididaPor: 'ANALISTA',
+  },
+  reglasEvaluadas: EN_REVISION.reglasEvaluadas?.map((r) => ({ ...r, sinResolver: false })),
+  decisionAnalista: {
+    justificacion:
+      'El monto del crédito supera el máximo de la regla, pero el perfil es MEDIO y el comportamiento de pago es bueno: se acepta con un recargo del 15 %.',
+    analista: { id: 'c154347a-8c3e-4386-b5d0-6f21daef5e27', rol: 'ANALISTA_RIESGO' },
+    registradaEn: '2026-10-16T09:12:30Z',
+  },
+};
+
+/** Rechazada por el analista: sin prima final ni recargo. */
+export const RECHAZADA_POR_ANALISTA: RevisionSolicitud = {
+  ...AJUSTADA_POR_ANALISTA,
+  estado: 'RECHAZADA',
+  decision: {
+    ...AJUSTADA_POR_ANALISTA.decision!,
+    resultado: 'RECHAZADA',
+    continuaAEmision: false,
+    primaFinal: undefined,
+    recargoPorcentaje: undefined,
+  },
+  decisionAnalista: {
+    ...AJUSTADA_POR_ANALISTA.decisionAnalista!,
+    justificacion: 'El endeudamiento es alto para el monto pedido.',
+  },
+};

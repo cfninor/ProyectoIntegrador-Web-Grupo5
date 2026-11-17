@@ -7,11 +7,13 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 
 import {
+  AJUSTADA_POR_ANALISTA,
   CON_AVISOS,
   EN_REVISION,
   ILEGIBLE,
   PENDIENTE,
   PERFIL_NO_COINCIDE,
+  RECHAZADA_POR_ANALISTA,
   SIN_PERFIL,
   YA_DECIDIDA,
 } from '../../../testing/fixtures-revision';
@@ -337,5 +339,108 @@ describe('PaginaRevision · SOLVENTAG5-53', () => {
     const { http } = await renderizar('a/b');
 
     http.expectOne(`${BFF}/v1/solicitudes-suscripcion/a%2Fb/revision`).flush(EN_REVISION);
+  });
+});
+
+describe('PaginaRevision · decisión del analista (SOLVENTAG5-54)', () => {
+  const urlDecision = `${BFF}/v1/solicitudes-suscripcion/${EN_REVISION.solicitudId}/decision`;
+  const panel = () => screen.queryByRole('heading', { level: 2, name: 'Registrar decisión' });
+
+  async function ajustar(usuario: ReturnType<typeof userEvent.setup>) {
+    await usuario.click(screen.getByRole('radio', { name: 'Ajustar condiciones del riesgo' }));
+    await usuario.type(screen.getByLabelText('Recargo de prima (%)'), '15');
+    await usuario.type(screen.getByLabelText('Justificación (obligatoria)'), 'Con codeudor.');
+    await usuario.click(screen.getByRole('button', { name: 'Registrar decisión' }));
+  }
+
+  it('en revisión ofrece registrar la decisión', async () => {
+    await cargar(EN_REVISION);
+
+    expect(panel()).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Decisión del analista' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['decidida por la automática', YA_DECIDIDA],
+    ['pendiente', PENDIENTE],
+  ])('%s no ofrece registrar la decisión', async (_, revision) => {
+    await cargar(revision);
+
+    expect(panel()).not.toBeInTheDocument();
+  });
+
+  it('al registrarla muestra el detalle ya decidido con la decisión del analista', async () => {
+    const { http, usuario, vista } = await cargar(EN_REVISION);
+
+    await ajustar(usuario);
+    http.expectOne(urlDecision).flush(AJUSTADA_POR_ANALISTA);
+    await vista.fixture.whenStable();
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Registraste la decisión: la solicitud quedó Ajustada.',
+    );
+    expect(panel()).not.toBeInTheDocument();
+    expect(screen.queryByText(/Esta solicitud no está en revisión/)).not.toBeInTheDocument();
+    const tarjeta = within(
+      screen
+        .getByRole('heading', { level: 2, name: 'Decisión del analista' })
+        .closest('section') as HTMLElement,
+    );
+    expect(tarjeta.getByText('Ajustada')).toHaveClass('chip-verde-azulado');
+    expect(dato('Recargo')).toHaveTextContent('15 %');
+    expect(dato('Prima final')).toHaveTextContent('$ 266.685 / mes');
+    expect(dato('Decidida por')).toHaveTextContent('Analista de riesgo');
+    expect(dato('Decidida por')).toHaveTextContent('Usuario c154347a');
+    expect(dato('Registrada')).toHaveTextContent('16/10/2026');
+    expect(dato('Registrada')).toHaveTextContent('04:12');
+    expect(
+      tarjeta.getByText(AJUSTADA_POR_ANALISTA.decisionAnalista!.justificacion),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Motivo de la revisión')).toBeInTheDocument();
+    expect(screen.queryByText('Sin resolver')).not.toBeInTheDocument();
+  });
+
+  it('una solicitud que ya decidió un analista muestra su decisión, sin el panel', async () => {
+    await cargar(AJUSTADA_POR_ANALISTA);
+
+    expect(panel()).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Esta solicitud no está en revisión: su estado es Ajustada. No hay nada que revisar.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Decisión del analista' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('rechazada por el analista no muestra recargo ni prima final', async () => {
+    await cargar(RECHAZADA_POR_ANALISTA);
+
+    expect(screen.getByText('El endeudamiento es alto para el monto pedido.')).toBeInTheDocument();
+    expect(screen.queryByText('Recargo', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Prima final', { selector: 'dt' })).not.toBeInTheDocument();
+  });
+
+  it('si otra persona ya la decidió, «Ver la decisión» vuelve a pedir el detalle', async () => {
+    const { http, usuario, vista } = await cargar(EN_REVISION);
+
+    await ajustar(usuario);
+    http
+      .expectOne(urlDecision)
+      .flush({ codigo: 'SOLICITUD_NO_EN_REVISION' }, { status: 409, statusText: 'Conflict' });
+    await vista.fixture.whenStable();
+    await usuario.click(screen.getByRole('button', { name: 'Ver la decisión' }));
+    http.expectOne(urlRevision(EN_REVISION.solicitudId)).flush(RECHAZADA_POR_ANALISTA);
+    await vista.fixture.whenStable();
+
+    expect(panel()).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Decisión del analista' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Rechazada', { selector: '.chip' })).toHaveLength(2);
   });
 });

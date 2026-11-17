@@ -49,6 +49,10 @@ const CHIPS: Record<ResultadoSuscripcion, () => { clase: string; texto: string }
  * tarjeta avisa a la página (`aceptarPrima`), que llama al BFF y le pasa la solicitud nueva. El
  * asesor no la acepta por él: ve si ya la aceptó. «Continuar al pago» solo aparece con ACEPTADA, o
  * con AJUSTADA y la nueva prima aceptada, y lleva a SOLV-WEB-09 (SOLVENTAG5-74).
+ *
+ * Si la decidió un analista de riesgo (SOLVENTAG5-54, `decididaPor` ANALISTA), la tarjeta lo dice:
+ * el resultado y la prima son los suyos, y el motivo es el de la revisión. La justificación no
+ * llega aquí: es del analista.
  */
 @Component({
   selector: 'app-tarjeta-resultado',
@@ -87,6 +91,7 @@ export class TarjetaResultado {
       sinDecision,
       // decidida true sin decision: el registro no se pudo leer. El estado sigue siendo cierto.
       ilegible: !sinDecision && d === undefined,
+      porAnalista: d?.decididaPor === 'ANALISTA',
       noVerificable: !sinDecision && (d === undefined || s.registrosVerificables === false),
       chip: sinDecision ? null : CHIPS[s.estado as ResultadoSuscripcion](),
       reglas: reglas as readonly ReglaLegible[],
