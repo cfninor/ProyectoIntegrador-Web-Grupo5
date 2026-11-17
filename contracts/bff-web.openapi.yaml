@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solventa · BFF Web
-  version: 1.7.0
+  version: 1.9.0
   description: >
     Contrato de la API que consume el portal web (repo ProyectoIntegrador-Web-Grupo5).
     Se diseña antes que el código (contrato primero) y se versiona por URI (/v1).
@@ -75,7 +75,9 @@ tags:
       la tarjeta nunca llega a Solventa: la pasarela lo tokeniza en el frontend (ADR 0004 D8).
       Cada solicitud lleva su `Idempotency-Key` (SOLVENTAG5-121): repetirla nunca cobra dos
       veces. Si la pasarela no responde a tiempo, el pago queda `PROCESANDO`, nunca se aprueba
-      ni se rechaza a ciegas (R3, BA-02).
+      ni se rechaza a ciegas (R3, BA-02). Una póliza tiene a lo sumo un pago `APROBADO` o
+      `PROCESANDO` de la primera prima, aunque los intentos lleguen con claves distintas
+      (SOLVENTAG5-75); el canal consulta el cobro de la póliza con `obtenerCobroPoliza`.
   - name: firma
     description: >
       Firma electrónica de la póliza (SOLVENTAG5-57, Ley 527 de 1999). Se pide con el documento
@@ -1113,10 +1115,14 @@ paths:
         (SOLVENTAG5-74). El token lo entrega la pasarela de pagos al tokenizar la tarjeta en el
         frontend; el PAN nunca llega a Solventa (R1, ADR 0004 D8). Cada solicitud lleva su
         encabezado Idempotency-Key (SOLVENTAG5-121): repetirla devuelve la misma respuesta sin
-        cobrar dos veces. Si la póliza ya tiene un pago APROBADO de la primera prima, responde
-        200 con ese pago, no un error (D4): no admite dos cobros aprobados. Si la pasarela no
-        responde a tiempo, el pago queda PROCESANDO (R3, BA-02): nunca se aprueba ni se rechaza
-        a ciegas; el canal consulta obtenerPoliza o este mismo recurso hasta que cambie. Con la
+        cobrar dos veces. Una póliza admite a lo sumo un pago APROBADO o PROCESANDO de la
+        primera prima (SOLVENTAG5-75, D2): si ya tiene uno, aunque el intento llegue con otra
+        clave, responde 200 con ese pago, no un error (D4 de la 74), sin llamar a la pasarela.
+        Antes de decidirlo, un pago PROCESANDO se resuelve consultando a la pasarela por su
+        referencia; nunca se vuelve a cobrar para resolverlo. Si la pasarela no responde a
+        tiempo, el pago queda PROCESANDO (R3, BA-02): nunca se aprueba ni se rechaza a ciegas.
+        El canal sigue un pago PROCESANDO con obtenerCobroPoliza, no reenviando este POST: con
+        la misma clave, la respuesta guardada no cambia aunque el pago ya haya terminado. Con la
         sesión del cliente, una póliza que no es suya responde 404 POLIZA_NO_ENCONTRADA; igual
         con la del asesor si la solicitud de la póliza no está en su cartera.
       x-roles: [ASESOR, CLIENTE]
@@ -1131,7 +1137,10 @@ paths:
               $ref: '#/components/schemas/CobroPrima'
       responses:
         '200':
-          description: La póliza ya tenía un pago APROBADO de la primera prima; es el existente.
+          description: >
+            La póliza ya tenía un pago APROBADO o PROCESANDO de la primera prima; es el
+            existente y no se llamó a la pasarela. Si está PROCESANDO, el canal lo sigue con
+            obtenerCobroPoliza.
           content:
             application/json:
               schema:
@@ -1139,6 +1148,8 @@ paths:
               examples:
                 aprobado:
                   $ref: '#/components/examples/PagoAprobado'
+                procesando:
+                  $ref: '#/components/examples/PagoExistenteProcesando'
         '201':
           description: Intento de cobro nuevo, con el resultado de la pasarela.
           content:
@@ -1162,6 +1173,51 @@ paths:
           $ref: '#/components/responses/PolizaNoPagableOClaveEnCurso'
         '422':
           $ref: '#/components/responses/ValidacionOClaveReutilizada'
+        '503':
+          $ref: '#/components/responses/NucleoNoDisponible'
+    get:
+      tags: [pagos]
+      operationId: obtenerCobroPoliza
+      summary: Consultar el cobro de la primera prima de una póliza
+      description: >
+        Devuelve el pago vigente de la primera prima de la póliza y la lista de sus intentos
+        (SOLVENTAG5-75, D6). El pago vigente es el APROBADO o PROCESANDO, si lo hay; si no, el
+        intento más reciente. Los intentos van del más antiguo al más reciente. Antes de
+        responder, un pago PROCESANDO se resuelve consultando a la pasarela por su referencia
+        (R4): toma APROBADO o RECHAZADO si la pasarela ya decidió, pasa a RECHAZADO si la
+        pasarela nunca recibió el cobro, y sigue PROCESANDO si la pasarela todavía no decide o
+        no responde. Nunca se vuelve a cobrar para resolverlo. No mueve dinero, por eso no lleva
+        Idempotency-Key. El canal la usa al entrar a la pantalla de pago y para seguir un pago
+        PROCESANDO, en vez de reenviar cobrarPrimaPoliza. Responde para la póliza en cualquier
+        estado: en una póliza CANCELADA porque la firma venció, el pago puede venir REVERSADO
+        (SOLVENTAG5-57, CA5), y cobrarPrimaPoliza responde 409 POLIZA_NO_PAGABLE. Una póliza
+        sin intentos de cobro responde 404 COBRO_NO_ENCONTRADO, y el canal muestra el
+        formulario de pago. Con la sesión del cliente, una póliza que no es suya responde 404
+        POLIZA_NO_ENCONTRADA; igual con la del asesor si la solicitud de la póliza no está en su
+        cartera.
+      x-roles: [ASESOR, CLIENTE]
+      parameters:
+        - $ref: '#/components/parameters/PolizaId'
+      responses:
+        '200':
+          description: Pago vigente de la póliza y sus intentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CobroPoliza'
+              examples:
+                aprobado:
+                  $ref: '#/components/examples/CobroPolizaAprobado'
+                procesando:
+                  $ref: '#/components/examples/CobroPolizaProcesando'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/PolizaOCobroNoEncontrado'
+        '422':
+          $ref: '#/components/responses/Validacion'
         '503':
           $ref: '#/components/responses/NucleoNoDisponible'
   /v1/polizas/{polizaId}/firma:
@@ -1950,9 +2006,9 @@ components:
     PolizaNoPagableOClaveEnCurso:
       description: >
         La póliza no admite un cobro porque no está PENDIENTE_FIRMA (POLIZA_NO_PAGABLE; si ya
-        tiene un pago APROBADO de la primera prima, en cambio, se responde 200 con ese pago, no
-        un error, D4), o ya hay una solicitud en curso con la misma clave de idempotencia
-        (CLAVE_IDEMPOTENCIA_EN_CURSO, SOLVENTAG5-121).
+        tiene un pago APROBADO o PROCESANDO de la primera prima, en cambio, se responde 200 con
+        ese pago, no un error, D4 de la 74 y D2 de la 75), o ya hay una solicitud en curso con
+        la misma clave de idempotencia (CLAVE_IDEMPOTENCIA_EN_CURSO, SOLVENTAG5-121).
       content:
         application/json:
           schema:
@@ -2053,6 +2109,30 @@ components:
               value:
                 codigo: FIRMA_NO_ENCONTRADA
                 detalle: La póliza todavía no tiene una firma.
+    PolizaOCobroNoEncontrado:
+      description: >
+        La póliza no existe o es ajena (POLIZA_NO_ENCONTRADA: el cliente no es su titular o el
+        asesor no tiene la solicitud de la póliza en su cartera), o la póliza todavía no tiene
+        intentos de cobro (COBRO_NO_ENCONTRADO), y el canal muestra el formulario de pago.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - properties:
+                  codigo:
+                    enum: [POLIZA_NO_ENCONTRADA, COBRO_NO_ENCONTRADO]
+          examples:
+            polizaNoEncontrada:
+              summary: La póliza no existe o es ajena
+              value:
+                codigo: POLIZA_NO_ENCONTRADA
+                detalle: No encontramos la póliza.
+            cobroNoEncontrado:
+              summary: La póliza todavía no tiene intentos de cobro
+              value:
+                codigo: COBRO_NO_ENCONTRADO
+                detalle: La póliza todavía no tiene intentos de cobro.
     FirmaNoEncontrada:
       description: >
         No hay una firma con ese id. Desde el enlace público no se distingue entre un id que
@@ -3301,6 +3381,13 @@ components:
           $ref: '#/components/schemas/ProximoCobro'
         documentos:
           $ref: '#/components/schemas/DocumentosPoliza'
+        beneficiario:
+          type: string
+          description: >
+            El beneficiario de la póliza (SOLVENTAG5-104): en VIDA_HIPOTECARIO, la entidad
+            acreedora del crédito, hasta el saldo de la deuda. Sale de los datos del bien de la
+            solicitud; no está en el PDF de la póliza, cuya huella no cambia.
+          examples: [Banco de Ejemplo]
     MedioPago:
       type: string
       description: Único medio soportado por ahora (D2 de SOLVENTAG5-74).
@@ -3310,8 +3397,11 @@ components:
       description: >
         PROCESANDO mientras la pasarela no responde a tiempo (R3); pasa a APROBADO o
         RECHAZADO cuando responde. Desde RECHAZADO, un intento nuevo usa otra Idempotency-Key
-        (no reabre el mismo pago).
-      enum: [PROCESANDO, APROBADO, RECHAZADO]
+        (no reabre el mismo pago). REVERSADO es un APROBADO que se devolvió cuando la firma
+        venció a las 72 horas (SOLVENTAG5-57, CA5). Solo lo devuelve obtenerCobroPoliza, en una
+        póliza CANCELADA; cobrarPrimaPoliza nunca, porque esa póliza responde 409
+        POLIZA_NO_PAGABLE.
+      enum: [PROCESANDO, APROBADO, RECHAZADO, REVERSADO]
     CobroPrima:
       type: object
       description: Cuerpo para cobrar la prima de una póliza PENDIENTE_FIRMA (SOLVENTAG5-74).
@@ -3329,8 +3419,10 @@ components:
       type: object
       description: >
         Intento de cobro de la primera prima de una póliza (SOLVENTAG5-74). referenciaPasarela,
-        marca, ultimos4 y vencimiento solo vienen cuando la pasarela ya respondió (APROBADO o
-        RECHAZADO); en PROCESANDO todavía no hay respuesta que guardar.
+        marca, ultimos4 y vencimiento vienen cuando la pasarela decidió el cobro (APROBADO o
+        RECHAZADO) y en REVERSADO, que antes fue APROBADO. Un RECHAZADO porque la pasarela nunca
+        recibió el cobro (SOLVENTAG5-75, R4) no los trae, y en PROCESANDO todavía no hay
+        respuesta que guardar.
       required: [pagoId, polizaId, estado, monto, moneda, medio, creadoEn]
       properties:
         pagoId:
@@ -3371,6 +3463,41 @@ components:
           type: string
           format: date-time
           description: Cuándo cambió de PROCESANDO a su estado final.
+    CobroPoliza:
+      type: object
+      description: >
+        Cobro de la primera prima de una póliza (SOLVENTAG5-75, D6). pago es el pago vigente
+        (APROBADO o PROCESANDO, ya consultado a la pasarela) o, si no hay, el intento más
+        reciente. intentos lista todos los intentos de la póliza, del más antiguo al más
+        reciente.
+      required: [pago, intentos]
+      properties:
+        pago:
+          $ref: '#/components/schemas/Pago'
+        intentos:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/IntentoCobro'
+    IntentoCobro:
+      type: object
+      description: >
+        Un intento de cobro de la primera prima de la póliza (SOLVENTAG5-75). Sin token, usuario
+        ni datos de la tarjeta.
+      required: [pagoId, estado, canal, creadoEn]
+      properties:
+        pagoId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoPago'
+        canal:
+          type: string
+          description: Canal por el que llegó el intento.
+          enum: [web, movil]
+        creadoEn:
+          type: string
+          format: date-time
     EstadoFirma:
       type: string
       description: >
@@ -3817,9 +3944,10 @@ components:
             DOCUMENTO_EN_GENERACION, CLAVE_IDEMPOTENCIA_EN_CURSO,
             CLAVE_IDEMPOTENCIA_REUTILIZADA, POLIZA_NO_PAGABLE, PAGO_NO_APROBADO,
             CLIENTE_SIN_CONTACTO, FIRMA_NO_ENCONTRADA, FIRMA_NO_REENVIABLE, ENLACE_VENCIDO,
-            CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO, CODIGO_INVALIDO y
-            POLIZA_NO_EMITIBLE. CODIGO_INVALIDO lleva además intentosRestantes (respuesta
-            FirmaRechazada) y POLIZA_NO_EMITIBLE, motivo (respuesta PolizaNoEmitible).
+            CODIGO_USADO, CODIGO_VENCIDO, DOCUMENTO_ALTERADO, CODIGO_INVALIDO,
+            POLIZA_NO_EMITIBLE y COBRO_NO_ENCONTRADO. CODIGO_INVALIDO lleva además
+            intentosRestantes (respuesta FirmaRechazada) y POLIZA_NO_EMITIBLE, motivo (respuesta
+            PolizaNoEmitible).
         detalle:
           type: string
           description: Explicación legible; no la muestres tal cual en la interfaz.
@@ -5133,6 +5261,58 @@ components:
         moneda: COP
         medio: TARJETA
         creadoEn: '2026-11-06T15:10:00.000Z'
+    PagoExistenteProcesando:
+      summary: >-
+        La póliza ya tenía un pago PROCESANDO de otro intento: se devuelve ese pago, sin cobrar
+      value:
+        pagoId: 5a7c9e1b-3d5f-4a7c-9e1b-3d5f7a9c1e3d
+        polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+        estado: PROCESANDO
+        monto: 70000
+        moneda: COP
+        medio: TARJETA
+        creadoEn: '2026-11-06T15:10:00.000Z'
+    CobroPolizaAprobado:
+      summary: Un intento rechazado y luego uno aprobado con otra tarjeta
+      value:
+        pago:
+          pagoId: 1f3a5c7e-9b1d-4e3f-8a5c-7e9b1d3f5a7c
+          polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+          estado: APROBADO
+          referenciaPasarela: pasarela-sim-00f4c8a2
+          marca: VISA
+          ultimos4: '4242'
+          vencimiento: '09/28'
+          monto: 70000
+          moneda: COP
+          medio: TARJETA
+          creadoEn: '2026-11-06T15:06:00.000Z'
+          actualizadoEn: '2026-11-06T15:06:01.200Z'
+        intentos:
+          - pagoId: 3c5e7a9b-1d3f-4e5a-9c7e-1b3d5f7a9c1e
+            estado: RECHAZADO
+            canal: web
+            creadoEn: '2026-11-06T15:05:00.000Z'
+          - pagoId: 1f3a5c7e-9b1d-4e3f-8a5c-7e9b1d3f5a7c
+            estado: APROBADO
+            canal: web
+            creadoEn: '2026-11-06T15:06:00.000Z'
+    CobroPolizaProcesando:
+      summary: La pasarela todavía no decide el cobro; el canal vuelve a consultar
+      value:
+        pago:
+          pagoId: 5a7c9e1b-3d5f-4a7c-9e1b-3d5f7a9c1e3d
+          polizaId: 2b4d6f8a-3c5e-4a7b-9d1f-4e6a8c0b2d4f
+          estado: PROCESANDO
+          monto: 70000
+          moneda: COP
+          medio: TARJETA
+          creadoEn: '2026-11-06T15:10:00.000Z'
+        intentos:
+          - pagoId: 5a7c9e1b-3d5f-4a7c-9e1b-3d5f7a9c1e3d
+            estado: PROCESANDO
+            canal: movil
+            creadoEn: '2026-11-06T15:10:00.000Z'
     FirmaPendienteEnvio:
       summary: Firma pedida; el envío del enlace todavía no sale («Esperando firma»)
       value:
