@@ -417,6 +417,18 @@ describe('PaginaRevision · decisión del analista (SOLVENTAG5-54)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('la tarjeta del analista separa sus datos como las demás tarjetas', async () => {
+    await cargar(AJUSTADA_POR_ANALISTA);
+
+    const tarjeta = screen
+      .getByRole('heading', { level: 2, name: 'Decisión del analista' })
+      .closest('section') as HTMLElement;
+    // `.lateral` (display: block) es solo para el panel: en la tarjeta anula el flex con gap de
+    // `.analista` y deja pegados el título, los datos y la justificación.
+    expect(tarjeta).toHaveClass('tarjeta', 'analista');
+    expect(tarjeta).not.toHaveClass('lateral');
+  });
+
   it('rechazada por el analista no muestra recargo ni prima final', async () => {
     await cargar(RECHAZADA_POR_ANALISTA);
 
