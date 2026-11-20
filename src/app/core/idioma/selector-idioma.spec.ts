@@ -34,8 +34,8 @@ describe('SelectorIdioma', () => {
 
     const grupo = screen.getByRole('group', { name: 'Idioma' });
     expect(grupo).toBeInTheDocument();
-    const espanol = screen.getByRole('button', { name: 'Español' });
-    const ingles = screen.getByRole('button', { name: 'English' });
+    const espanol = screen.getByRole('button', { name: 'ES (Español)' });
+    const ingles = screen.getByRole('button', { name: 'EN (English)' });
     expect(espanol).toHaveTextContent('ES');
     expect(ingles).toHaveTextContent('EN');
     expect(espanol).toHaveAttribute('aria-pressed', 'true');
@@ -48,8 +48,11 @@ describe('SelectorIdioma', () => {
   it('con el portal en inglés, EN es el activo', async () => {
     await renderizar('en-US');
 
-    expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Español' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'EN (English)' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'ES (Español)' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
@@ -58,13 +61,16 @@ describe('SelectorIdioma', () => {
   it('con un LOCALE_ID que el portal no maneja, el activo es el español', async () => {
     await renderizar('fr-FR');
 
-    expect(screen.getByRole('button', { name: 'Español' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'ES (Español)' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('elegir el otro idioma guarda la preferencia y recarga la página', async () => {
     const { recargar, guardado, usuario } = await renderizar('es-CO');
 
-    await usuario.click(screen.getByRole('button', { name: 'English' }));
+    await usuario.click(screen.getByRole('button', { name: 'EN (English)' }));
 
     expect(guardado[CLAVE_PREFERENCIA]).toBe('en-US');
     expect(recargar).toHaveBeenCalledTimes(1);
@@ -73,7 +79,7 @@ describe('SelectorIdioma', () => {
   it('elegir el idioma activo no hace nada', async () => {
     const { recargar, guardado, usuario } = await renderizar('en-US');
 
-    await usuario.click(screen.getByRole('button', { name: 'English' }));
+    await usuario.click(screen.getByRole('button', { name: 'EN (English)' }));
 
     expect(guardado).toEqual({});
     expect(recargar).not.toHaveBeenCalled();
@@ -82,7 +88,7 @@ describe('SelectorIdioma', () => {
   it('sin localStorage no recarga: volvería al mismo idioma', async () => {
     const { recargar, usuario } = await renderizar('es-CO', false);
 
-    await usuario.click(screen.getByRole('button', { name: 'English' }));
+    await usuario.click(screen.getByRole('button', { name: 'EN (English)' }));
 
     expect(recargar).not.toHaveBeenCalled();
   });

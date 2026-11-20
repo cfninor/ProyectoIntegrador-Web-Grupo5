@@ -54,11 +54,11 @@ describe('Base del portal · en inglés', () => {
     const vista = await navegar('/', 'CLIENTE');
 
     const selector = within(vista.getByRole('group', { name: 'Language' }));
-    expect(selector.getByRole('button', { name: 'English' })).toHaveAttribute(
+    expect(selector.getByRole('button', { name: 'EN (English)' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(selector.getByRole('button', { name: 'Español' })).toHaveAttribute(
+    expect(selector.getByRole('button', { name: 'ES (Español)' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );

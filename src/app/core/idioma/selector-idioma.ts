@@ -35,10 +35,20 @@ interface OpcionIdioma {
   idioma: Idioma;
   /** Código corto visible: ES o EN. */
   corto: string;
-  /** Nombre del idioma en ese mismo idioma, para el lector de pantalla. */
+  /** Nombre del idioma en ese mismo idioma, que completa el nombre accesible. */
   nombre: string;
+  /**
+   * Nombre accesible del botón: el código visible y el nombre del idioma, «ES (Español)». Debe
+   * contener el texto visible para que quien usa control por voz pueda decir «ES» (WCAG 2.5.3).
+   */
+  etiqueta: string;
   /** `lang` del botón, para que el lector de pantalla pronuncie bien el nombre. */
   lang: string;
+}
+
+/** Una opción del selector, con su nombre accesible «código (nombre)». */
+function opcionIdioma(idioma: Idioma, corto: string, nombre: string, lang: string): OpcionIdioma {
+  return { idioma, corto, nombre, etiqueta: `${corto} (${nombre})`, lang };
 }
 
 /**
@@ -90,7 +100,7 @@ interface OpcionIdioma {
           class="opcion"
           [class.activa]="opcion.idioma === activo"
           [attr.aria-pressed]="opcion.idioma === activo"
-          [attr.aria-label]="opcion.nombre"
+          [attr.aria-label]="opcion.etiqueta"
           [attr.lang]="opcion.lang"
           (click)="elegir(opcion.idioma)"
         >
@@ -108,18 +118,18 @@ export class SelectorIdioma {
   protected readonly activo: Idioma = esIdioma(this.locale) ? this.locale : IDIOMA_FUENTE;
 
   protected readonly opciones: readonly OpcionIdioma[] = [
-    {
-      idioma: 'es-CO',
-      corto: $localize`:@@idioma.es.corto:ES`,
-      nombre: $localize`:@@idioma.es.nombre:Español`,
-      lang: 'es',
-    },
-    {
-      idioma: 'en-US',
-      corto: $localize`:@@idioma.en.corto:EN`,
-      nombre: $localize`:@@idioma.en.nombre:English`,
-      lang: 'en',
-    },
+    opcionIdioma(
+      'es-CO',
+      $localize`:@@idioma.es.corto:ES`,
+      $localize`:@@idioma.es.nombre:Español`,
+      'es',
+    ),
+    opcionIdioma(
+      'en-US',
+      $localize`:@@idioma.en.corto:EN`,
+      $localize`:@@idioma.en.nombre:English`,
+      'en',
+    ),
   ];
 
   protected elegir(idioma: Idioma): void {
