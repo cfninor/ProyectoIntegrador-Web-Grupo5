@@ -571,7 +571,7 @@
     "bandeja.tabla.acciones": "Actions",
     "bandeja.sinVerificar": "Unverified record",
     "bandeja.sinCliente": "No identified customer",
-    "bandeja.verPerfil.etiqueta": "View the risk profile of application {$codigo}",
+    "bandeja.verPerfil.etiqueta": "View profile of application {$codigo}",
     "bandeja.verPerfil": "View profile",
     "bandeja.revisar.etiqueta": "Review application {$codigo}",
     "bandeja.revisar": "Review",
