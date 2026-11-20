@@ -93,11 +93,11 @@ describe('LayoutPortal', () => {
 
     const selector = vista.getByRole('group', { name: 'Idioma' });
     expect(pagina.querySelector('header .acciones')).toContainElement(selector);
-    expect(within(selector).getByRole('button', { name: 'Español' })).toHaveAttribute(
+    expect(within(selector).getByRole('button', { name: 'ES (Español)' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(within(selector).getByRole('button', { name: 'English' })).toHaveAttribute(
+    expect(within(selector).getByRole('button', { name: 'EN (English)' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );

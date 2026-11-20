@@ -624,7 +624,7 @@
     "bandeja.aviso": " Una solicitud de esta bandeja no avanza a cobro ni a emisión hasta que se registre una decisión. ",
     "bandeja.motivo.regla": "{$nombre}: {$valor} (límite: {$limite})",
     "bandeja.motivo.ilegible": "No pudimos leer el motivo en el registro de la decisión.",
-    "bandeja.verPerfil.etiqueta": "Ver el perfil de riesgo de la solicitud {$codigo}",
+    "bandeja.verPerfil.etiqueta": "Ver perfil de riesgo de la solicitud {$codigo}",
     "bandeja.revisar.etiqueta": "Revisar la solicitud {$codigo}",
     "perfilRiesgo.consulta.titulo": " Consultar el perfil de una solicitud ",
     "perfilRiesgo.consulta.texto": " Es el mismo perfil de riesgo con que se calculó la cotización que el cliente aceptó. No se recalcula. ",

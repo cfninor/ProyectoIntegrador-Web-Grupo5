@@ -142,7 +142,7 @@ describe('PaginaBandeja · SOLVENTAG5-52', () => {
     await cargar(BANDEJA);
 
     expect(
-      screen.getByRole('link', { name: 'Ver el perfil de riesgo de la solicitud 4c6e8a0b' }),
+      screen.getByRole('link', { name: 'Ver perfil de riesgo de la solicitud 4c6e8a0b' }),
     ).toHaveAttribute('href', `/riesgo/perfil-riesgo/${MONTO_ALTO.solicitudId}`);
   });
 

@@ -146,9 +146,7 @@ test('«Ver perfil» abre el perfil de riesgo de la solicitud', async ({ page })
   );
 
   await page.goto('/riesgo/bandeja');
-  await page
-    .getByRole('link', { name: 'Ver el perfil de riesgo de la solicitud 4c6e8a0b' })
-    .click();
+  await page.getByRole('link', { name: 'Ver perfil de riesgo de la solicitud 4c6e8a0b' }).click();
 
   await expect(page).toHaveURL(`/riesgo/perfil-riesgo/${MONTO_ALTO.solicitudId}`);
 });

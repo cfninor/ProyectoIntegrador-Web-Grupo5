@@ -44,7 +44,10 @@ interface FilaBandeja {
   recibidaFecha: string;
   recibidaHora: string;
   rutaPerfil: string;
-  /** El nombre accesible de «Ver perfil», con el código de la solicitud. */
+  /**
+   * El nombre accesible de «Ver perfil», con el código de la solicitud. Empieza por el texto visible
+   * para que quien usa control por voz pueda decir «Ver perfil» (WCAG 2.5.3).
+   */
   etiquetaPerfil: string;
   /** El detalle de revisión de la solicitud (SOLVENTAG5-53). */
   rutaRevision: string;
@@ -89,7 +92,7 @@ function fila(s: SolicitudEnRevision, idioma: Idioma): FilaBandeja {
     recibidaFecha: fechaBogota(s.enRevisionDesde, idioma),
     recibidaHora: horaBogota(s.enRevisionDesde, idioma),
     rutaPerfil: `${RUTA_PERFIL_RIESGO}/${s.solicitudId}`,
-    etiquetaPerfil: $localize`:@@bandeja.verPerfil.etiqueta:Ver el perfil de riesgo de la solicitud ${codigo}:codigo:`,
+    etiquetaPerfil: $localize`:@@bandeja.verPerfil.etiqueta:Ver perfil de riesgo de la solicitud ${codigo}:codigo:`,
     rutaRevision: `${RUTA_REVISION}/${s.solicitudId}`,
     etiquetaRevision: $localize`:@@bandeja.revisar.etiqueta:Revisar la solicitud ${codigo}:codigo:`,
   };
